@@ -48,7 +48,8 @@ func (d *DB) ActivateTestForm(ctx context.Context, id, mode, sender string) (str
 	var raw []byte
 	var eventID, lead *string
 	var expires time.Time
-	err = tx.QueryRow(ctx, `SELECT profile,contact_event_id,claimed_by,expires_at FROM bia_go.test_forms WHERE id=$1 FOR UPDATE`, id).Scan(&raw, &eventID, &lead, &expires)
+	var slotID string
+	err = tx.QueryRow(ctx, `SELECT profile,contact_event_id,claimed_by,expires_at,selected_slot_id FROM bia_go.test_forms WHERE id=$1 FOR UPDATE`, id).Scan(&raw, &eventID, &lead, &expires, &slotID)
 	if err != nil {
 		return "", err
 	}
@@ -101,6 +102,14 @@ func (d *DB) ActivateTestForm(ctx context.Context, id, mode, sender string) (str
 	}
 	if ct.RowsAffected() != 1 {
 		return "", ErrConflict
+	}
+	if slotID != "" {
+		if mode != "live" {
+			return "", &FormBookingError{Code: "live_calendar_required"}
+		}
+		if _, _, err = reserveFormSlot(ctx, tx, "form-booking:"+id, leadID, slotID, f, mode); err != nil {
+			return "", err
+		}
 	}
 	if _, err = tx.Exec(ctx, `UPDATE bia_go.test_forms SET contact_event_id=$2,claimed_by=$3,claimed_at=now() WHERE id=$1`, id, ev.ID, leadID); err != nil {
 		return "", err

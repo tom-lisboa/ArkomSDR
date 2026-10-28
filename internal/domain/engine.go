@@ -349,6 +349,13 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 }
 
 func offer(s *State, r *Result, e Event, slots []Slot, p Policy, now time.Time) {
+	if s.Booking != nil && s.Booking.Outcome == "" && s.Booking.Start.After(now) && !RescheduleRequested(e.Text) && !(s.Stage == "choosing_slot" && len(s.Offered) > 0) {
+		s.Offered = nil
+		s.OfferVersion = ""
+		s.Stage = "booked"
+		r.Effects = append(r.Effects, Effect{ID: e.ID + ":existing-booking", LeadID: s.ID, Kind: "send", Purpose: "reply", Text: bookingText(*s.Booking, p, *s), Due: now, Expires: now.Add(30 * time.Minute), BookingID: s.Booking.ID, BookingStart: s.Booking.Start})
+		return
+	}
 	available := append([]Slot(nil), slots...)
 	sort.SliceStable(available, func(i, j int) bool { return available[i].Start.Before(available[j].Start) })
 	// Prefer the model's requested IDs only if every ID is in the fresh calendar.

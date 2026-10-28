@@ -111,10 +111,15 @@ func textContext(s domain.State, e domain.Event, slots []domain.Slot, scheduling
 	if e.CalendarUnavailable {
 		status = "unavailable"
 	}
+	meetingStatus := "not_scheduled"
+	if s.Booking != nil && s.Booking.Outcome == "" && s.Booking.Start.After(now) {
+		meetingStatus = "upcoming"
+	}
 	return map[string]any{
-		"customer": domain.CustomerContext(s, s.Booking, p),
-		"profile":  map[string]any{"company": s.Profile.Company, "name": s.Profile.Name, "goal": s.Profile.Goal, "revenue": s.Profile.Revenue, "timezone": zone.String()},
-		"history":  history, "booking": s.Booking, "offered": labels(s.Offered), "available_slots": labels(slots),
+		"meeting_status": meetingStatus,
+		"customer":       domain.CustomerContext(s, s.Booking, p),
+		"profile":        map[string]any{"company": s.Profile.Company, "name": s.Profile.Name, "goal": s.Profile.Goal, "revenue": s.Profile.Revenue, "timezone": zone.String()},
+		"history":        history, "booking": s.Booking, "offered": labels(s.Offered), "available_slots": labels(slots),
 		"calendar":              map[string]any{"status": status, "timezone": zone.String()},
 		"conversation_progress": map[string]any{"previous_user_turns": turns, "goal_already_in_form": strings.TrimSpace(s.Profile.Goal) != "", "stage": s.Stage},
 		"current_message":       e.Text, "scheduling_url": schedulingURL, "now": now.In(zone),

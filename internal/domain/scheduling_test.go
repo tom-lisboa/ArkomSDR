@@ -100,3 +100,20 @@ func TestLocalBookingCanConfirmWithoutMeetingLink(t *testing.T) {
 		t.Fatal("missing link accepted for external provider")
 	}
 }
+
+func TestExistingBookingStopsUnsolicitedOffers(t *testing.T) {
+	now := time.Now()
+	b := &Booking{ID: "web-booking", Provider: "local", CloserID: 1, Start: now.Add(48 * time.Hour), End: now.Add(48*time.Hour + 45*time.Minute)}
+	s := State{ID: "lead", Owner: "go", Stage: "booked", Profile: Form{Name: "Ana", Consent: true}, Booking: b}
+	slots := []Slot{{ID: "other", Provider: "local", CloserID: 1, Start: now.Add(72 * time.Hour), End: now.Add(72*time.Hour + 45*time.Minute)}}
+	for _, text := range []string{"Claro", "Sim", "Quero vender mais", "Quanto custa?"} {
+		r := Reduce(s, Event{ID: "inbound", LeadID: s.ID, Kind: "message.received", At: now, Text: text}, Decision{Action: "offer_slots"}, slots, Policy{TimeZone: "America/Cuiaba"}, now)
+		if len(r.State.Offered) != 0 || r.State.Stage != "booked" || len(r.Effects) != 1 || r.Effects[0].BookingID != b.ID {
+			t.Fatalf("lost reservation for %q: %+v", text, r)
+		}
+	}
+	r := Reduce(s, Event{ID: "change", LeadID: s.ID, Kind: "message.received", At: now, Text: "Quero remarcar minha reunião"}, Decision{Action: "offer_slots"}, slots, Policy{TimeZone: "America/Cuiaba", DisableFollowups: true}, now)
+	if len(r.State.Offered) != 1 {
+		t.Fatal("explicit reschedule blocked", r)
+	}
+}

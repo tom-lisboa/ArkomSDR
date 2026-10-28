@@ -16,7 +16,7 @@ import (
 var ErrTestFormLimit = errors.New("test_form_rate_limit")
 var formCodePattern = regexp.MustCompile(`\bARKOM-([a-f0-9]{32})\b`)
 
-func (d *DB) RegisterTestForm(ctx context.Context, id string, f domain.Form) (code string, duplicate bool, err error) {
+func (d *DB) RegisterTestForm(ctx context.Context, id string, f domain.Form, selectedSlot ...string) (code string, duplicate bool, err error) {
 	tx, e := d.Pool.Begin(ctx)
 	if e != nil {
 		return "", false, e
@@ -25,8 +25,15 @@ func (d *DB) RegisterTestForm(ctx context.Context, id string, f domain.Form) (co
 	if _, e = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('bia:test-form-limit',0))`); e != nil {
 		return "", false, e
 	}
+	slotID := ""
+	if len(selectedSlot) > 0 {
+		slotID = selectedSlot[0]
+	}
 	raw, _ := json.Marshal(f)
 	fp := hash(raw)
+	if slotID != "" {
+		fp = hash(append(append([]byte{}, raw...), []byte("\nslot:"+slotID)...))
+	}
 	var old string
 	e = tx.QueryRow(ctx, `SELECT code,fingerprint FROM bia_go.test_forms WHERE id=$1`, id).Scan(&code, &old)
 	if e == nil {
@@ -46,7 +53,7 @@ func (d *DB) RegisterTestForm(ctx context.Context, id string, f domain.Form) (co
 		return "", false, ErrTestFormLimit
 	}
 	code = token()
-	_, e = tx.Exec(ctx, `INSERT INTO bia_go.test_forms(id,code,phone,profile,fingerprint) VALUES($1,$2,$3,$4,$5)`, id, code, testPhoneKey(f.Phone), raw, fp)
+	_, e = tx.Exec(ctx, `INSERT INTO bia_go.test_forms(id,code,phone,profile,fingerprint,selected_slot_id) VALUES($1,$2,$3,$4,$5,$6)`, id, code, testPhoneKey(f.Phone), raw, fp, slotID)
 	if e != nil {
 		return "", false, e
 	}

@@ -75,3 +75,16 @@ func TestIncompleteModelBookingAsksForChoice(t *testing.T) {
 		t.Fatal(d, err)
 	}
 }
+
+func TestCurrentBookingOverridesOldConversationInContext(t *testing.T) {
+	now := time.Now()
+	s := domain.State{Booking: &domain.Booking{Start: now.Add(time.Hour)}, History: []domain.Turn{{Role: "assistant", Text: "Quer agendar?"}}}
+	c := textContext(s, domain.Event{Text: "Sim"}, nil, "", now)
+	if c["meeting_status"] != "upcoming" {
+		t.Fatal(c)
+	}
+	s.Booking = nil
+	if c = textContext(s, domain.Event{}, nil, "", now); c["meeting_status"] != "not_scheduled" {
+		t.Fatal(c)
+	}
+}

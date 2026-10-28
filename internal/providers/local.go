@@ -79,6 +79,18 @@ func (c *LocalCalendar) Book(ctx context.Context, key string, s domain.State, sl
 		return b, e
 	}
 	defer tx.Rollback(ctx)
+	b, e = BookLocalTx(ctx, tx, key, s, slot, old)
+	if e != nil {
+		return b, e
+	}
+	return b, tx.Commit(ctx)
+}
+
+// BookLocalTx lets the form atomically reserve and enqueue the booking event.
+// The caller owns commit/rollback; all calendar locking rules remain shared.
+func BookLocalTx(ctx context.Context, tx pgx.Tx, key string, s domain.State, slot domain.Slot, old *domain.Booking) (domain.Booking, error) {
+	var b domain.Booking
+	var e error
 	// Serialize all bookings for this identity, including different slots.
 	_, e = tx.Exec(ctx, `SELECT id FROM bia_go.leads WHERE id=$1 FOR UPDATE`, s.ID)
 	if e != nil {
@@ -144,7 +156,7 @@ func (c *LocalCalendar) Book(ctx context.Context, key string, s domain.State, sl
 	if e != nil {
 		return b, e
 	}
-	return b, tx.Commit(ctx)
+	return b, nil
 }
 func (c *LocalCalendar) Cancel(ctx context.Context, key string, b domain.Booking) error {
 	if b.Provider != "local" || b.Group {

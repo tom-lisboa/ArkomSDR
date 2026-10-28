@@ -124,3 +124,14 @@ func selectedOffer(text string, offered []Slot, zone *time.Location, now time.Ti
 	}
 	return selected, selected != ""
 }
+
+// Only an expressed wish to change the meeting opens a new availability offer.
+func RescheduleRequested(text string) bool {
+	t := normalizedChoice(text)
+	for _, phrase := range []string{"remarc", "reagend", "outro horario", "outros horarios", "outra data", "outro dia", "mudar o horario", "mudar a reuniao", "trocar o horario", "trocar a reuniao", "nao posso nesse", "nao posso neste", "nao consigo nesse", "nao consigo neste"} {
+		if strings.Contains(t, phrase) {
+			return true
+		}
+	}
+	return false
+}

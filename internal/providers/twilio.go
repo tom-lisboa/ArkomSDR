@@ -104,6 +104,9 @@ func (t *TwilioMessaging) Send(ctx context.Context, key string, s domain.State, 
 		}
 		return t.send(ctx, key, s, text, url.Values{"ContentSid": {t.FormContentSID}}, now)
 	}
+	if purpose == "booking_confirmation" && !messageWindowOpen(s, now) {
+		return Receipt{}, &Deferred{Code: "booking_confirmation_awaiting_whatsapp", After: time.Minute}
+	}
 	return t.send(ctx, key, s, text, url.Values{"Body": {text}}, now)
 }
 

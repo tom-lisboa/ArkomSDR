@@ -112,3 +112,7 @@ O worker consulta a aprovação pela API antes de cada envio fora da janela. Enq
 Códigos: 400 JSON inválido/campos desconhecidos; 404 chave incorreta; 409 UUID em conflito ou submissão expirada; 422 dados/consentimento inválidos; 429 limite; 503 indisponível. O administrador pode consultar `GET /v1/jobs/{event_id}` e o job `fx/{event_id}:0` na API privada autenticada.
 
 Referências: [janela e templates](https://www.twilio.com/docs/whatsapp/key-concepts) e [Content API da Twilio](https://www.twilio.com/docs/content/content-api-resources).
+
+## Agendamento pelo formulário
+
+O formulário aceita `slot_id` opcional para reservar antes do contato automático. Consulte `GET {WEBHOOK}/availability` e envie o ID escolhido na submissão; para submissões já concluídas, use `POST {WEBHOOK}/bookings`. Contrato completo e exemplos em [Agenda no formulário](form-calendar.md).

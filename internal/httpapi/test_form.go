@@ -33,6 +33,7 @@ func (s *Server) testForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var input struct {
+		SlotID     string `json:"slot_id,omitempty"`
 		Name       string `json:"name"`
 		Company    string `json:"company"`
 		Phone      string `json:"phone"`
@@ -73,7 +74,17 @@ func (s *Server) testForm(w http.ResponseWriter, r *http.Request) {
 		write(w, 422, map[string]string{"error": e.Error()})
 		return
 	}
-	code, duplicate, e := s.DB.RegisterTestForm(r.Context(), id, f)
+	if input.SlotID != "" {
+		if !domain.ValidID(input.SlotID) || len(input.SlotID) > 200 {
+			write(w, 422, map[string]string{"error": "invalid_slot_id"})
+			return
+		}
+		if s.Calendar == nil || !s.FormAutoContact || s.Mode != "live" {
+			write(w, 409, map[string]string{"error": "live_calendar_and_auto_contact_required"})
+			return
+		}
+	}
+	code, duplicate, e := s.DB.RegisterTestForm(r.Context(), id, f, input.SlotID)
 	if errors.Is(e, store.ErrConflict) {
 		write(w, 409, map[string]string{"error": "idempotency_conflict"})
 		return
@@ -94,15 +105,21 @@ func (s *Server) testForm(w http.ResponseWriter, r *http.Request) {
 			write(w, 409, map[string]string{"error": "expired_or_conflicting_submission"})
 			return
 		}
-		if err != nil {
-			write(w, 503, map[string]string{"error": "storage_unavailable"})
+		if calendarError(w, err) {
 			return
+		}
+		var booking *domain.Booking
+		if input.SlotID != "" {
+			booking, err = s.formBooking(r, id)
+			if calendarError(w, err) {
+				return
+			}
 		}
 		status, message := "contact_queued", "Formulário recebido. A Bia vai iniciar o contato no seu WhatsApp; você não precisa enviar uma mensagem primeiro."
 		if s.Mode == "shadow" {
 			status, message = "queued_for_simulation", "Formulário recebido para simulação. Nenhuma mensagem real será enviada."
 		}
-		write(w, 202, map[string]any{"status": status, "submission_id": id, "event_id": eventID, "duplicate": duplicate, "requires_whatsapp_action": false, "whatsapp_url": link, "message": message})
+		write(w, 202, map[string]any{"status": status, "booking": booking, "submission_id": id, "event_id": eventID, "duplicate": duplicate, "requires_whatsapp_action": false, "whatsapp_url": link, "message": message})
 		return
 	}
 	write(w, 202, map[string]any{"status": "awaiting_whatsapp", "submission_id": id, "duplicate": duplicate, "whatsapp_url": link, "message": "Formulário recebido. Abra o WhatsApp e envie a mensagem pronta usando o número informado. A Bia receberá os dados do formulário.", "link_validity": "24 horas a partir da primeira submissão"})
