@@ -30,6 +30,9 @@ type SkipEffect struct{ Reason string }
 func (s *SkipEffect) Error() string { return s.Reason }
 
 type Worker struct {
+	SMSSender interface {
+		SendSMS(context.Context, string, domain.State, string, time.Time, time.Time) (providers.Receipt, error)
+	}
 	AfterSend   func(domain.State, domain.Effect, time.Time) []domain.Effect
 	AudioSender interface {
 		SendAudio(context.Context, string, domain.State, string, time.Time) (providers.Receipt, error)
@@ -216,7 +219,7 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 	var result any
 	var follow []domain.Effect
 	switch fx.Kind {
-	case "send", "send_audio":
+	case "send", "send_audio", "send_sms":
 		lead, global, e := w.DB.Counts(ctx, s.ID)
 		if e != nil {
 			return true, e
@@ -242,7 +245,13 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 			}
 		}
 		var receipt providers.Receipt
-		if fx.Kind == "send_audio" {
+		if fx.Kind == "send_sms" {
+			if w.SMSSender == nil {
+				err = &providers.Failure{Code: "sms_not_enabled"}
+			} else {
+				receipt, err = w.SMSSender.SendSMS(opCtx, j.ID, s, text, now, fx.Expires)
+			}
+		} else if fx.Kind == "send_audio" {
 			text = "[Áudio de lembrete da reunião enviado]"
 			if w.AudioSender == nil {
 				err = &providers.Failure{Code: "audio_sender_not_configured"}
@@ -272,6 +281,9 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 				w.replyTyping(opCtx, s, fx.ConversationID)
 			}
 			now = sentAt
+			if fx.Kind == "send_sms" {
+				text = "[SMS enviado] " + text
+			}
 			j.Delivery = &conversation.Delivery{ConversationID: fx.ConversationID, ProviderConversationID: s.Profile.ConversationID, ID: "outbound/" + j.ID, Text: text, At: now}
 			domain.AppendTurn(&s, "assistant", text, now)
 			if s.FirstContactAt == nil {
@@ -315,7 +327,10 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 		}
 		// Never fabricate a success message after a timeout or unknown response.
 		if fx.Kind != "crm" {
-			s.Human = true
+			// A failed optional SMS must not take over the WhatsApp conversation.
+			if fx.Kind != "send_sms" {
+				s.Human = true
+			}
 			s.Reasons = append(s.Reasons, f.Code)
 			follow = []domain.Effect{{ID: j.ID + ":review", LeadID: s.ID, Kind: "crm", Purpose: "handoff", Text: "Revisar operação " + j.ID + ": " + f.Code, Due: now, Expires: now.Add(7 * 24 * time.Hour)}}
 		}

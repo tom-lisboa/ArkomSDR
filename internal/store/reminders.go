@@ -11,6 +11,14 @@ import (
 // downtime. Stable IDs and ON CONFLICT prevent replay of completed/skipped jobs.
 // It never changes ownership or promotes jobs originally created in shadow.
 func (d *DB) ReconcileMeetingReminders(ctx context.Context, now time.Time, live bool) error {
+	return d.reconcileReminders(ctx, now, live, domain.MeetingSequence)
+}
+
+func (d *DB) ReconcileSMSReminders(ctx context.Context, now time.Time, live bool) error {
+	return d.reconcileReminders(ctx, now, live, domain.SMSSequence)
+}
+
+func (d *DB) reconcileReminders(ctx context.Context, now time.Time, live bool, sequence func(domain.State, time.Time) []domain.Effect) error {
 	after := ""
 	for {
 		rows, err := d.Pool.Query(ctx, `SELECT id,state FROM bia_go.leads WHERE id>$1 AND state->'booking'->>'start' IS NOT NULL AND (state->'booking'->>'start')::timestamptz>$2 ORDER BY id LIMIT 100`, after, now)
@@ -46,7 +54,7 @@ func (d *DB) ReconcileMeetingReminders(ctx context.Context, now time.Time, live 
 			if live {
 				mode = "live"
 			}
-			for _, fx := range domain.MeetingSequence(s, now) {
+			for _, fx := range sequence(s, now) {
 				raw, _ := json.Marshal(fx)
 				_, err = d.Pool.Exec(ctx, `INSERT INTO bia_go.jobs(id,lead_id,kind,mode,payload,fingerprint,due_at) VALUES($1,$2,'effect',$3,$4,$5,$6) ON CONFLICT DO NOTHING`, fx.ID, s.ID, mode, raw, hash(raw), fx.Due)
 				if err != nil {

@@ -33,6 +33,7 @@ CORS habilitado para a página de teste, inclusive localhost. `OPTIONS` retorna 
 - `email`: opcional, até 254 bytes.
 - `timezone`: fuso IANA; padrão America/Cuiaba.
 - `consent`: obrigatório `true`, vindo de um checkbox real: “Autorizo a Arkom a entrar em contato comigo pelo WhatsApp sobre o diagnóstico que estou solicitando.”
+- `sms_consent`: opcional, padrão `false`. Usar um checkbox separado: “Quero receber por SMS o lembrete da minha reunião com a Arkom.” Com `true`, informar o celular completo com o nono dígito. Veja [SMS em T−5](sms-reminders.md).
 
 Não envie `data_reuniao`, `owner`, IDs de reserva ou campos de ferramentas neste webhook. A data da reunião continua vindo da agenda e não é criada pela submissão do formulário.
 

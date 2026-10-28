@@ -33,6 +33,12 @@ func New(base worker.Worker) *Worker {
 		if why != "" || due.After(now) || !domain.IsMeetingReminder(fx) {
 			return due, why
 		}
+		if fx.Purpose == "meeting_sms" {
+			if w.runtime.SMSSender == nil {
+				return time.Time{}, "sms_not_enabled"
+			}
+			return due, ""
+		}
 		if s.LastInbound.IsZero() || now.Sub(s.LastInbound) >= 23*time.Hour {
 			return time.Time{}, "approved_template_required_outside_session"
 		}
@@ -55,6 +61,13 @@ func (w *Worker) RunScheduler(ctx context.Context) {
 	tick := time.NewTicker(30 * time.Second)
 	defer tick.Stop()
 	for {
+		if w.runtime.Policy.SMSReminders {
+			step, cancel := context.WithTimeout(ctx, 20*time.Second)
+			if err := w.runtime.DB.ReconcileSMSReminders(step, time.Now().UTC(), w.runtime.Live); err != nil && ctx.Err() == nil {
+				slog.Error("SMS reminder reconciliation failed")
+			}
+			cancel()
+		}
 		if w.runtime.Policy.MeetingReminders {
 			step, cancel := context.WithTimeout(ctx, 20*time.Second)
 			if err := w.runtime.DB.ReconcileMeetingReminders(step, time.Now().UTC(), w.runtime.Live); err != nil && ctx.Err() == nil {
@@ -119,7 +132,17 @@ func NextContact(p domain.Policy, s domain.State, fx domain.Effect, now time.Tim
 		}
 		return now, ""
 	}
-	if domain.IsMeetingReminder(fx) {
+	if fx.Purpose == "meeting_sms" {
+		if !p.SMSReminders || p.TestPhone != "" {
+			return time.Time{}, "sms_reminders_disabled"
+		}
+		// This is a requested reminder for the booked time, including 07:55
+		// for an 08:00 meeting. It is not an unsolicited follow-up cadence.
+		if ok, why := domain.Deliverable(s, fx, now); !ok {
+			return time.Time{}, why
+		}
+		return now, ""
+	} else if domain.IsMeetingReminder(fx) {
 		if !p.MeetingReminders || p.TestPhone != "" {
 			return time.Time{}, "meeting_reminders_disabled"
 		}

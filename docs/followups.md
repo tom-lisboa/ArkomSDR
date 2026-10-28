@@ -12,6 +12,10 @@ uma etapa por clique usando os mesmos workers, mesmo com a cadência desligada.
 | T−15 minutos | Follow-up | Envia texto com horário, fuso e link da reserva atual. |
 | Após confirmar o envio do texto | Follow-up → voz | Solicita permissão pelo botão nativo do WhatsApp. |
 | Após o cliente permitir | Voz → agenda | Confere a reserva e inicia uma única ligação de lembrete. |
+| T−5 minutos | Follow-up → SMS | Envia lembrete por SMS aos contatos que autorizaram esse canal. |
+
+O [SMS](sms-reminders.md) tem ativação independente e não depende do áudio instalado
+nem da janela de atendimento do WhatsApp.
 
 O botão não autoriza a ligação sozinho: a resposta nativa precisa ser validada.
 Sem aceite, não há chamada. A ligação pode começar após T−15, quando o cliente

@@ -16,7 +16,7 @@ func (s *Server) testReminder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	action := r.PathValue("action")
-	if action != "audio" && action != "call" {
+	if action != "audio" && action != "call" && action != "sms" {
 		http.NotFound(w, r)
 		return
 	}
@@ -37,7 +37,7 @@ func (s *Server) testReminder(w http.ResponseWriter, r *http.Request) {
 		write(w, 422, map[string]string{"error": "phone_must_be_e164"})
 		return
 	}
-	job, duplicate, err := s.DB.QueueTestReminder(r.Context(), id, input.SubmissionID, phone, action, s.Mode, s.ReminderAudio.Ready(), s.VoiceEnabled)
+	job, duplicate, err := s.DB.QueueTestReminder(r.Context(), id, input.SubmissionID, phone, action, s.Mode, s.ReminderAudio.Ready(), s.VoiceEnabled, s.SMSEnabled)
 	var blocked *store.TestReminderError
 	switch {
 	case errors.Is(err, store.ErrConflict):
@@ -50,7 +50,7 @@ func (s *Server) testReminder(w http.ResponseWriter, r *http.Request) {
 			code = 404
 		case "test_trigger_rate_limit", "permission_request_limit":
 			code = 429
-		case "reminder_audio_not_ready", "voice_not_enabled":
+		case "reminder_audio_not_ready", "voice_not_enabled", "sms_not_enabled":
 			code = 503
 		}
 		write(w, code, map[string]string{"error": blocked.Code})
@@ -72,7 +72,7 @@ func (s *Server) testReminderStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	action, id := r.PathValue("action"), r.PathValue("id")
-	if (action != "audio" && action != "call") || !domain.ValidID(id) || len(id) > 100 {
+	if (action != "audio" && action != "call" && action != "sms") || !domain.ValidID(id) || len(id) > 100 {
 		http.NotFound(w, r)
 		return
 	}
@@ -87,7 +87,7 @@ func (s *Server) testReminderStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var fx domain.Effect
-	if json.Unmarshal(j.Payload, &fx) != nil || !fx.ManualReminder || (action == "audio" && fx.Purpose != "meeting_audio") || (action == "call" && fx.Purpose != "meeting_call") {
+	if json.Unmarshal(j.Payload, &fx) != nil || !fx.ManualReminder || (action == "audio" && fx.Purpose != "meeting_audio") || (action == "call" && fx.Purpose != "meeting_call") || (action == "sms" && fx.Purpose != "meeting_sms") {
 		http.NotFound(w, r)
 		return
 	}

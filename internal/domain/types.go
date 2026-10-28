@@ -34,6 +34,9 @@ type Event struct {
 // Form intentionally has no website or team-size field. Revenue is optional,
 // and zero is a valid value, never a reason to silently discard the contact.
 type Form struct {
+	SMSConsent         bool   `json:"sms_consent,omitempty"`
+	SMSPhone           string `json:"sms_phone,omitempty"`
+	SMSConsentVersion  string `json:"sms_consent_version,omitempty"`
 	Company            string `json:"company,omitempty"`
 	Name               string `json:"name"`
 	Phone              string `json:"phone"`
@@ -144,6 +147,8 @@ type Result struct {
 }
 
 type Policy struct {
+	SMSReminders     bool
+	WhatsAppPhone    string
 	MeetingReminders bool
 	DisableFollowups bool
 	TestPhone        string
@@ -244,6 +249,9 @@ func ValidateEvent(e Event) error {
 		}
 		if f.Consent && strings.TrimSpace(f.ConsentTextVersion) == "" {
 			return errors.New("consent_text_version required")
+		}
+		if f.SMSConsent && (SMSDestination(*f) == "" || f.SMSConsentVersion == "") {
+			return errors.New("SMS consent requires its version and the original mobile number")
 		}
 		if f.Revenue != nil && *f.Revenue < 0 {
 			return errors.New("revenue cannot be negative")

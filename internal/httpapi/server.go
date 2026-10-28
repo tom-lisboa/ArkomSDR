@@ -18,6 +18,7 @@ import (
 )
 
 type Server struct {
+	SMSEnabled      bool
 	FormAutoContact bool
 	ReminderAudio   remindermedia.Asset
 	TestFormToken   string

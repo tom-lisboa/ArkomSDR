@@ -33,5 +33,5 @@ func MeetingSequence(s State, now time.Time) []Effect {
 }
 
 func IsMeetingReminder(fx Effect) bool {
-	return fx.Purpose == "meeting_audio" || fx.Purpose == "meeting_call"
+	return fx.Purpose == "meeting_audio" || fx.Purpose == "meeting_call" || fx.Purpose == "meeting_sms"
 }

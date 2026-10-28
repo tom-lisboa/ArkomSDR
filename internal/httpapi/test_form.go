@@ -33,14 +33,15 @@ func (s *Server) testForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var input struct {
-		Name     string `json:"name"`
-		Company  string `json:"company"`
-		Phone    string `json:"phone"`
-		Email    string `json:"email,omitempty"`
-		Revenue  *int64 `json:"revenue"`
-		Goal     string `json:"goal,omitempty"`
-		TimeZone string `json:"timezone,omitempty"`
-		Consent  bool   `json:"consent"`
+		Name       string `json:"name"`
+		Company    string `json:"company"`
+		Phone      string `json:"phone"`
+		Email      string `json:"email,omitempty"`
+		Revenue    *int64 `json:"revenue"`
+		Goal       string `json:"goal,omitempty"`
+		TimeZone   string `json:"timezone,omitempty"`
+		Consent    bool   `json:"consent"`
+		SMSConsent bool   `json:"sms_consent,omitempty"`
 	}
 	if !decode(w, r, &input) {
 		return
@@ -56,6 +57,11 @@ func (s *Server) testForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f := domain.Form{Name: strings.TrimSpace(input.Name), Company: strings.TrimSpace(input.Company), Phone: phone, Email: strings.TrimSpace(input.Email), Revenue: input.Revenue, Goal: strings.TrimSpace(input.Goal), TimeZone: input.TimeZone, Consent: input.Consent, ConsentTextVersion: "test-form-v1", Source: "test_form", Channel: "gateway"}
+	if input.SMSConsent {
+		f.SMSConsent = true
+		f.SMSPhone = phone
+		f.SMSConsentVersion = "test-form-sms-v1"
+	}
 	if !f.Consent {
 		write(w, 422, map[string]string{"error": "test_contact_consent_required"})
 		return

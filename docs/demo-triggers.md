@@ -6,12 +6,13 @@ Use a **mesma URL do webhook já configurada no formulário**, acrescentando:
 |---|---|---|
 | Enviar áudio agora | POST | `/reminders/audio` |
 | Lembrar por ligação agora | POST | `/reminders/call` |
+| Enviar SMS agora | POST | `/reminders/sms` |
 
 Exemplo de base: `https://24.199.100.186/webhooks/test-form/SUA_CHAVE_DE_TESTE`.
 Não use credenciais OpenAI/Twilio nem o Bearer administrativo na página.
 Os endpoints têm CORS e usam a mesma chave limitada à demonstração.
 
-## Corpo dos dois POSTs
+## Corpo dos POSTs
 
 ```json
 {
@@ -26,9 +27,12 @@ falha de rede. O mesmo UUID/corpo nunca dispara uma segunda vez, mesmo depois de
 reiniciar o servidor. Outro número, submissão ou ação com o mesmo UUID retorna 409.
 
 O número deve corresponder à submissão ativada do formulário, válida por 24h.
-A pessoa precisa ter respondido no WhatsApp nas últimas 23h e ter uma reunião
+A pessoa precisa ter respondido no WhatsApp nas últimas 23h para áudio/ligação e ter uma reunião
 futura no nosso banco. Os botões usam essa reserva; não criam uma nova data,
 não antecipam a reunião e não ligam a cadência automática.
+
+SMS exige `sms_consent: true` na submissão, mas não depende da janela do WhatsApp.
+Use `criarDisparo("sms", dados)` no exemplo abaixo. [Detalhes do SMS](sms-reminders.md).
 
 ## O que acontece
 
@@ -148,5 +152,7 @@ Pare a consulta no estado terminal, após 10 minutos ou ao sair da página.
 | 429 `permission_request_limit` | O limite de pedidos de ligação desse contato foi atingido. |
 | 503 `reminder_audio_not_ready` | Instalar o áudio definitivo. |
 | 503 `voice_not_enabled` | Habilitar a integração de voz no servidor. |
+| 409 `sms_consent_required` | Autorizar SMS no formulário. |
+| 503 `sms_not_enabled` | Configurar o remetente SMS no servidor. |
 
 Nenhum desses erros deve ser mostrado como envio concluído.

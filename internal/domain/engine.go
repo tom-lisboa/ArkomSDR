@@ -162,6 +162,9 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 		if p.MeetingReminders {
 			r.Effects = append(r.Effects, MeetingSequence(s, now)...)
 		}
+		if p.SMSReminders {
+			r.Effects = append(r.Effects, SMSSequence(s, now)...)
+		}
 		add("crm", "booking", "Reserva confirmada pelo provedor: "+b.ID, now, now.Add(24*time.Hour)).Booking = &b
 	case "booking.cancelled":
 		if e.At.Before(s.LastBookingEventAt) || s.Booking == nil || s.Booking.ID != e.BookingID {
@@ -489,6 +492,9 @@ func Deliverable(s State, fx Effect, now time.Time) (bool, string) {
 		return false, "stale_booking"
 	}
 	if IsMeetingReminder(fx) {
+		if fx.Purpose == "meeting_sms" && (!s.Profile.SMSConsent || SMSDestination(s.Profile) == "") {
+			return false, "sms_consent_required"
+		}
 		if !s.Profile.Consent {
 			return false, "no_consent"
 		}
@@ -539,6 +545,9 @@ func Deliverable(s State, fx Effect, now time.Time) (bool, string) {
 }
 
 func Render(s State, fx Effect, p Policy, now time.Time) string {
+	if fx.Purpose == "meeting_sms" {
+		return SMSReminderText(s, p)
+	}
 	if fx.Purpose == "meeting_call" && s.Booking != nil {
 		return "Olá, " + firstName(s.Profile.Name) + "! Sou a Bia, assistente de IA da " + p.Brand + ". " + bookingText(*s.Booking, p, s) + " Posso te ligar para lembrar da reunião e ajudar com o acesso? Autorize no botão que vou enviar a seguir."
 	}

@@ -16,10 +16,10 @@ func (e *TestReminderError) Error() string { return e.Code }
 
 // QueueTestReminder accepts only a phone bound to an activated test submission.
 // The transaction stores an immediate effect, never edits the booking or cadence.
-func (d *DB) QueueTestReminder(ctx context.Context, id, submission, phone, action, mode string, audioReady, voiceEnabled bool) (string, bool, error) {
+func (d *DB) QueueTestReminder(ctx context.Context, id, submission, phone, action, mode string, audioReady, voiceEnabled, smsEnabled bool) (string, bool, error) {
 	jobID := "fx/demo:" + id
 	deny := func(code string) (string, bool, error) { return "", false, &TestReminderError{Code: code} }
-	if !domain.ValidID(id) || !domain.ValidID(submission) || (action != "audio" && action != "call") || (mode != "live" && mode != "shadow") {
+	if !domain.ValidID(id) || !domain.ValidID(submission) || (action != "audio" && action != "call" && action != "sms") || (mode != "live" && mode != "shadow") {
 		return deny("invalid_trigger")
 	}
 	fp, _ := json.Marshal([]string{submission, testPhoneKey(phone), action, mode})
@@ -81,8 +81,16 @@ func (d *DB) QueueTestReminder(ctx context.Context, id, submission, phone, actio
 	if s.Booking == nil || s.Booking.Outcome != "" || !s.Booking.Start.After(now) {
 		return deny("future_booking_required")
 	}
-	if s.LastInbound.IsZero() || !s.LastInbound.After(now.Add(-23*time.Hour)) || s.LastInbound.After(now.Add(time.Minute)) {
+	if action != "sms" && (s.LastInbound.IsZero() || !s.LastInbound.After(now.Add(-23*time.Hour)) || s.LastInbound.After(now.Add(time.Minute))) {
 		return deny("whatsapp_reply_required")
+	}
+	if action == "sms" {
+		if !smsEnabled {
+			return deny("sms_not_enabled")
+		}
+		if !s.Profile.SMSConsent || domain.SMSDestination(s.Profile) == "" {
+			return deny("sms_consent_required")
+		}
 	}
 	if action == "audio" && !audioReady {
 		return deny("reminder_audio_not_ready")
@@ -112,8 +120,11 @@ func (d *DB) QueueTestReminder(ctx context.Context, id, submission, phone, actio
 	if action == "call" {
 		purpose, kind = "meeting_call", "send"
 	}
+	if action == "sms" {
+		purpose, kind = "meeting_sms", "send_sms"
+	}
 	var recent, total int
-	err = tx.QueryRow(ctx, `SELECT count(*) FILTER(WHERE lead_id=$1 AND payload->>'purpose'=$2 AND (created_at>now()-interval '1 minute' OR status IN ('pending','running','uncertain'))),count(*) FILTER(WHERE created_at>now()-interval '1 hour' AND payload->>'kind' IN ('prepare_audio','send')) FROM bia_go.jobs WHERE id LIKE 'fx/demo:%' AND payload->>'manual_reminder'='true'`, s.ID, purpose).Scan(&recent, &total)
+	err = tx.QueryRow(ctx, `SELECT count(*) FILTER(WHERE lead_id=$1 AND payload->>'purpose'=$2 AND (created_at>now()-interval '1 minute' OR status IN ('pending','running','uncertain'))),count(*) FILTER(WHERE created_at>now()-interval '1 hour' AND payload->>'kind' IN ('prepare_audio','send','send_sms')) FROM bia_go.jobs WHERE id LIKE 'fx/demo:%' AND payload->>'manual_reminder'='true'`, s.ID, purpose).Scan(&recent, &total)
 	if err != nil {
 		return "", false, err
 	}

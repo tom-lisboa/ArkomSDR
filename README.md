@@ -137,3 +137,6 @@ O arquivo de áudio ainda precisa ser disponibilizado. Consulte [instalação, a
 Para apresentações, os [endpoints de demonstração](docs/demo-triggers.md) permitem
 acionar o áudio e o fluxo de autorização/ligação por dois botões no formulário,
 sem esperar os horários T−30/T−15 e sem mudar a reunião no banco.
+
+O [lembrete SMS em T−5](docs/sms-reminders.md) usa o mesmo worker de follow-up,
+com autorização própria no formulário e botão opcional `/reminders/sms` para demonstração.

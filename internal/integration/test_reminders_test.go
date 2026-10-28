@@ -289,7 +289,7 @@ func TestDemoReminderPermissionLimitAndUncertainAudio(t *testing.T) {
 	t.Run("uncertain_media", func(t *testing.T) {
 		db, srv, s := demoFixture(t)
 		ctx := context.Background()
-		if _, _, err := db.QueueTestReminder(ctx, "audio-one", "demo-form", s.Profile.Phone, "audio", "live", true, true); err != nil {
+		if _, _, err := db.QueueTestReminder(ctx, "audio-one", "demo-form", s.Profile.Phone, "audio", "live", true, true, false); err != nil {
 			t.Fatal(err)
 		}
 		w := runtimeWorker(db, time.Now(), &countingMessenger{})
@@ -299,7 +299,7 @@ func TestDemoReminderPermissionLimitAndUncertainAudio(t *testing.T) {
 		if _, err := db.Pool.Exec(ctx, `UPDATE bia_go.jobs SET created_at=now()-interval '2 minutes',status=CASE WHEN id LIKE '%:media' THEN 'uncertain' ELSE status END WHERE id LIKE 'fx/demo:%'`); err != nil {
 			t.Fatal(err)
 		}
-		_, _, err := db.QueueTestReminder(ctx, "audio-two", "demo-form", s.Profile.Phone, "audio", "live", true, true)
+		_, _, err := db.QueueTestReminder(ctx, "audio-two", "demo-form", s.Profile.Phone, "audio", "live", true, true, false)
 		if err == nil || err.Error() != "test_trigger_rate_limit" {
 			t.Fatal(err)
 		}

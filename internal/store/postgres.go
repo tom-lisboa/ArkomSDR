@@ -46,6 +46,9 @@ var formContactSchema string
 //go:embed manual_reminders.sql
 var manualRemindersSchema string
 
+//go:embed sms.sql
+var smsSchema string
+
 var ErrConflict = errors.New("idempotency key reused with different payload")
 var ErrLease = errors.New("lease lost; stale worker cannot commit")
 
@@ -123,6 +126,9 @@ func (d *DB) Migrate(ctx context.Context) error {
 		return e
 	}
 	if _, e = tx.Exec(ctx, manualRemindersSchema); e != nil {
+		return e
+	}
+	if _, e = tx.Exec(ctx, smsSchema); e != nil {
 		return e
 	}
 	return tx.Commit(ctx)
@@ -394,13 +400,13 @@ func (d *DB) Counts(ctx context.Context, id string) (int, int, error) {
 	e := d.Pool.QueryRow(ctx, `SELECT
  count(*) FILTER(WHERE lead_id=$1),
  count(*) FILTER(WHERE COALESCE(completed_at,due_at)>now()-interval '1 hour')
- FROM bia_go.jobs WHERE mode='live' AND status IN ('done','running','uncertain') AND kind='effect' AND payload->>'kind' IN ('send','send_audio') AND COALESCE(result->>'chunked','false')<>'true' AND COALESCE(completed_at,due_at)>now()-interval '24 hours'`, id).Scan(&lead, &global)
+ FROM bia_go.jobs WHERE mode='live' AND status IN ('done','running','uncertain') AND kind='effect' AND payload->>'kind' IN ('send','send_audio','send_sms') AND COALESCE(result->>'chunked','false')<>'true' AND COALESCE(completed_at,due_at)>now()-interval '24 hours'`, id).Scan(&lead, &global)
 	return lead, global, e
 }
 
 func (d *DB) Metrics(ctx context.Context) (map[string]any, error) {
 	var pending, uncertain, dead, simulated, sent int64
-	e := d.Pool.QueryRow(ctx, `SELECT count(*) FILTER(WHERE status='pending'),count(*) FILTER(WHERE status='uncertain'),count(*) FILTER(WHERE status='dead'),count(*) FILTER(WHERE status='simulated'),count(*) FILTER(WHERE status='done' AND kind='effect' AND payload->>'kind' IN ('send','send_audio') AND COALESCE(result->>'chunked','false')<>'true') FROM bia_go.jobs`).Scan(&pending, &uncertain, &dead, &simulated, &sent)
+	e := d.Pool.QueryRow(ctx, `SELECT count(*) FILTER(WHERE status='pending'),count(*) FILTER(WHERE status='uncertain'),count(*) FILTER(WHERE status='dead'),count(*) FILTER(WHERE status='simulated'),count(*) FILTER(WHERE status='done' AND kind='effect' AND payload->>'kind' IN ('send','send_audio','send_sms') AND COALESCE(result->>'chunked','false')<>'true') FROM bia_go.jobs`).Scan(&pending, &uncertain, &dead, &simulated, &sent)
 	if e != nil {
 		return nil, e
 	}

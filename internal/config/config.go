@@ -13,6 +13,7 @@ import (
 )
 
 type Config struct {
+	SMSFrom                            string
 	Availability                       providers.DailyAvailability
 	FormAutoContact                    bool
 	FormContentSID                     string
@@ -114,6 +115,13 @@ func Load() (Config, error) {
 	}
 	c.Policy.DisableFollowups = os.Getenv("BIA_DISABLE_FOLLOWUPS") == "true"
 	c.Policy.MeetingReminders = os.Getenv("BIA_MEETING_REMINDERS_ENABLED") == "true"
+	c.Policy.SMSReminders = os.Getenv("BIA_SMS_REMINDERS_ENABLED") == "true"
+	c.SMSFrom = os.Getenv("TWILIO_SMS_FROM")
+	if c.SMSFrom != "" {
+		if normalized, err := domain.NormalizePhone(c.SMSFrom); err != nil || normalized != c.SMSFrom {
+			return c, errors.New("TWILIO_SMS_FROM must be E.164")
+		}
+	}
 	c.ReminderAudio = remindermedia.Asset{Directory: env("BIA_REMINDER_AUDIO_DIR", ".local/media/reminders"), SHA256: os.Getenv("BIA_REMINDER_AUDIO_SHA256"), PublicURL: os.Getenv("BIA_VOICE_PUBLIC_URL")}
 	if c.ReminderAudio.SHA256 != "" && !remindermedia.ValidHash(c.ReminderAudio.SHA256) {
 		return c, errors.New("invalid BIA_REMINDER_AUDIO_SHA256")
@@ -160,6 +168,10 @@ func Load() (Config, error) {
 		return c, e
 	}
 	c.Voice = v
+	c.Policy.WhatsAppPhone = v.Sender
+	if c.Policy.SMSReminders && (c.SMSFrom == "" || v.Account == "" || v.AuthToken == "" || c.TestPhone != "") {
+		return c, errors.New("SMS reminders require a configured SMS sender, Twilio credentials and unrestricted recipient configuration")
+	}
 	if c.Policy.MeetingReminders && (c.TestPhone != "" || c.MessagingProvider != "twilio" || !v.Enabled || c.ReminderAudio.SHA256 == "" || !c.ReminderAudio.Ready()) {
 		return c, errors.New("meeting reminders require Twilio voice, a verified local OGG/Opus audio file and unrestricted recipient configuration")
 	}

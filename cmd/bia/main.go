@@ -79,6 +79,10 @@ func run() error {
 	if twilioMessages != nil {
 		w.AudioSender = twilioMessages
 	}
+	if c.SMSFrom != "" {
+		transport := &providers.TwilioMessaging{Pool: db.Pool, Account: c.Voice.Account, AuthToken: c.Voice.AuthToken, Client: providers.NewHTTP(), AllowedPhone: c.TestPhone}
+		w.SMSSender = &providers.TwilioSMS{Transport: transport, From: c.SMSFrom}
+	}
 	sw := schedulingworker.New(*w, calendar)
 	fw := followupworker.New(*w)
 	fw.Audio = c.ReminderAudio
@@ -174,6 +178,7 @@ func run() error {
 	}
 	api := &httpapi.Server{ReminderAudio: c.ReminderAudio, TestFormToken: c.TestFormToken, DB: db, Calendar: calendar, Token: c.Token, Mode: c.Mode, Policy: c.Policy, VoiceSender: c.Voice.Sender, VoiceEnabled: c.Voice.Enabled}
 	api.FormAutoContact = c.FormAutoContact
+	api.SMSEnabled = c.SMSFrom != ""
 	srv := &http.Server{Addr: c.Address, Handler: api.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}
 	voiceSrv := &http.Server{Addr: c.Voice.Address, Handler: vs.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, BaseContext: func(net.Listener) context.Context { return ctx }}
 	serverErr := make(chan error, 2)
