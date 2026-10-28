@@ -1,4 +1,4 @@
-# Botões de demonstração: áudio e ligação
+# Botões de demonstração: áudio, ligação e SMS
 
 Use a **mesma URL do webhook já configurada no formulário**, acrescentando:
 
@@ -40,8 +40,9 @@ Use `criarDisparo("sms", dados)` no exemplo abaixo. [Detalhes do SMS](sms-remind
 - **Ligação:** API → followup envia o texto da reunião → confirma envio →
   worker de voz envia o botão nativo → aguarda aceite → consulta o worker da
   agenda → faz uma ligação de lembrete com IA.
+- **SMS:** API → worker de follow-up → Twilio SMS, com autorização SMS registrada no formulário.
 
-A sequência manual começa assim que os workers a processam, sem esperar T−30/T−15
+A sequência manual começa assim que os workers a processam, sem esperar T−30/T−15/T−5
 ou o horário da cadência. Mensagens do cliente ainda sendo agrupadas e uma ligação
 em andamento podem adiar o processamento. A ação expira em 10 minutos ou no início
 da reunião, o que ocorrer primeiro. Para a ligação, o aceite precisa chegar nesse prazo.
@@ -89,11 +90,45 @@ function criarDisparo(acao, dados) {
 const dados = { phone: dadosDoFormulario.phone, submission_id: resultado.submission_id };
 const enviarAudio = criarDisparo("audio", dados);
 const solicitarLigacao = criarDisparo("call", dados);
+const enviarSMS = criarDisparo("sms", dados);
 // onClick do primeiro botão: await enviarAudio()
 // onClick do segundo botão: await solicitarLigacao()
+// onClick do terceiro botão: await enviarSMS()
 // Desabilite o botão enquanto aguarda e mostre erros na própria página.
 // Para uma NOVA demonstração, crie outro disparo explicitamente (respeitando os limites).
 ```
+
+Para um botão HTML de SMS, crie-o com `type="button"` para não reenviar o formulário:
+
+```html
+<button id="enviar-sms" type="button">Enviar SMS agora</button>
+<p id="sms-status" role="status"></p>
+```
+
+Depois de criar `enviarSMS` no código acima, conecte o clique:
+
+```js
+const botaoSMS = document.querySelector("#enviar-sms");
+const statusSMS = document.querySelector("#sms-status");
+botaoSMS.addEventListener("click", async () => {
+  botaoSMS.disabled = true;
+  try {
+    const disparo = await enviarSMS();
+    statusSMS.textContent = disparo.duplicate
+      ? "Esta solicitação já foi recebida. Consulte o progresso."
+      : "SMS solicitado. Aguardando o processamento.";
+    // Consulte disparo.status_url conforme o exemplo abaixo.
+  } catch (erro) {
+    statusSMS.textContent = erro.message;
+  } finally {
+    botaoSMS.disabled = false;
+  }
+});
+```
+
+O contato precisa ter uma reunião futura e ter marcado `sms_consent: true` no
+formulário. O botão antecipa o lembrete, mas não altera a data da reunião. Nenhuma
+autorização de chamada ou janela aberta no WhatsApp é necessária para SMS.
 
 Resposta HTTP 202:
 
