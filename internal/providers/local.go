@@ -22,7 +22,7 @@ type LocalSlot struct {
 }
 
 func (c *LocalCalendar) Add(ctx context.Context, slot LocalSlot) error {
-	if !domain.ValidID(slot.ID) || !slot.Start.After(time.Now()) || !slot.End.After(slot.Start) || slot.CloserID <= 0 || !domain.ValidHTTPS(slot.MeetingURL) {
+	if !domain.ValidID(slot.ID) || !slot.Start.After(time.Now()) || !slot.End.After(slot.Start) || slot.CloserID <= 0 || (slot.MeetingURL != "" && !domain.ValidHTTPS(slot.MeetingURL)) {
 		return &Failure{Code: "invalid_local_slot"}
 	}
 	tx, e := c.Pool.Begin(ctx)

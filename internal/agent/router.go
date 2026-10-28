@@ -22,7 +22,7 @@ func Select(s domain.State, e domain.Event) string {
 		return "recovery"
 	}
 	t := strings.ToLower(e.Text)
-	if s.Booking != nil || e.SelectedSlotID != "" || strings.Contains(t, "agend") || strings.Contains(t, "horário") || strings.Contains(t, "horario") || strings.Contains(t, "reunião") {
+	if len(s.Offered) > 0 || s.Stage == "awaiting_availability" || s.Booking != nil || e.SelectedSlotID != "" || strings.Contains(t, "agend") || strings.Contains(t, "horário") || strings.Contains(t, "horario") || strings.Contains(t, "reunião") {
 		return "scheduling"
 	}
 	return "sdr"
@@ -34,7 +34,7 @@ func specialty(id string) string {
 	case "recovery":
 		return "Acolha a ausência sem culpa e facilite uma nova escolha de horário."
 	default:
-		return "Entenda a necessidade sem repetir o formulário e encaminhe ao próximo passo adequado."
+		return "Use o objetivo do formulário e conduza à oferta de horários. Não transforme o WhatsApp em diagnóstico ou questionário."
 	}
 }
 func Execute(ctx context.Context, p Planner, s domain.State, e domain.Event, slots []domain.Slot, id string) (Outcome, error) {

@@ -255,7 +255,7 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 			handoff(d.Reason)
 		case "confirm":
 			if s.Booking == nil || !s.Booking.Start.After(now) {
-				message("reply", "Ainda não tenho uma reunião futura confirmada para você. Pode escolher seu horário aqui: "+p.SchedulingURL)
+				offer(&s, &r, e, slots, p, now)
 				break
 			}
 			if !confirmRE.MatchString(strings.TrimSpace(e.Text)) && !evidence(e, d) {
@@ -307,9 +307,15 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 				offer(&s, &r, e, slots, p, now)
 				break
 			}
-			if e.SelectedSlotID == "" && (!evidence(e, d) || !selectionEvidence(d.Evidence, *chosen, p.Zone(s))) {
+			// Resolve the actual inbound message independently. The model may
+			// quote JSON labels in evidence; that must not break an unambiguous
+			// human choice, nor authorize a different slot.
+			if e.SelectedSlotID == "" && !selectionEvidence(e.Text, *chosen, s.Offered, p.Zone(s), now) {
 				message("reply", "Para confirmar, qual dos horários oferecidos você escolhe?")
 				break
+			}
+			if e.SelectedSlotID == "" {
+				r.Decision.Evidence = e.Text
 			}
 			if s.Booking != nil && !s.Booking.Group && (s.Booking.CloserID == 0 || chosen.CloserID != s.Booking.CloserID || chosen.Provider != s.Booking.Provider) {
 				handoff("reschedule_must_keep_provider_and_closer")
@@ -330,7 +336,8 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 		default:
 			text := strings.TrimSpace(d.Message)
 			if text == "" {
-				text = "Posso te ajudar com o diagnóstico de IA. Para escolher um horário, acesse: " + p.SchedulingURL
+				offer(&s, &r, e, slots, p, now)
+				break
 			}
 			if !SafeReply(text, s, p) {
 				handoff("unsafe_or_unverified_model_reply")
@@ -344,7 +351,28 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 
 func offer(s *State, r *Result, e Event, slots []Slot, p Policy, now time.Time) {
 	available := append([]Slot(nil), slots...)
-	sort.Slice(available, func(i, j int) bool { return available[i].Start.Before(available[j].Start) })
+	sort.SliceStable(available, func(i, j int) bool { return available[i].Start.Before(available[j].Start) })
+	// Prefer the model's requested IDs only if every ID is in the fresh calendar.
+	preferred := []Slot{}
+	seenPreferred := map[string]bool{}
+	validPreference := len(r.Decision.OfferSlotIDs) > 0 && len(r.Decision.OfferSlotIDs) <= 2
+	for _, id := range r.Decision.OfferSlotIDs {
+		found := false
+		for _, slot := range available {
+			if slot.ID == id && !seenPreferred[id] {
+				preferred = append(preferred, slot)
+				seenPreferred[id] = true
+				found = true
+				break
+			}
+		}
+		if !found {
+			validPreference = false
+		}
+	}
+	if validPreference {
+		available = append(preferred, available...)
+	}
 	s.Offered = nil
 	seen := map[string]bool{}
 	for _, slot := range available {
@@ -361,31 +389,42 @@ func offer(s *State, r *Result, e Event, slots []Slot, p Policy, now time.Time) 
 		}
 	}
 	s.OfferVersion = e.ID
-	text := "Você já pode escolher um horário para o diagnóstico aqui: " + p.SchedulingURL
-	if s.Booking != nil && len(s.Offered) == 0 {
-		text = "Não encontrei um novo horário disponível com o especialista da sua reunião. Sua reserva atual continua confirmada."
-		s.Human = true
-		r.Effects = append(r.Effects, Effect{ID: e.ID + ":no-slots", LeadID: s.ID, Kind: "crm", Purpose: "handoff", Text: "Agenda do mesmo closer indisponível.", Due: now, Expires: now.Add(24 * time.Hour)})
-	} else if len(s.Offered) > 0 {
+	text := "Não encontrei horários disponíveis na agenda agora. O agendamento ainda não foi feito."
+	if e.CalendarUnavailable {
+		text = "Não consegui consultar a agenda agora. O agendamento ainda não foi feito."
+	}
+	if len(s.Offered) == 0 {
+		s.Stage = "awaiting_availability"
+		if s.Booking != nil {
+			text += " Sua reserva atual continua confirmada."
+		}
+		r.Effects = append(r.Effects, Effect{ID: e.ID + ":no-slots", LeadID: s.ID, Kind: "crm", Purpose: "availability_requested", Text: "Agendamento pendente: " + text, Due: now, Expires: now.Add(24 * time.Hour)})
+	} else {
+		s.Stage = "choosing_slot"
 		parts := []string{}
 		for _, slot := range s.Offered {
-			parts = append(parts, slot.Start.In(p.Zone(*s)).Format("02/01 às 15:04")+" ("+slot.ID+")")
+			parts = append(parts, SlotLabel(slot, p.Zone(*s)))
 		}
 		text = "Tenho estes horários para o diagnóstico: " + strings.Join(parts, " ou ") + ". Horário de " + p.Zone(*s).String() + ". Qual você escolhe?"
 	}
+	if intro := strings.TrimSpace(r.Decision.Message); r.Decision.Action == "offer_slots" && intro != "" && !strings.Contains(intro, "?") && len([]rune(intro)) <= 350 && SafeReply(intro, *s, p) {
+		text = intro + "\n\n" + text
+	}
 	r.Effects = append(r.Effects, Effect{ID: e.ID + ":offer", LeadID: s.ID, Kind: "send", Purpose: "reply", Text: text, Due: now, Expires: now.Add(30 * time.Minute)})
-	if len(s.Offered) > 0 && !s.Paused {
+	if len(s.Offered) > 0 && !s.Paused && !p.DisableFollowups {
 		due := p.NextContact(now.Add(p.FollowupAfter), *s)
-		r.Effects = append(r.Effects, Effect{ID: e.ID + ":followup", LeadID: s.ID, Kind: "send", Purpose: "followup", Text: "Quer seguir com o diagnóstico? Você pode conferir os horários atualizados aqui: " + p.SchedulingURL, Due: due, Expires: due.Add(time.Hour), OfferVersion: e.ID})
+		r.Effects = append(r.Effects, Effect{ID: e.ID + ":followup", LeadID: s.ID, Kind: "send", Purpose: "followup", Text: "Quer seguir com o diagnóstico? Posso consultar os horários atualizados por aqui.", Due: due, Expires: due.Add(time.Hour), OfferVersion: e.ID})
 	}
 }
 
 func evidence(e Event, d Decision) bool {
 	return strings.TrimSpace(d.Evidence) != "" && strings.Contains(strings.ToLower(e.Text), strings.ToLower(d.Evidence))
 }
-func selectionEvidence(text string, slot Slot, zone *time.Location) bool {
-	return strings.Contains(text, slot.ID) || strings.Contains(text, slot.Start.In(zone).Format("15:04")) || strings.Contains(text, slot.Start.In(zone).Format("15h04"))
+func selectionEvidence(text string, slot Slot, offered []Slot, zone *time.Location, now time.Time) bool {
+	id, ok := selectedOffer(text, offered, zone, now)
+	return ok && id == slot.ID
 }
+
 func firstName(name string) string {
 	parts := strings.Fields(name)
 	if len(parts) == 0 {

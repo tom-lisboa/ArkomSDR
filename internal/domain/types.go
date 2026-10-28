@@ -11,22 +11,24 @@ import (
 )
 
 type Event struct {
-	ConversationID string                    `json:"conversation_id,omitempty"`
-	Attachments    []conversation.Attachment `json:"attachments,omitempty"`
-	Context        *conversation.Window      `json:"context,omitempty"`
-	ID             string                    `json:"id"`
-	Kind           string                    `json:"kind"`
-	LeadID         string                    `json:"lead_id"`
-	At             time.Time                 `json:"at"`
-	Form           *Form                     `json:"form,omitempty"`
-	Text           string                    `json:"text,omitempty"`
-	AudioURL       string                    `json:"audio_url,omitempty"`
-	SelectedSlotID string                    `json:"selected_slot_id,omitempty"`
-	Booking        *Booking                  `json:"booking,omitempty"`
-	BookingID      string                    `json:"booking_id,omitempty"`
-	Owner          string                    `json:"owner,omitempty"`
-	Reason         string                    `json:"reason,omitempty"`
-	Preference     string                    `json:"preference,omitempty"`
+	// CalendarUnavailable is internal execution context, never accepted from webhooks.
+	CalendarUnavailable bool                      `json:"-"`
+	ConversationID      string                    `json:"conversation_id,omitempty"`
+	Attachments         []conversation.Attachment `json:"attachments,omitempty"`
+	Context             *conversation.Window      `json:"context,omitempty"`
+	ID                  string                    `json:"id"`
+	Kind                string                    `json:"kind"`
+	LeadID              string                    `json:"lead_id"`
+	At                  time.Time                 `json:"at"`
+	Form                *Form                     `json:"form,omitempty"`
+	Text                string                    `json:"text,omitempty"`
+	AudioURL            string                    `json:"audio_url,omitempty"`
+	SelectedSlotID      string                    `json:"selected_slot_id,omitempty"`
+	Booking             *Booking                  `json:"booking,omitempty"`
+	BookingID           string                    `json:"booking_id,omitempty"`
+	Owner               string                    `json:"owner,omitempty"`
+	Reason              string                    `json:"reason,omitempty"`
+	Preference          string                    `json:"preference,omitempty"`
 }
 
 // Form intentionally has no website or team-size field. Revenue is optional,
@@ -102,11 +104,12 @@ type State struct {
 }
 
 type Decision struct {
-	Action   string `json:"action"`
-	Message  string `json:"message"`
-	SlotID   string `json:"slot_id"`
-	Evidence string `json:"evidence"`
-	Reason   string `json:"reason"`
+	Action       string   `json:"action"`
+	Message      string   `json:"message"`
+	SlotID       string   `json:"slot_id"`
+	OfferSlotIDs []string `json:"offer_slot_ids,omitempty"`
+	Evidence     string   `json:"evidence"`
+	Reason       string   `json:"reason"`
 }
 
 type Effect struct {
@@ -257,7 +260,7 @@ func ValidateEvent(e Event) error {
 		if e.Booking == nil || e.Booking.ID == "" || e.Booking.Provider == "" || !e.Booking.End.After(e.Booking.Start) {
 			return errors.New("valid booking required")
 		}
-		if !ValidHTTPS(e.Booking.MeetingURL) {
+		if !(e.Booking.Provider == "local" && e.Booking.MeetingURL == "") && !ValidHTTPS(e.Booking.MeetingURL) {
 			return errors.New("confirmed booking requires an HTTPS meeting URL")
 		}
 	case "booking.cancelled", "attendance.attended", "attendance.no_show":

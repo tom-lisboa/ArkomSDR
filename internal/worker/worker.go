@@ -122,6 +122,7 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 		if e.Kind == "message.received" && !s.OptedOut && !s.Human && !domain.AutomaticReply(e.Text) && (e.Context == nil || !e.Context.MediaFailed) {
 			var calendarErr error
 			slots, calendarErr = w.Calendar.Slots(opCtx, s, now)
+			e.CalendarUnavailable = calendarErr != nil
 			if domain.NeedsPlan(s, e, now) {
 				id := agent.Select(s, e)
 				var out agent.Outcome
@@ -138,7 +139,8 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 				d = domain.Decision{Action: "handoff", Reason: "model_unavailable"}
 			}
 			if calendarErr != nil && (d.Action == "offer_slots" || d.Action == "book" || d.Action == "reschedule") {
-				d = domain.Decision{Action: "reply", Message: "Não consegui consultar a agenda agora. Qual dia e período você prefere? Posso registrar sua preferência.", Reason: "calendar_unavailable"}
+				d = domain.Decision{Action: "offer_slots", Reason: "calendar_unavailable"}
+				slots = nil
 			}
 		}
 		r := domain.Reduce(s, e, d, slots, w.Policy, now)

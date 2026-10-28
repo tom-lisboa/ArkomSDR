@@ -142,6 +142,9 @@ func run() error {
 	if *role == "all" || *role == "followup" {
 		start(fw.RunScheduler)
 	}
+	if *role == "all" || *role == "scheduling" {
+		start(func(ctx context.Context) { sw.RunAvailability(ctx, c.Availability) })
+	}
 	for range c.Workers {
 		if *role == "all" || *role == "voice" {
 			start(vw.Run)

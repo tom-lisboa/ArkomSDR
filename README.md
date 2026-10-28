@@ -72,11 +72,13 @@ Referências utilizadas: [SDK Go oficial](https://developers.openai.com/api/refe
 
 ## Agenda própria
 
-`POST /v1/slots` publica uma vaga na agenda local. Informe `id`, `start`, `end`, `closer_id` e `meeting_url`; datas usam RFC3339 com fuso. O exemplo de produto adota 45 minutos, conforme as imagens. A duração efetiva é `end - start`, sem um segundo valor escondido no prompt.
+O [atendimento por WhatsApp](docs/whatsapp-scheduling.md) usa um prompt separado do roteiro de ligação e conduz o lead à oferta de dois horários reais. O worker de agenda pode manter disponibilidade diária em uma janela móvel, com duração, intervalos e fuso configuráveis.
+
+`POST /v1/slots` publica uma vaga na agenda local. Informe `id`, `start`, `end`, `closer_id` e, quando houver, `meeting_url`; datas usam RFC3339 com fuso. O exemplo de produto adota 45 minutos, conforme as imagens. A duração efetiva é `end - start`, sem um segundo valor escondido no prompt.
 
 `GET /v1/leads/{id}/availability` devolve as vagas. Para selecionar, envie um evento `message.received` com `selected_slot_id` em `/v1/events`. O servidor confere disponibilidade e identidade do closer. Reserva e liberação da vaga antiga acontecem na mesma transação no calendário local.
 
-A agenda local não sincroniza Google Calendar, não gera links de Meet e não envia convites por e-mail. O link da sala precisa ser cadastrado na vaga. Em `shadow`, a reserva também é apenas proposta: não consome a vaga. Os testes de integração exercitam a reserva real dentro do banco de testes isolado.
+A agenda local não sincroniza Google Calendar, não gera links de Meet e não envia convites por e-mail. Na homologação atual, a reserva fica somente no PostgreSQL e a confirmação informa dia/hora, sem link de sala. Em `shadow`, a reserva também é apenas proposta: não consome a vaga. Os testes de integração exercitam a reserva real dentro do banco de testes isolado.
 
 ## Organização
 
@@ -118,7 +120,7 @@ Sem essa variável, os testes de integração são sinalizados como ignorados, n
 
 ## Antes da operação real
 
-O serviço permanece em simulação. Para operação futura será necessário implementar/homologar o gateway de mensagens, cadastrar horários reais, integrar o site e a origem dos eventos e avaliar conversas reais anonimizadas. `BIA_MODE=live` exige gateway e URL de agenda reais no modo legado; o adaptador Twilio usa envio direto e pode consultar a agenda local sem URL externa. Cada contato ainda precisa ter `owner=go`; o padrão é `shadow`. Isso impede assumir contatos do n8n por acidente.
+O padrão local é simulação; o servidor de homologação usa Twilio em modo live. Antes de substituir a operação existente, ainda é necessário homologar a disponibilidade dos especialistas, integrar as origens dos eventos e avaliar conversas reais anonimizadas. `BIA_MODE=live` exige gateway e URL de agenda reais no modo legado; o adaptador Twilio usa envio direto e pode consultar a agenda local sem URL externa. Cada contato ainda precisa ter `owner=go`; o padrão é `shadow`. Isso impede assumir contatos do n8n por acidente.
 
 Leia [contratos de integração](docs/integrations.md), [diagnóstico e critérios](docs/diagnosis.md) e [mapa de migração](docs/migration.md). Nenhum ganho de comparecimento foi medido em produção nesta etapa.
 

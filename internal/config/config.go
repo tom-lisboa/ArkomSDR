@@ -2,6 +2,7 @@ package config
 
 import (
 	"arkom/bia/internal/domain"
+	"arkom/bia/internal/providers"
 	"arkom/bia/internal/remindermedia"
 	"arkom/bia/internal/store"
 	"errors"
@@ -12,6 +13,7 @@ import (
 )
 
 type Config struct {
+	Availability                       providers.DailyAvailability
 	FormAutoContact                    bool
 	FormContentSID                     string
 	ReminderAudio                      remindermedia.Asset
@@ -90,6 +92,26 @@ func Load() (Config, error) {
 	}
 	c.Policy = domain.Policy{Brand: env("BIA_BRAND", "Grupo Bilhon"), SchedulingURL: env("BIA_SCHEDULING_URL", "https://example.invalid/agendar"), TimeZone: env("BIA_TIMEZONE", "America/Cuiaba"), QuietStart: 8, QuietEnd: 20, FollowupAfter: 2 * time.Hour, Reminders: []time.Duration{24 * time.Hour, 2 * time.Hour, 15 * time.Minute}}
 	c.Policy.TestPhone = c.TestPhone
+	c.Availability = providers.DailyAvailability{Enabled: os.Getenv("BIA_LOCAL_CALENDAR_ENABLED") == "true", TimeZone: env("BIA_LOCAL_CALENDAR_TIMEZONE", c.Policy.TimeZone), Windows: env("BIA_LOCAL_CALENDAR_WINDOWS", "08:00-12:00,14:00-20:00"), DurationMinutes: 45, Days: 14, CloserID: 1, MeetingURL: os.Getenv("BIA_LOCAL_CALENDAR_MEETING_URL")}
+	for key, target := range map[string]*int{"BIA_LOCAL_CALENDAR_DURATION_MINUTES": &c.Availability.DurationMinutes, "BIA_LOCAL_CALENDAR_DAYS": &c.Availability.Days} {
+		if raw := os.Getenv(key); raw != "" {
+			n, err := strconv.Atoi(raw)
+			if err != nil {
+				return c, errors.New("invalid " + key)
+			}
+			*target = n
+		}
+	}
+	if raw := os.Getenv("BIA_LOCAL_CALENDAR_CLOSER_ID"); raw != "" {
+		id, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			return c, errors.New("invalid BIA_LOCAL_CALENDAR_CLOSER_ID")
+		}
+		c.Availability.CloserID = id
+	}
+	if err := c.Availability.Validate(); err != nil {
+		return c, err
+	}
 	c.Policy.DisableFollowups = os.Getenv("BIA_DISABLE_FOLLOWUPS") == "true"
 	c.Policy.MeetingReminders = os.Getenv("BIA_MEETING_REMINDERS_ENABLED") == "true"
 	c.ReminderAudio = remindermedia.Asset{Directory: env("BIA_REMINDER_AUDIO_DIR", ".local/media/reminders"), SHA256: os.Getenv("BIA_REMINDER_AUDIO_SHA256"), PublicURL: os.Getenv("BIA_VOICE_PUBLIC_URL")}
