@@ -98,13 +98,9 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 			add("send", "form_contact", FormContactText, now, now.Add(24*time.Hour)).TriggerAt = e.At
 			add("crm", "form_received", "Formulário recebido; contato automático enfileirado.", now, now.Add(24*time.Hour))
 		} else if first && s.Profile.Consent && !s.OptedOut {
-			text := fmt.Sprintf("Olá, %s! Sou a Bia, assistente de IA do %s. Recebi seu cadastro. Vamos encontrar o próximo passo para usar IA no seu negócio? Você já pode escolher um horário aqui: %s", firstName(s.Profile.Name), p.Brand, p.SchedulingURL)
-			if p.SchedulingURL == "" {
-				text = fmt.Sprintf("Olá, %s! Sou a Bia, assistente de IA do %s. Recebi seu cadastro. Posso consultar os horários disponíveis para conversarmos?", firstName(s.Profile.Name), p.Brand)
-			}
 			// Initial contact is immediate after the explicit form request. Quiet
 			// hours apply to later unsolicited follow-ups, not this acknowledgment.
-			add("send", "welcome", text, now, now.Add(15*time.Minute))
+			add("send", "welcome", FormContactText, now, now.Add(15*time.Minute))
 			add("crm", "lead_created", "Cadastro recebido; primeiro contato enfileirado.", now, now.Add(24*time.Hour))
 		}
 	case "ownership.changed":

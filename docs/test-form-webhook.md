@@ -86,7 +86,9 @@ Resposta HTTP 202:
 
 A primeira mensagem é fixa:
 
-> Olá! Sou a Bia, assistente de IA da Arkom. Recebi seu formulário de diagnóstico. Podemos continuar seu atendimento por aqui? Para não receber mensagens, responda SAIR.
+> Oi, tudo bem?
+>
+> Retomando nossa conversa por aqui
 
 Dentro da janela de atendimento, sai como texto. Fora dela, o worker usa `TWILIO_FORM_CONTACT_CONTENT_SID`, com o template em `deploy/form-contact-template.json`. O template precisa estar aprovado pela Meta; a submissão do formulário **não abre nem altera a janela do WhatsApp**. A margem usada pelo código é de 23 horas desde a última mensagem recebida.
 

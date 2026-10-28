@@ -1,9 +1,9 @@
 {
-  "friendly_name": "arkom_formulario_recebido_v1",
+  "friendly_name": "arkom_abertura_atendimento_v2",
   "language": "pt_BR",
   "types": {
     "twilio/text": {
-      "body": "Olá! Sou a Bia, assistente de IA da Arkom. Recebi seu formulário de diagnóstico. Podemos continuar seu atendimento por aqui? Para não receber mensagens, responda SAIR."
+      "body": "Oi, tudo bem?\n\nRetomando nossa conversa por aqui"
     }
   }
 }
