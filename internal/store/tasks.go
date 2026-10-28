@@ -154,7 +154,7 @@ func (d *DB) CompleteMedia(ctx context.Context, t Task, r conversation.MediaResu
 
 func (d *DB) HasNewInput(ctx context.Context, lead, conv string, version int64) (bool, error) {
 	var b bool
-	e := d.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM bia_go.worker_tasks WHERE lead_id=$1 AND kind='inbound' AND status IN('pending','running')) OR EXISTS(SELECT 1 FROM bia_go.conversations WHERE id=$2 AND version>$3) OR EXISTS(SELECT 1 FROM bia_go.conversation_messages WHERE conversation_id=$2 AND role='user' AND run_id IS NULL)`, lead, conv, version).Scan(&b)
+	e := d.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM bia_go.worker_tasks WHERE lead_id=$1 AND kind='inbound' AND status IN('pending','running')) OR EXISTS(SELECT 1 FROM bia_go.conversations WHERE id=$2 AND version>$3) OR EXISTS(SELECT 1 FROM bia_go.conversation_messages WHERE conversation_id=$2 AND role='user' AND run_id IS NULL) OR ($2='' AND EXISTS(SELECT 1 FROM bia_go.conversations WHERE lead_id=$1 AND (flush_at IS NOT NULL OR active_run IS NOT NULL)))`, lead, conv, version).Scan(&b)
 	return b, e
 }
 

@@ -15,6 +15,7 @@ import (
 var ErrBlocked = errors.New("voice_request_blocked")
 
 type Request struct {
+	ScheduledReminder bool       `json:"scheduled_reminder"`
 	BookingID         string     `json:"booking_id,omitempty"`
 	BookingStart      *time.Time `json:"booking_start,omitempty"`
 	ID                string     `json:"id"`
@@ -35,11 +36,11 @@ type Request struct {
 	Error             string     `json:"error_code,omitempty"`
 }
 
-const requestColumns = `id,lead_id,mode,sender,purpose,state,created_at,expires_at,permission_at,permission_expires_at,permanent,revoked_at,COALESCE(permission_sid,''),COALESCE(call_sid,''),COALESCE(lease_token,''),COALESCE(error_code,''),COALESCE(booking_id,''),booking_start`
+const requestColumns = `id,lead_id,mode,sender,purpose,state,created_at,expires_at,permission_at,permission_expires_at,permanent,revoked_at,COALESCE(permission_sid,''),COALESCE(call_sid,''),COALESCE(lease_token,''),COALESCE(error_code,''),COALESCE(booking_id,''),booking_start,scheduled_reminder`
 
 func scanRequest(row pgx.Row) (Request, error) {
 	var r Request
-	e := row.Scan(&r.ID, &r.LeadID, &r.Mode, &r.Sender, &r.Purpose, &r.State, &r.Created, &r.Expires, &r.PermissionAt, &r.PermissionExpires, &r.Permanent, &r.Revoked, &r.PermissionSID, &r.CallSID, &r.Token, &r.Error, &r.BookingID, &r.BookingStart)
+	e := row.Scan(&r.ID, &r.LeadID, &r.Mode, &r.Sender, &r.Purpose, &r.State, &r.Created, &r.Expires, &r.PermissionAt, &r.PermissionExpires, &r.Permanent, &r.Revoked, &r.PermissionSID, &r.CallSID, &r.Token, &r.Error, &r.BookingID, &r.BookingStart, &r.ScheduledReminder)
 	return r, e
 }
 
@@ -49,6 +50,15 @@ func (s Repository) Get(ctx context.Context, id string) (Request, error) {
 	return scanRequest(s.DB.Pool.QueryRow(ctx, `SELECT `+requestColumns+` FROM bia_go.voice_requests WHERE id=$1`, id))
 }
 func (s Repository) Create(ctx context.Context, id, lead, mode, sender, purpose string) (bool, error) {
+	return s.create(ctx, id, lead, mode, sender, purpose, nil)
+}
+func (s Repository) CreateScheduled(ctx context.Context, id, lead, mode, sender string, fx domain.Effect) (bool, error) {
+	if !domain.IsMeetingReminder(fx) || fx.Kind != "request_call" {
+		return false, ErrBlocked
+	}
+	return s.create(ctx, id, lead, mode, sender, "confirm", &fx)
+}
+func (s Repository) create(ctx context.Context, id, lead, mode, sender, purpose string, expected *domain.Effect) (bool, error) {
 	if !domain.ValidID(id) || !domain.ValidID(lead) || (mode != "shadow" && mode != "live") || purpose != "confirm" {
 		return false, ErrBlocked
 	}
@@ -69,7 +79,14 @@ func (s Repository) Create(ctx context.Context, id, lead, mode, sender, purpose 
 	if st.Booking == nil || !st.Booking.Start.After(time.Now()) || st.Profile.Phone == "" || !st.Profile.Consent || st.OptedOut || st.Human || st.Paused {
 		return false, ErrBlocked
 	}
-	ct, e := tx.Exec(ctx, `INSERT INTO bia_go.voice_requests(id,lead_id,mode,sender,purpose,booking_id,booking_start) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO NOTHING`, id, lead, mode, sender, purpose, st.Booking.ID, st.Booking.Start)
+	expires := time.Now().Add(24 * time.Hour)
+	if expected != nil {
+		if ok, _ := domain.Deliverable(st, *expected, time.Now()); !ok || expected.BookingID == "" || expected.BookingStart.IsZero() {
+			return false, ErrBlocked
+		}
+		expires = st.Booking.Start
+	}
+	ct, e := tx.Exec(ctx, `INSERT INTO bia_go.voice_requests(id,lead_id,mode,sender,purpose,booking_id,booking_start,expires_at,scheduled_reminder) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(id) DO NOTHING`, id, lead, mode, sender, purpose, st.Booking.ID, st.Booking.Start, expires, expected != nil)
 	if e != nil {
 		var pe *pgconn.PgError
 		if errors.As(e, &pe) && pe.Code == "23505" {
@@ -82,7 +99,7 @@ func (s Repository) Create(ctx context.Context, id, lead, mode, sender, purpose 
 		if e != nil {
 			return false, e
 		}
-		if old.LeadID != lead || old.Mode != mode || old.Sender != sender || old.Purpose != purpose || old.BookingID != st.Booking.ID || old.BookingStart == nil || !old.BookingStart.Equal(st.Booking.Start) {
+		if old.LeadID != lead || old.Mode != mode || old.Sender != sender || old.Purpose != purpose || old.BookingID != st.Booking.ID || old.BookingStart == nil || !old.BookingStart.Equal(st.Booking.Start) || old.ScheduledReminder != (expected != nil) {
 			return false, store.ErrConflict
 		}
 	}

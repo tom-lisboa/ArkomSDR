@@ -122,12 +122,12 @@ O serviço permanece em simulação. Para operação futura será necessário im
 
 Leia [contratos de integração](docs/integrations.md), [diagnóstico e critérios](docs/diagnosis.md) e [mapa de migração](docs/migration.md). Nenhum ganho de comparecimento foi medido em produção nesta etapa.
 
-## Próxima etapa de follow-up
+## Follow-up da reunião
 
-Planejado, ainda não implementado nem ativado:
+Implementado em código, com ativação separada e desligada até instalar a gravação:
 
 - Trinta minutos antes da reunião: enviar o áudio pronto fornecido pela equipe, usando o worker de mídia.
 - Quinze minutos antes: enviar a mensagem de lembrete e solicitar autorização de chamada. A ligação só pode ocorrer após autorização nativa válida.
-- O worker de follow-up deverá coordenar a sequência, conferir a reserva atual e impedir duplicidade após reinício, remarcação ou cancelamento.
+- O worker de follow-up coordena a sequência no PostgreSQL, confere a reserva atual e impede duplicidade após reinício, remarcação ou cancelamento.
 
-O arquivo de áudio ainda precisa ser disponibilizado para essa implementação. Os comprovantes operacionais e as credenciais permanecem nos arquivos locais ignorados pelo Git.
+O arquivo de áudio ainda precisa ser disponibilizado. Consulte [instalação, ativação e limites da janela do WhatsApp](docs/followups.md). Os comprovantes operacionais e as credenciais permanecem nos arquivos locais ignorados pelo Git.

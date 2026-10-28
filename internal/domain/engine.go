@@ -144,6 +144,9 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 			fx.BookingID = b.ID
 			fx.BookingStart = b.Start
 			for _, before := range p.Reminders {
+				if p.MeetingReminders {
+					break
+				}
 				due := b.Start.Add(-before)
 				if !due.After(now) {
 					continue
@@ -156,6 +159,9 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 				fx.BookingID = b.ID
 				fx.BookingStart = b.Start
 			}
+		}
+		if p.MeetingReminders {
+			r.Effects = append(r.Effects, MeetingSequence(s, now)...)
 		}
 		add("crm", "booking", "Reserva confirmada pelo provedor: "+b.ID, now, now.Add(24*time.Hour)).Booking = &b
 	case "booking.cancelled":
@@ -444,6 +450,17 @@ func Deliverable(s State, fx Effect, now time.Time) (bool, string) {
 	if fx.BookingID != "" && (s.Booking == nil || s.Booking.ID != fx.BookingID) {
 		return false, "stale_booking"
 	}
+	if IsMeetingReminder(fx) {
+		if !s.Profile.Consent {
+			return false, "no_consent"
+		}
+		if s.Paused {
+			return false, "paused"
+		}
+		if s.Booking == nil || s.Booking.Outcome != "" || !s.Booking.Start.After(now) {
+			return false, "meeting_not_upcoming"
+		}
+	}
 	if !fx.BookingStart.IsZero() && (s.Booking == nil || !s.Booking.Start.Equal(fx.BookingStart)) {
 		return false, "stale_booking_time"
 	}
@@ -476,6 +493,9 @@ func Deliverable(s State, fx Effect, now time.Time) (bool, string) {
 }
 
 func Render(s State, fx Effect, p Policy, now time.Time) string {
+	if fx.Purpose == "meeting_call" && s.Booking != nil {
+		return "Olá, " + firstName(s.Profile.Name) + "! Sou a Bia, assistente de IA da " + p.Brand + ". " + bookingText(*s.Booking, p, s) + " Posso te ligar para lembrar da reunião e ajudar com o acesso? Autorize no botão que vou enviar a seguir."
+	}
 	if fx.Purpose != "reminder" || s.Booking == nil {
 		return fx.Text
 	}

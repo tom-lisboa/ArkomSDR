@@ -23,7 +23,17 @@ type CalendarReader interface {
 type EffectHandler func(context.Context, store.Job, domain.State, domain.Effect, time.Time) (domain.State, []domain.Effect, any, error)
 type EffectSchedule func(domain.State, domain.Effect, time.Time) (time.Time, string)
 
+// SkipEffect records an expected policy outcome without claiming delivery or
+// handing the entire conversation over to a human.
+type SkipEffect struct{ Reason string }
+
+func (s *SkipEffect) Error() string { return s.Reason }
+
 type Worker struct {
+	AfterSend   func(domain.State, domain.Effect, time.Time) []domain.Effect
+	AudioSender interface {
+		SendAudio(context.Context, string, domain.State, string, time.Time) (providers.Receipt, error)
+	}
 	VoiceAutoRequest bool
 	VoiceSender      string
 	Queue            string
@@ -161,11 +171,18 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 		return true, w.DB.Finish(ctx, j, s, nil, "skipped", map[string]string{"reason": why})
 	}
 	if fx.Kind != "crm" {
-		pending, e := w.DB.HasNewInput(ctx, s.ID, fx.ConversationID, fx.ConversationVersion)
+		conv, version := fx.ConversationID, fx.ConversationVersion
+		if domain.IsMeetingReminder(fx) {
+			conv, version = "", 0
+		}
+		pending, e := w.DB.HasNewInput(ctx, s.ID, conv, version)
 		if e != nil {
 			return true, e
 		}
 		if pending {
+			if domain.IsMeetingReminder(fx) {
+				return true, w.DB.DeferJob(ctx, j, now.Add(5*time.Second), "new_input_pending")
+			}
 			return true, w.DB.Finish(ctx, j, s, nil, "skipped", map[string]string{"reason": "new_input_superseded_run"})
 		}
 	}
@@ -197,7 +214,7 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 	var result any
 	var follow []domain.Effect
 	switch fx.Kind {
-	case "send":
+	case "send", "send_audio":
 		lead, global, e := w.DB.Counts(ctx, s.ID)
 		if e != nil {
 			return true, e
@@ -223,12 +240,24 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 			}
 		}
 		var receipt providers.Receipt
-		receipt, err = w.Messenger.Send(opCtx, j.ID, s, text, fx.Purpose, now)
+		if fx.Kind == "send_audio" {
+			text = "[Áudio de lembrete da reunião enviado]"
+			if w.AudioSender == nil {
+				err = &providers.Failure{Code: "audio_sender_not_configured"}
+			} else {
+				receipt, err = w.AudioSender.SendAudio(opCtx, j.ID, s, fx.MediaURL, now)
+			}
+		} else {
+			receipt, err = w.Messenger.Send(opCtx, j.ID, s, text, fx.Purpose, now)
+		}
 		if err == nil {
 			result = receipt
 			sentAt := time.Now().UTC()
 			if w.Now != nil {
 				sentAt = w.Now()
+			}
+			if w.AfterSend != nil {
+				follow = append(follow, w.AfterSend(s, fx, sentAt)...)
 			}
 			if len(fx.RemainingParts) > 0 {
 				next := fx
@@ -263,6 +292,10 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 		s, follow, result, err = w.HandleEffect(opCtx, j, s, fx, now)
 	}
 	if err != nil {
+		var skip *SkipEffect
+		if errors.As(err, &skip) {
+			return true, w.DB.Finish(ctx, j, s, nil, "skipped", map[string]string{"reason": skip.Reason})
+		}
 		f := providers.Classify(err)
 		if f.Retryable && !f.Ambiguous {
 			return true, w.DB.Fail(ctx, j, f.Code, true)

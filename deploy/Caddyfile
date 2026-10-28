@@ -17,6 +17,9 @@ https://24.199.100.186 {
     handle /webhooks/test-form/* {
         reverse_proxy 127.0.0.1:8080
     }
+    handle /media/reminders/* {
+        reverse_proxy 127.0.0.1:8080
+    }
     handle /healthz {
         reverse_proxy 127.0.0.1:8080
     }

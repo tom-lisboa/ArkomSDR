@@ -75,8 +75,13 @@ func run() error {
 	}
 	calendar := &providers.LocalCalendar{Pool: db.Pool}
 	w := &worker.Worker{VoiceAutoRequest: c.Voice.AutoRequest, VoiceSender: c.Voice.Sender, Queue: "execution", DB: db, Planner: planner, Messenger: messenger, Calendar: calendar, CRM: providers.LocalCRM{Pool: db.Pool}, Policy: c.Policy, Live: c.Mode == "live", PerLeadDaily: c.PerLeadDaily, GlobalHourly: c.GlobalHourly}
+	if twilioMessages != nil {
+		w.AudioSender = twilioMessages
+	}
 	sw := schedulingworker.New(*w, calendar)
 	fw := followupworker.New(*w)
+	fw.Audio = c.ReminderAudio
+	fw.VoiceEnabled = c.Voice.Enabled
 	var processor *providers.Media
 	if c.OpenAIKey != "" && (len(c.MediaHosts) > 0 || twilioMessages != nil) {
 		hosts := map[string]bool{}
@@ -112,7 +117,7 @@ func run() error {
 		cw.Typing = twilioMessages
 		cw.TestPhone = c.TestPhone
 	}
-	mw := &mediaworker.Worker{DB: db}
+	mw := &mediaworker.Worker{DB: db, Outbound: mediaworker.Outbound(*w, c.ReminderAudio)}
 	if processor != nil {
 		mw.Processor = processor
 	}
@@ -133,6 +138,9 @@ func run() error {
 	if (*role == "all" || *role == "context") && cw.Typing != nil {
 		start(cw.RunTyping)
 	}
+	if *role == "all" || *role == "followup" {
+		start(fw.RunScheduler)
+	}
 	for range c.Workers {
 		if *role == "all" || *role == "voice" {
 			start(vw.Run)
@@ -151,6 +159,7 @@ func run() error {
 		}
 		if *role == "all" || *role == "media" {
 			start(mw.Run)
+			start(mw.Outbound.Run)
 		}
 	}
 	if *role != "all" && *role != "api" && *role != "voice" {
@@ -159,7 +168,7 @@ func run() error {
 		wg.Wait()
 		return nil
 	}
-	api := &httpapi.Server{TestFormToken: c.TestFormToken, DB: db, Calendar: calendar, Token: c.Token, Mode: c.Mode, Policy: c.Policy, VoiceSender: c.Voice.Sender, VoiceEnabled: c.Voice.Enabled}
+	api := &httpapi.Server{ReminderAudio: c.ReminderAudio, TestFormToken: c.TestFormToken, DB: db, Calendar: calendar, Token: c.Token, Mode: c.Mode, Policy: c.Policy, VoiceSender: c.Voice.Sender, VoiceEnabled: c.Voice.Enabled}
 	srv := &http.Server{Addr: c.Address, Handler: api.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}
 	voiceSrv := &http.Server{Addr: c.Voice.Address, Handler: vs.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, BaseContext: func(net.Listener) context.Context { return ctx }}
 	serverErr := make(chan error, 2)

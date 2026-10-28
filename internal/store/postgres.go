@@ -37,6 +37,9 @@ var agendaSchema string
 //go:embed test_form.sql
 var testFormSchema string
 
+//go:embed reminders.sql
+var remindersSchema string
+
 var ErrConflict = errors.New("idempotency key reused with different payload")
 var ErrLease = errors.New("lease lost; stale worker cannot commit")
 
@@ -105,6 +108,9 @@ func (d *DB) Migrate(ctx context.Context) error {
 		return e
 	}
 	if _, e = tx.Exec(ctx, testFormSchema); e != nil {
+		return e
+	}
+	if _, e = tx.Exec(ctx, remindersSchema); e != nil {
 		return e
 	}
 	return tx.Commit(ctx)
@@ -182,7 +188,7 @@ func (d *DB) Claim(ctx context.Context) (Job, domain.State, error) {
 // A global per-lead lease spans all queues. Earlier due events in any queue
 // must finish before a later event or an effect can use that lead's state.
 func (d *DB) ClaimQueue(ctx context.Context, queue string) (Job, domain.State, error) {
-	if queue != "execution" && queue != "scheduling" && queue != "followup" {
+	if queue != "execution" && queue != "scheduling" && queue != "followup" && queue != "media" {
 		return Job{}, domain.State{}, errors.New("invalid job queue")
 	}
 	var j Job
@@ -267,6 +273,20 @@ func (d *DB) Finish(ctx context.Context, j Job, s domain.State, effects []domain
 	}
 	if ct.RowsAffected() != 1 {
 		return ErrLease
+	}
+	// Pending invitations cannot survive a cancellation, reschedule or contact
+	// pause. Completed/in-flight calls keep their provider audit history.
+	bookingID := ""
+	var bookingStart *time.Time
+	if s.Booking != nil {
+		bookingID = s.Booking.ID
+		bookingStart = &s.Booking.Start
+	}
+	_, e = tx.Exec(ctx, `UPDATE bia_go.voice_requests SET state='skipped',error_code='meeting_or_contact_changed',updated_at=now()
+ WHERE lead_id=$1 AND scheduled_reminder AND state IN ('new','awaiting_permission','ready')
+ AND (booking_id IS DISTINCT FROM $2 OR booking_start IS DISTINCT FROM $3::timestamptz OR $4)`, s.ID, bookingID, bookingStart, s.OptedOut || s.Paused || s.Human || !s.Profile.Consent || s.Owner != "go" || (s.Booking != nil && s.Booking.Outcome != ""))
+	if e != nil {
+		return e
 	}
 	// Form submission never initiates reminder calls. They require an existing booking.
 	for _, fx := range effects {
@@ -362,13 +382,13 @@ func (d *DB) Counts(ctx context.Context, id string) (int, int, error) {
 	e := d.Pool.QueryRow(ctx, `SELECT
  count(*) FILTER(WHERE lead_id=$1),
  count(*) FILTER(WHERE COALESCE(completed_at,due_at)>now()-interval '1 hour')
- FROM bia_go.jobs WHERE mode='live' AND status IN ('done','running','uncertain') AND kind='effect' AND payload->>'kind'='send' AND COALESCE(result->>'chunked','false')<>'true' AND COALESCE(completed_at,due_at)>now()-interval '24 hours'`, id).Scan(&lead, &global)
+ FROM bia_go.jobs WHERE mode='live' AND status IN ('done','running','uncertain') AND kind='effect' AND payload->>'kind' IN ('send','send_audio') AND COALESCE(result->>'chunked','false')<>'true' AND COALESCE(completed_at,due_at)>now()-interval '24 hours'`, id).Scan(&lead, &global)
 	return lead, global, e
 }
 
 func (d *DB) Metrics(ctx context.Context) (map[string]any, error) {
 	var pending, uncertain, dead, simulated, sent int64
-	e := d.Pool.QueryRow(ctx, `SELECT count(*) FILTER(WHERE status='pending'),count(*) FILTER(WHERE status='uncertain'),count(*) FILTER(WHERE status='dead'),count(*) FILTER(WHERE status='simulated'),count(*) FILTER(WHERE status='done' AND kind='effect' AND payload->>'kind'='send' AND COALESCE(result->>'chunked','false')<>'true') FROM bia_go.jobs`).Scan(&pending, &uncertain, &dead, &simulated, &sent)
+	e := d.Pool.QueryRow(ctx, `SELECT count(*) FILTER(WHERE status='pending'),count(*) FILTER(WHERE status='uncertain'),count(*) FILTER(WHERE status='dead'),count(*) FILTER(WHERE status='simulated'),count(*) FILTER(WHERE status='done' AND kind='effect' AND payload->>'kind' IN ('send','send_audio') AND COALESCE(result->>'chunked','false')<>'true') FROM bia_go.jobs`).Scan(&pending, &uncertain, &dead, &simulated, &sent)
 	if e != nil {
 		return nil, e
 	}
@@ -389,7 +409,7 @@ func (d *DB) Metrics(ctx context.Context) (map[string]any, error) {
 	if e != nil {
 		return nil, e
 	}
-	queues := map[string]int64{"execution": 0, "scheduling": 0, "followup": 0}
+	queues := map[string]int64{"execution": 0, "scheduling": 0, "followup": 0, "media": 0}
 	rows, e := d.Pool.Query(ctx, `SELECT queue,count(*) FROM bia_go.jobs WHERE status IN ('pending','running') GROUP BY queue`)
 	if e != nil {
 		return nil, e

@@ -91,16 +91,28 @@ func MessageCreated(m TwilioMessage) (time.Time, error) {
 	return at, e
 }
 func (t *TwilioMessaging) Send(ctx context.Context, key string, s domain.State, text, purpose string, now time.Time) (Receipt, error) {
+	if len([]rune(text)) > 1000 || strings.TrimSpace(text) == "" {
+		return Receipt{}, &Failure{Code: "twilio_invalid_text"}
+	}
+	return t.send(ctx, key, s, text, url.Values{"Body": {text}}, now)
+}
+
+// WhatsApp audio has no caption. Keep the same write-before-POST delivery ledger.
+func (t *TwilioMessaging) SendAudio(ctx context.Context, key string, s domain.State, mediaURL string, now time.Time) (Receipt, error) {
+	if !domain.ValidHTTPS(mediaURL) {
+		return Receipt{}, &Failure{Code: "twilio_invalid_media_url"}
+	}
+	return t.send(ctx, key, s, "audio\x00"+mediaURL, url.Values{"MediaUrl": {mediaURL}}, now)
+}
+
+func (t *TwilioMessaging) send(ctx context.Context, key string, s domain.State, content string, form url.Values, now time.Time) (Receipt, error) {
 	if t.AllowedPhone != "" && s.Profile.Phone != t.AllowedPhone {
 		return Receipt{}, &Failure{Code: "twilio_recipient_not_allowed"}
 	}
 	if s.LastInbound.IsZero() || now.Sub(s.LastInbound) >= 23*time.Hour || s.LastInbound.After(now.Add(time.Minute)) {
 		return Receipt{}, &Failure{Code: "twilio_requires_approved_template"}
 	}
-	if len([]rune(text)) > 1000 || strings.TrimSpace(text) == "" {
-		return Receipt{}, &Failure{Code: "twilio_invalid_text"}
-	}
-	sum := sha256.Sum256([]byte(s.Profile.Phone + "\x00" + text))
+	sum := sha256.Sum256([]byte(s.Profile.Phone + "\x00" + content))
 	fp := hex.EncodeToString(sum[:])
 	ct, e := t.Pool.Exec(ctx, `INSERT INTO bia_go.twilio_messages(id,phone,fingerprint) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, key, s.Profile.Phone, fp)
 	if e != nil {
@@ -108,7 +120,9 @@ func (t *TwilioMessaging) Send(ctx context.Context, key string, s domain.State, 
 	}
 	var m TwilioMessage
 	if ct.RowsAffected() == 1 {
-		m, e = t.request(ctx, "POST", "/Messages.json", url.Values{"From": {"whatsapp:" + t.Sender}, "To": {"whatsapp:" + s.Profile.Phone}, "Body": {text}})
+		form.Set("From", "whatsapp:"+t.Sender)
+		form.Set("To", "whatsapp:"+s.Profile.Phone)
+		m, e = t.request(ctx, "POST", "/Messages.json", form)
 		if e != nil {
 			_, _ = t.Pool.Exec(ctx, `UPDATE bia_go.twilio_messages SET error_code=$2,updated_at=now() WHERE id=$1`, key, Classify(e).Code)
 			return Receipt{}, e

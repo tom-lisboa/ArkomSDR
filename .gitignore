@@ -24,3 +24,5 @@ docs/*result.json
 *.ogg
 *.opus
 *.m4a
+__pycache__/
+*.pyc

@@ -6,6 +6,8 @@ x-runtime: &runtime
   restart: unless-stopped
   init: true
   read_only: true
+  volumes:
+    - /var/lib/arkom-bia/media/reminders:/media/reminders:ro
   cap_drop: [ALL]
   security_opt: [no-new-privileges:true]
   pids_limit: 64

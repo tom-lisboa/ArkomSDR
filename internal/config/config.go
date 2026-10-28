@@ -2,6 +2,7 @@ package config
 
 import (
 	"arkom/bia/internal/domain"
+	"arkom/bia/internal/remindermedia"
 	"arkom/bia/internal/store"
 	"errors"
 	"os"
@@ -11,6 +12,7 @@ import (
 )
 
 type Config struct {
+	ReminderAudio                      remindermedia.Asset
 	Window                             store.WindowPolicy
 	MessagingProvider, TestPhone       string
 	TestFormToken                      string
@@ -79,6 +81,11 @@ func Load() (Config, error) {
 	c.Policy = domain.Policy{Brand: env("BIA_BRAND", "Grupo Bilhon"), SchedulingURL: env("BIA_SCHEDULING_URL", "https://example.invalid/agendar"), TimeZone: env("BIA_TIMEZONE", "America/Cuiaba"), QuietStart: 8, QuietEnd: 20, FollowupAfter: 2 * time.Hour, Reminders: []time.Duration{24 * time.Hour, 2 * time.Hour, 15 * time.Minute}}
 	c.Policy.TestPhone = c.TestPhone
 	c.Policy.DisableFollowups = os.Getenv("BIA_DISABLE_FOLLOWUPS") == "true"
+	c.Policy.MeetingReminders = os.Getenv("BIA_MEETING_REMINDERS_ENABLED") == "true"
+	c.ReminderAudio = remindermedia.Asset{Directory: env("BIA_REMINDER_AUDIO_DIR", ".local/media/reminders"), SHA256: os.Getenv("BIA_REMINDER_AUDIO_SHA256"), PublicURL: os.Getenv("BIA_VOICE_PUBLIC_URL")}
+	if c.ReminderAudio.SHA256 != "" && !remindermedia.ValidHash(c.ReminderAudio.SHA256) {
+		return c, errors.New("invalid BIA_REMINDER_AUDIO_SHA256")
+	}
 	if c.MessagingProvider == "twilio" && (os.Getenv("BIA_SCHEDULING_URL") == "" || c.Policy.SchedulingURL == "https://example.invalid/agendar") {
 		c.Policy.SchedulingURL = ""
 	}
@@ -121,6 +128,9 @@ func Load() (Config, error) {
 		return c, e
 	}
 	c.Voice = v
+	if c.Policy.MeetingReminders && (c.TestPhone != "" || c.MessagingProvider != "twilio" || !v.Enabled || c.ReminderAudio.SHA256 == "" || !c.ReminderAudio.Ready()) {
+		return c, errors.New("meeting reminders require Twilio voice, a verified local OGG/Opus audio file and unrestricted recipient configuration")
+	}
 	if c.MessagingProvider == "twilio" && (v.Account == "" || v.AuthToken == "" || v.Sender == "" || v.PublicURL == "") {
 		return c, errors.New("Twilio messaging requires credentials, sender and public URL")
 	}

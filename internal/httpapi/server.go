@@ -11,12 +11,14 @@ import (
 
 	"arkom/bia/internal/domain"
 	"arkom/bia/internal/providers"
+	"arkom/bia/internal/remindermedia"
 	"arkom/bia/internal/store"
 	"arkom/bia/internal/voiceworker"
 	"github.com/jackc/pgx/v5"
 )
 
 type Server struct {
+	ReminderAudio remindermedia.Asset
 	TestFormToken string
 	VoiceSender   string
 	VoiceEnabled  bool
@@ -28,6 +30,8 @@ type Server struct {
 
 func (s *Server) Handler() http.Handler {
 	m := http.NewServeMux()
+	m.Handle("/media/reminders/", s.ReminderAudio)
+	m.Handle("GET /v1/followups", s.auth(http.HandlerFunc(s.followupStatus)))
 	m.HandleFunc("POST /webhooks/test-form/{key}", s.testForm)
 	m.HandleFunc("OPTIONS /webhooks/test-form/{key}", s.testForm)
 	m.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { write(w, 200, map[string]string{"status": "ok"}) })

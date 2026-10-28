@@ -55,6 +55,12 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 		now = w.Now()
 	}
 	finish := func(state, id, code string) (bool, error) { return true, w.Repo.Finish(ctx, r, state, id, code) }
+	if r.ScheduledReminder && !w.Policy.MeetingReminders {
+		return finish("skipped", "", "meeting_reminders_disabled")
+	}
+	if r.ScheduledReminder && r.State == "requesting" && (r.BookingStart == nil || !now.Before(r.BookingStart.Add(-10*time.Minute))) {
+		return finish("expired", "", "permission_request_window_expired")
+	}
 	st, e := w.Repo.DB.Lead(ctx, r.LeadID)
 	if e != nil {
 		return true, e

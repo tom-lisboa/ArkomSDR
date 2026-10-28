@@ -109,6 +109,7 @@ type Decision struct {
 }
 
 type Effect struct {
+	MediaURL            string    `json:"media_url,omitempty"`
 	ReplyRoot           string    `json:"reply_root,omitempty"`
 	ReplyPart           int       `json:"reply_part,omitempty"`
 	RemainingParts      []string  `json:"remaining_parts,omitempty"`
@@ -138,6 +139,7 @@ type Result struct {
 }
 
 type Policy struct {
+	MeetingReminders bool
 	DisableFollowups bool
 	TestPhone        string
 	Brand            string
