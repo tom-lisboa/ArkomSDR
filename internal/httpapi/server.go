@@ -18,14 +18,15 @@ import (
 )
 
 type Server struct {
-	ReminderAudio remindermedia.Asset
-	TestFormToken string
-	VoiceSender   string
-	VoiceEnabled  bool
-	DB            *store.DB
-	Calendar      *providers.LocalCalendar
-	Token, Mode   string
-	Policy        domain.Policy
+	FormAutoContact bool
+	ReminderAudio   remindermedia.Asset
+	TestFormToken   string
+	VoiceSender     string
+	VoiceEnabled    bool
+	DB              *store.DB
+	Calendar        *providers.LocalCalendar
+	Token, Mode     string
+	Policy          domain.Policy
 }
 
 func (s *Server) Handler() http.Handler {

@@ -40,6 +40,9 @@ var testFormSchema string
 //go:embed reminders.sql
 var remindersSchema string
 
+//go:embed form_contact.sql
+var formContactSchema string
+
 var ErrConflict = errors.New("idempotency key reused with different payload")
 var ErrLease = errors.New("lease lost; stale worker cannot commit")
 
@@ -113,6 +116,9 @@ func (d *DB) Migrate(ctx context.Context) error {
 	if _, e = tx.Exec(ctx, remindersSchema); e != nil {
 		return e
 	}
+	if _, e = tx.Exec(ctx, formContactSchema); e != nil {
+		return e
+	}
 	return tx.Commit(ctx)
 }
 func (d *DB) Close() { d.Pool.Close() }
@@ -136,7 +142,7 @@ func (d *DB) Submit(ctx context.Context, e domain.Event, mode string) (bool, err
 		return false, err
 	}
 	fingerprintEvent := e
-	if e.Kind == "form.submitted" {
+	if e.Kind == "form.submitted" || e.Kind == "form.contact_requested" {
 		fingerprintEvent.At = time.Time{}
 	}
 	fp, _ := json.Marshal(fingerprintEvent)
@@ -314,7 +320,7 @@ func (d *DB) Finish(ctx context.Context, j Job, s domain.State, effects []domain
 			return e
 		}
 	}
-	_, e = tx.Exec(ctx, `UPDATE bia_go.jobs SET status=$3,result=$4,completed_at=now(),lease_token=NULL WHERE id=$1 AND lease_token=$2`, j.ID, j.Token, status, r)
+	_, e = tx.Exec(ctx, `UPDATE bia_go.jobs SET status=$3,result=$4,completed_at=now(),lease_token=NULL,error_code=CASE WHEN $3='done' THEN NULL ELSE error_code END WHERE id=$1 AND lease_token=$2`, j.ID, j.Token, status, r)
 	if e != nil {
 		return e
 	}

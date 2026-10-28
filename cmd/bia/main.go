@@ -71,6 +71,7 @@ func run() error {
 	}
 	if c.MessagingProvider == "twilio" {
 		twilioMessages = &providers.TwilioMessaging{Pool: db.Pool, Account: c.Voice.Account, AuthToken: c.Voice.AuthToken, Sender: c.Voice.Sender, AllowedPhone: c.TestPhone, Client: providers.NewHTTP()}
+		twilioMessages.FormContentSID = c.FormContentSID
 		messenger = twilioMessages
 	}
 	calendar := &providers.LocalCalendar{Pool: db.Pool}
@@ -169,6 +170,7 @@ func run() error {
 		return nil
 	}
 	api := &httpapi.Server{ReminderAudio: c.ReminderAudio, TestFormToken: c.TestFormToken, DB: db, Calendar: calendar, Token: c.Token, Mode: c.Mode, Policy: c.Policy, VoiceSender: c.Voice.Sender, VoiceEnabled: c.Voice.Enabled}
+	api.FormAutoContact = c.FormAutoContact
 	srv := &http.Server{Addr: c.Address, Handler: api.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}
 	voiceSrv := &http.Server{Addr: c.Voice.Address, Handler: vs.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, BaseContext: func(net.Listener) context.Context { return ctx }}
 	serverErr := make(chan error, 2)

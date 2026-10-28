@@ -62,7 +62,7 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 		return r
 	}
 	switch e.Kind {
-	case "form.submitted":
+	case "form.submitted", "form.contact_requested":
 		// A duplicate registration cannot undo opt-out, ownership or a human takeover.
 		first := s.Profile.Phone == ""
 		if first {
@@ -94,7 +94,10 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 			}
 			s.Profile = f
 		}
-		if first && s.Profile.Consent && !s.OptedOut {
+		if e.Kind == "form.contact_requested" && s.Profile.Consent && !s.OptedOut {
+			add("send", "form_contact", FormContactText, now, now.Add(24*time.Hour)).TriggerAt = e.At
+			add("crm", "form_received", "Formulário recebido; contato automático enfileirado.", now, now.Add(24*time.Hour))
+		} else if first && s.Profile.Consent && !s.OptedOut {
 			text := fmt.Sprintf("Olá, %s! Sou a Bia, assistente de IA do %s. Recebi seu cadastro. Vamos encontrar o próximo passo para usar IA no seu negócio? Você já pode escolher um horário aqui: %s", firstName(s.Profile.Name), p.Brand, p.SchedulingURL)
 			if p.SchedulingURL == "" {
 				text = fmt.Sprintf("Olá, %s! Sou a Bia, assistente de IA do %s. Recebi seu cadastro. Posso consultar os horários disponíveis para conversarmos?", firstName(s.Profile.Name), p.Brand)
@@ -465,6 +468,14 @@ func Deliverable(s State, fx Effect, now time.Time) (bool, string) {
 		return false, "stale_booking_time"
 	}
 	if fx.Kind == "send" {
+		if fx.Purpose == "form_contact" {
+			if s.Paused {
+				return false, "paused"
+			}
+			if s.LastFormContactAt != nil && now.Sub(*s.LastFormContactAt) < 15*time.Minute {
+				return false, "form_contact_cooldown"
+			}
+		}
 		if fx.Purpose != "reply" && !s.Profile.Consent {
 			return false, "no_consent"
 		}

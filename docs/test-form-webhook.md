@@ -1,4 +1,4 @@
-# Webhook do formulário de teste
+# Formulário com contato automático
 
 Número de teste: **+55 11 93624-6321**. A restrição a um único destinatário foi retirada para atendimento iniciado no WhatsApp. Texto, áudios, imagens e agrupamento de mensagens usam os workers existentes. Follow-ups automáticos permanecem desligados nesta fase. Ligações continuam restritas a lembretes com reunião válida e autorização nativa.
 
@@ -29,18 +29,18 @@ CORS habilitado para a página de teste, inclusive localhost. `OPTIONS` retorna 
 - `goal`: objetivo, opcional, até 2000 bytes.
 - `email`: opcional, até 254 bytes.
 - `timezone`: fuso IANA; padrão America/Cuiaba.
-- `consent`: obrigatório `true`, vindo de um checkbox real: “Quero testar o atendimento da Bia pelo WhatsApp e autorizo o uso destes dados no teste.”
+- `consent`: obrigatório `true`, vindo de um checkbox real: “Autorizo a Arkom a entrar em contato comigo pelo WhatsApp sobre o diagnóstico que estou solicitando.”
 
 Não envie `data_reuniao`, `owner`, IDs de reserva ou campos de ferramentas neste webhook. A data da reunião continua vindo da agenda e não é criada pela submissão do formulário.
 
 ## Fluxo na página
 
 1. Envie o formulário e aguarde HTTP 202.
-2. Mostre **“Continuar teste no WhatsApp”**, apontando para `whatsapp_url` da resposta.
-3. A pessoa abre o link com o WhatsApp do telefone informado e **envia a mensagem pronta**, sem apagar o código `ARKOM-...`.
-4. Nosso webhook da Twilio verifica a mensagem; o código é consumido uma única vez e os dados entram no perfil usado pela Bia. A execução seguinte recebe empresa, nome, faturamento e objetivo. A conversa pode continuar normalmente com texto, áudio e imagens.
+2. Exiba `message` da resposta. Com `requires_whatsapp_action=false`, a Bia inicia o contato automaticamente.
+3. `whatsapp_url` permanece como atalho opcional; abrir o WhatsApp e enviar o código não é mais uma etapa obrigatória.
+4. Os dados ficam no PostgreSQL e entram no contexto da IA quando a pessoa responde. Nome, empresa, faturamento e objetivo não precisam ser perguntados novamente.
 
-A submissão sozinha não dispara mensagem nem ligação. O contato pelo WhatsApp vincula o formulário ao número real e abre a sessão de atendimento. Para números brasileiros, o vínculo aceita a variante oficial reportada pelo WhatsApp sem o nono dígito quando aplicável. Não vinculamos apenas por semelhança do número: é necessário o código recebido após enviar o formulário.
+HTTP 202 significa aceito na fila, não mensagem já entregue. Concluir o formulário não agenda uma reunião nem inicia uma ligação. A primeira mensagem não contém faturamento, objetivo ou outros dados privados.
 
 ```js
 const WEBHOOK = "https://SEU_HOST/webhooks/test-form/SUA_CHAVE_DE_TESTE";
@@ -62,7 +62,7 @@ async function enviarFormulario(dados, submissionId) {
 
 // No submit: const submissionId = crypto.randomUUID();
 // const resultado = await enviarFormulario(dadosDoFormulario, submissionId);
-// Mostre um <a href={resultado.whatsapp_url}>Continuar teste no WhatsApp</a>.
+// Mostre resultado.message. O link para o WhatsApp agora é opcional.
 // Não tente abrir popup automaticamente depois do await; prefira um botão/link.
 ```
 
@@ -70,14 +70,39 @@ Resposta HTTP 202:
 
 ```json
 {
-  "status": "awaiting_whatsapp",
+  "status": "contact_queued",
+  "requires_whatsapp_action": false,
+  "event_id": "form-contact-UUID enviado",
   "submission_id": "UUID enviado",
   "duplicate": false,
   "whatsapp_url": "https://wa.me/5511936246321?text=...",
-  "message": "Formulário recebido. Abra o WhatsApp e envie a mensagem pronta usando o número informado. A Bia receberá os dados do formulário."
+  "message": "Formulário recebido. A Bia vai iniciar o contato no seu WhatsApp; você não precisa enviar uma mensagem primeiro."
 }
 ```
 
-Códigos: 400 JSON inválido/campos desconhecidos; 404 endereço incorreto/desabilitado; 409 mesma chave com conteúdo diferente; 422 campos inválidos/consentimento ausente; 429 limite do teste; 503 indisponibilidade temporária. Limites de formulário: 10 submissões por telefone/hora e 60 no total/hora. Repetição idêntica não consome outra submissão. Link válido por 24 horas desde a primeira submissão; códigos expirados ou enviados por outro número não vinculam dados. Para repetir a vinculação após consumir o código, faça uma nova submissão com novo UUID.
+## Envio pela Twilio
 
-Publicado e verificado no release `r-3ed6c616d356`, schema 8. Limites de mensagens nesta fase: 100 por contato/dia e 300 no total/hora. Testes automatizados com PostgreSQL e detector de corrida passaram. O endpoint público respondeu 202 e o preflight 204, com duplicidade e validação conferidas. Execução sintética na OpenAI passou com a chave atual. O teste de conversa real iniciado por esta página ainda depende do envio pelo aparelho de vocês.
+`BIA_FORM_AUTO_CONTACT=true` ativa o contato automático no mesmo webhook. Quando desligado, o vínculo antigo por código continua disponível por compatibilidade. Shadow retorna `queued_for_simulation` e não envia mensagens reais.
+
+A primeira mensagem é fixa:
+
+> Olá! Sou a Bia, assistente de IA da Arkom. Recebi seu formulário de diagnóstico. Podemos continuar seu atendimento por aqui? Para não receber mensagens, responda SAIR.
+
+Dentro da janela de atendimento, sai como texto. Fora dela, o worker usa `TWILIO_FORM_CONTACT_CONTENT_SID`, com o template em `deploy/form-contact-template.json`. O template precisa estar aprovado pela Meta; a submissão do formulário **não abre nem altera a janela do WhatsApp**. A margem usada pelo código é de 23 horas desde a última mensagem recebida.
+
+O worker consulta a aprovação pela API antes de cada envio fora da janela. Enquanto estiver pendente, mantém o mesmo job aguardando, sem consumir tentativas nem transferir o atendimento a um humano. A mensagem expira após 24 horas se o impedimento persistir. `contact_queued` não garante aprovação nem entrega.
+
+## Duplicidade e controles
+
+- Um evento de contato por submissão, persistido com a ativação em uma transação.
+- Retry com o mesmo UUID e conteúdo não reenfileira nem consome limite de formulário.
+- Novos UUIDs do mesmo contato têm intervalo mínimo de 15 minutos entre mensagens iniciais enviadas; o perfil ainda recebe os dados novos.
+- Opt-out, pausa, atendimento humano e propriedade n8n são preservados.
+- Uma resposta após a submissão pode substituir a saudação pendente, seguindo pelo atendimento normal.
+- Telefones brasileiros com/sem nono dígito reutilizam conversas Twilio existentes. Mensagens assinadas e permissões de ligação seguem o mesmo lead.
+- Limites do formulário: 10 submissões por telefone/hora e 60 totais/hora, além dos limites de mensagens configurados.
+- A publicação não dispara mensagens para todos os cadastros antigos.
+
+Códigos: 400 JSON inválido/campos desconhecidos; 404 chave incorreta; 409 UUID em conflito ou submissão expirada; 422 dados/consentimento inválidos; 429 limite; 503 indisponível. O administrador pode consultar `GET /v1/jobs/{event_id}` e o job `fx/{event_id}:0` na API privada autenticada.
+
+Referências: [janela e templates](https://www.twilio.com/docs/whatsapp/key-concepts) e [Content API da Twilio](https://www.twilio.com/docs/content/content-api-resources).

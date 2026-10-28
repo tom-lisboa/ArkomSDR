@@ -142,6 +142,13 @@ func (s Repository) Defer(ctx context.Context, r Request, due time.Time) error {
 // Permission timestamps are fetched from Twilio's Message resource, not supplied
 // by the sender or inferred from arrival order. Each provider event is consumed once.
 func (s Repository) Permission(ctx context.Context, eventID, phone, sender string, accepted, permanent bool, at time.Time) error {
+	lead := domain.LeadKey(phone)
+	contact, lookupErr := s.DB.WhatsAppContact(ctx, phone)
+	if lookupErr == nil {
+		lead = contact.ID
+	} else if !errors.Is(lookupErr, pgx.ErrNoRows) {
+		return lookupErr
+	}
 	tx, e := s.DB.Pool.Begin(ctx)
 	if e != nil {
 		return e
@@ -154,7 +161,6 @@ func (s Repository) Permission(ctx context.Context, eventID, phone, sender strin
 	if ct.RowsAffected() == 0 {
 		return tx.Commit(ctx)
 	}
-	lead := domain.LeadKey(phone)
 	if !accepted {
 		_, e = tx.Exec(ctx, `UPDATE bia_go.voice_requests SET revoked_at=$3,updated_at=now(),state=CASE WHEN state IN ('awaiting_permission','ready','new') THEN 'rejected' ELSE state END WHERE lead_id=$1 AND sender=$2 AND mode='live' AND (permission_at IS NULL OR permission_at<=$3)`, lead, sender, at)
 	} else {

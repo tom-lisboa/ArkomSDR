@@ -18,6 +18,15 @@ type Failure struct {
 	Ambiguous bool
 }
 
+// Deferred is a prerequisite wait before any provider mutation, not a failed
+// send. The durable job keeps its original expiry and retry budget.
+type Deferred struct {
+	Code  string
+	After time.Duration
+}
+
+func (d *Deferred) Error() string { return d.Code }
+
 func (e *Failure) Error() string { return e.Code }
 func Classify(e error) *Failure {
 	var f *Failure

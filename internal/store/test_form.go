@@ -11,7 +11,8 @@ import (
 	"time"
 )
 
-// No message or lead mutation happens until the recipient sends the pairing code.
+// Registration records the submission. The configured route either activates
+// automatic contact or leaves it waiting for the legacy pairing flow.
 var ErrTestFormLimit = errors.New("test_form_rate_limit")
 var formCodePattern = regexp.MustCompile(`\bARKOM-([a-f0-9]{32})\b`)
 
@@ -53,7 +54,7 @@ func (d *DB) RegisterTestForm(ctx context.Context, id string, f domain.Form) (co
 }
 
 // Brazilian WhatsApp may report the mobile number without the ninth digit.
-// This equivalence is used ONLY with possession of a one-use form code.
+// Existing Twilio conversations and legacy pairing also accept this spelling.
 func testPhoneKey(s string) string {
 	if strings.HasPrefix(s, "+55") && len(s) == 14 && s[5] == '9' && s[6] >= '6' && s[6] <= '9' {
 		return s[:5] + s[6:]

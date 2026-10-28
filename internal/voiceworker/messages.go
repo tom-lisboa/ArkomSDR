@@ -6,6 +6,7 @@ import (
 	"arkom/bia/internal/store"
 	"context"
 	"errors"
+	"github.com/jackc/pgx/v5"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -71,6 +72,20 @@ func (s *Server) messages(w http.ResponseWriter, r *http.Request) {
 	conv := "twilio:" + s.Sender + ":" + phone
 	profile := domain.Form{Name: name, Phone: phone, Channel: "gateway", ConversationID: conv, Consent: true, ConsentTextVersion: "whatsapp_inbound_service_v1", TimeZone: s.TimeZone, Source: "twilio_whatsapp"}
 	event := domain.Event{ID: "twilio-" + m.SID, LeadID: domain.LeadKey(phone), Kind: "message.received", At: at, Text: text, ConversationID: conv, Attachments: attachments}
+	// A form-created lead may store the other Brazilian spelling of this mobile.
+	// The signed provider message continues that same conversation and ownership.
+	existing, lookupErr := s.Repo.DB.WhatsAppContact(ctx, phone)
+	if lookupErr == nil {
+		profile.Phone = existing.Profile.Phone
+		if existing.Profile.ConversationID != "" {
+			profile.ConversationID = existing.Profile.ConversationID
+		}
+		event.LeadID = existing.ID
+		event.ConversationID = profile.ConversationID
+	} else if !errors.Is(lookupErr, pgx.ErrNoRows) {
+		http.Error(w, "contact lookup unavailable", 503)
+		return
+	}
 	if e = domain.ValidateEvent(event); e != nil {
 		http.Error(w, "invalid event", 400)
 		return

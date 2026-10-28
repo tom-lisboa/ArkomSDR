@@ -84,6 +84,7 @@ type State struct {
 	CreatedAt          time.Time  `json:"created_at"`
 	LastInbound        time.Time  `json:"last_inbound"`
 	FirstContactAt     *time.Time `json:"first_contact_at,omitempty"`
+	LastFormContactAt  *time.Time `json:"last_form_contact_at,omitempty"`
 	OptedOut           bool       `json:"opted_out"`
 	Paused             bool       `json:"paused"`
 	Human              bool       `json:"human"`
@@ -222,7 +223,7 @@ func ValidateEvent(e Event) error {
 		return errors.New("event text too large")
 	}
 	switch e.Kind {
-	case "form.submitted":
+	case "form.submitted", "form.contact_requested":
 		if e.Form == nil {
 			return errors.New("form required")
 		}

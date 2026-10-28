@@ -281,6 +281,9 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 			if fx.Purpose == "followup" {
 				s.LastFollowup = &now
 			}
+			if fx.Purpose == "form_contact" {
+				s.LastFormContactAt = &now
+			}
 		}
 	case "crm":
 		err = w.CRM.Record(opCtx, j.ID, s, fx)
@@ -292,6 +295,10 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 		s, follow, result, err = w.HandleEffect(opCtx, j, s, fx, now)
 	}
 	if err != nil {
+		var deferred *providers.Deferred
+		if errors.As(err, &deferred) {
+			return true, w.DB.DeferJob(ctx, j, now.Add(deferred.After), deferred.Code)
+		}
 		var skip *SkipEffect
 		if errors.As(err, &skip) {
 			return true, w.DB.Finish(ctx, j, s, nil, "skipped", map[string]string{"reason": skip.Reason})

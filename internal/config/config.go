@@ -12,6 +12,8 @@ import (
 )
 
 type Config struct {
+	FormAutoContact                    bool
+	FormContentSID                     string
 	ReminderAudio                      remindermedia.Asset
 	Window                             store.WindowPolicy
 	MessagingProvider, TestPhone       string
@@ -62,6 +64,14 @@ func Load() (Config, error) {
 	c.MessagingProvider = env("BIA_MESSAGING_PROVIDER", "gateway")
 	c.TestPhone = os.Getenv("BIA_TEST_PHONE")
 	c.TestFormToken = os.Getenv("BIA_TEST_FORM_TOKEN")
+	c.FormAutoContact = os.Getenv("BIA_FORM_AUTO_CONTACT") == "true"
+	c.FormContentSID = os.Getenv("TWILIO_FORM_CONTACT_CONTENT_SID")
+	if c.FormContentSID != "" && (len(c.FormContentSID) != 34 || !strings.HasPrefix(c.FormContentSID, "HX")) {
+		return c, errors.New("invalid TWILIO_FORM_CONTACT_CONTENT_SID")
+	}
+	if c.FormAutoContact && c.MessagingProvider != "twilio" {
+		return c, errors.New("automatic public form contact requires Twilio messaging")
+	}
 	if c.TestFormToken != "" && len(c.TestFormToken) < 32 {
 		return c, errors.New("test form token must have at least 32 characters")
 	}
