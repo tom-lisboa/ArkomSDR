@@ -15,6 +15,7 @@ import (
 var ErrBlocked = errors.New("voice_request_blocked")
 
 type Request struct {
+	ManualReminder    bool       `json:"manual_reminder"`
 	ScheduledReminder bool       `json:"scheduled_reminder"`
 	BookingID         string     `json:"booking_id,omitempty"`
 	BookingStart      *time.Time `json:"booking_start,omitempty"`
@@ -36,11 +37,11 @@ type Request struct {
 	Error             string     `json:"error_code,omitempty"`
 }
 
-const requestColumns = `id,lead_id,mode,sender,purpose,state,created_at,expires_at,permission_at,permission_expires_at,permanent,revoked_at,COALESCE(permission_sid,''),COALESCE(call_sid,''),COALESCE(lease_token,''),COALESCE(error_code,''),COALESCE(booking_id,''),booking_start,scheduled_reminder`
+const requestColumns = `id,lead_id,mode,sender,purpose,state,created_at,expires_at,permission_at,permission_expires_at,permanent,revoked_at,COALESCE(permission_sid,''),COALESCE(call_sid,''),COALESCE(lease_token,''),COALESCE(error_code,''),COALESCE(booking_id,''),booking_start,scheduled_reminder,manual_reminder`
 
 func scanRequest(row pgx.Row) (Request, error) {
 	var r Request
-	e := row.Scan(&r.ID, &r.LeadID, &r.Mode, &r.Sender, &r.Purpose, &r.State, &r.Created, &r.Expires, &r.PermissionAt, &r.PermissionExpires, &r.Permanent, &r.Revoked, &r.PermissionSID, &r.CallSID, &r.Token, &r.Error, &r.BookingID, &r.BookingStart, &r.ScheduledReminder)
+	e := row.Scan(&r.ID, &r.LeadID, &r.Mode, &r.Sender, &r.Purpose, &r.State, &r.Created, &r.Expires, &r.PermissionAt, &r.PermissionExpires, &r.Permanent, &r.Revoked, &r.PermissionSID, &r.CallSID, &r.Token, &r.Error, &r.BookingID, &r.BookingStart, &r.ScheduledReminder, &r.ManualReminder)
 	return r, e
 }
 
@@ -86,7 +87,12 @@ func (s Repository) create(ctx context.Context, id, lead, mode, sender, purpose 
 		}
 		expires = st.Booking.Start
 	}
-	ct, e := tx.Exec(ctx, `INSERT INTO bia_go.voice_requests(id,lead_id,mode,sender,purpose,booking_id,booking_start,expires_at,scheduled_reminder) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(id) DO NOTHING`, id, lead, mode, sender, purpose, st.Booking.ID, st.Booking.Start, expires, expected != nil)
+	manual := expected != nil && expected.ManualReminder
+	if manual && expected.Expires.Before(expires) {
+		expires = expected.Expires
+	}
+	scheduled := expected != nil && !manual
+	ct, e := tx.Exec(ctx, `INSERT INTO bia_go.voice_requests(id,lead_id,mode,sender,purpose,booking_id,booking_start,expires_at,scheduled_reminder,manual_reminder) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(id) DO NOTHING`, id, lead, mode, sender, purpose, st.Booking.ID, st.Booking.Start, expires, scheduled, manual)
 	if e != nil {
 		var pe *pgconn.PgError
 		if errors.As(e, &pe) && pe.Code == "23505" {
@@ -99,7 +105,7 @@ func (s Repository) create(ctx context.Context, id, lead, mode, sender, purpose 
 		if e != nil {
 			return false, e
 		}
-		if old.LeadID != lead || old.Mode != mode || old.Sender != sender || old.Purpose != purpose || old.BookingID != st.Booking.ID || old.BookingStart == nil || !old.BookingStart.Equal(st.Booking.Start) || old.ScheduledReminder != (expected != nil) {
+		if old.LeadID != lead || old.Mode != mode || old.Sender != sender || old.Purpose != purpose || old.BookingID != st.Booking.ID || old.BookingStart == nil || !old.BookingStart.Equal(st.Booking.Start) || old.ScheduledReminder != scheduled || old.ManualReminder != manual {
 			return false, store.ErrConflict
 		}
 	}

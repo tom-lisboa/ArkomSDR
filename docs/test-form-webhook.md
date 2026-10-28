@@ -6,7 +6,10 @@ Número de teste: **+55 11 93624-6321**. A restrição a um único destinatário
 
 `POST https://SEU_HOST/webhooks/test-form/SUA_CHAVE_DE_TESTE`
 
-Este endereço tem uma chave própria, limitada ao recebimento do formulário. Não use a chave OpenAI, credenciais Twilio ou token administrativo na página. Não é necessário cabeçalho Authorization.
+Este endereço tem uma chave própria, limitada ao formulário e aos seus disparos de demonstração. Não use a chave OpenAI, credenciais Twilio ou token administrativo na página. Não é necessário cabeçalho Authorization.
+
+Os botões para antecipar o áudio e o convite de ligação usam essa mesma base:
+[contrato e exemplo JavaScript](demo-triggers.md). Guarde `submission_id` da resposta para essas ações.
 
 CORS habilitado para a página de teste, inclusive localhost. `OPTIONS` retorna 204. Envie `Content-Type: application/json` e `Idempotency-Key` com UUID. Reutilize o mesmo UUID e corpo ao repetir uma requisição que falhou por rede. Gere outro UUID para uma nova submissão ou alteração de dados.
 

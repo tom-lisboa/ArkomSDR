@@ -43,6 +43,9 @@ var remindersSchema string
 //go:embed form_contact.sql
 var formContactSchema string
 
+//go:embed manual_reminders.sql
+var manualRemindersSchema string
+
 var ErrConflict = errors.New("idempotency key reused with different payload")
 var ErrLease = errors.New("lease lost; stale worker cannot commit")
 
@@ -117,6 +120,9 @@ func (d *DB) Migrate(ctx context.Context) error {
 		return e
 	}
 	if _, e = tx.Exec(ctx, formContactSchema); e != nil {
+		return e
+	}
+	if _, e = tx.Exec(ctx, manualRemindersSchema); e != nil {
 		return e
 	}
 	return tx.Commit(ctx)

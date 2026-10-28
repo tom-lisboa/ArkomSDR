@@ -108,6 +108,17 @@ func (w *Worker) effect(ctx context.Context, j store.Job, s domain.State, fx dom
 // Recheck the current timezone and quiet hours at delivery, including after a
 // restart or profile update. Never extend a reminder beyond its original expiry.
 func NextContact(p domain.Policy, s domain.State, fx domain.Effect, now time.Time) (time.Time, string) {
+	// Explicit demo actions bypass only the cadence and contact hours. Consent,
+	// booking, session, provider limits and delivery checks still apply.
+	if domain.IsMeetingReminder(fx) && fx.ManualReminder {
+		if ok, why := domain.Deliverable(s, fx, now); !ok {
+			return time.Time{}, why
+		}
+		if p.TestPhone != "" && s.Profile.Phone != p.TestPhone {
+			return time.Time{}, "test_phone_mismatch"
+		}
+		return now, ""
+	}
 	if domain.IsMeetingReminder(fx) {
 		if !p.MeetingReminders || p.TestPhone != "" {
 			return time.Time{}, "meeting_reminders_disabled"

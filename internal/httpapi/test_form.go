@@ -11,18 +11,25 @@ import (
 	"time"
 )
 
-// This capability accepts only test-form data; it never grants admin API access.
-func (s *Server) testForm(w http.ResponseWriter, r *http.Request) {
+// This capability is scoped to the test form and its demo actions, never admin.
+func (s *Server) testAccess(w http.ResponseWriter, r *http.Request) bool {
 	if len(s.TestFormToken) < 32 || subtle.ConstantTimeCompare([]byte(r.PathValue("key")), []byte(s.TestFormToken)) != 1 {
 		http.NotFound(w, r)
-		return
+		return false
 	}
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Idempotency-Key")
 	w.Header().Set("Access-Control-Max-Age", "600")
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusNoContent)
+		return false
+	}
+	return true
+}
+
+func (s *Server) testForm(w http.ResponseWriter, r *http.Request) {
+	if !s.testAccess(w, r) {
 		return
 	}
 	var input struct {

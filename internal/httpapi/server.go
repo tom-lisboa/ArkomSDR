@@ -35,6 +35,10 @@ func (s *Server) Handler() http.Handler {
 	m.Handle("GET /v1/followups", s.auth(http.HandlerFunc(s.followupStatus)))
 	m.HandleFunc("POST /webhooks/test-form/{key}", s.testForm)
 	m.HandleFunc("OPTIONS /webhooks/test-form/{key}", s.testForm)
+	m.HandleFunc("POST /webhooks/test-form/{key}/reminders/{action}", s.testReminder)
+	m.HandleFunc("OPTIONS /webhooks/test-form/{key}/reminders/{action}", s.testReminder)
+	m.HandleFunc("GET /webhooks/test-form/{key}/reminders/{action}/{id}", s.testReminderStatus)
+	m.HandleFunc("OPTIONS /webhooks/test-form/{key}/reminders/{action}/{id}", s.testReminderStatus)
 	m.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { write(w, 200, map[string]string{"status": "ok"}) })
 	m.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, c := context.WithTimeout(r.Context(), time.Second)

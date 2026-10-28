@@ -80,6 +80,9 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 		return true, w.Repo.Defer(ctx, r, now.Add(5*time.Second))
 	}
 	due := w.Policy.NextContact(now, st)
+	if r.ManualReminder {
+		due = now
+	}
 	if !due.Before(r.Expires) {
 		return finish("expired", "", "contact_window_expired")
 	}

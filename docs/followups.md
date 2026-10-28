@@ -3,6 +3,9 @@
 Implementação própria em Go, PostgreSQL e worker de mídia. A agenda e os demais
 workers existentes continuam sendo a fonte dos dados; o n8n não participa.
 
+Para apresentações, os [disparos manuais do formulário](demo-triggers.md) antecipam
+uma etapa por clique usando os mesmos workers, mesmo com a cadência desligada.
+
 | Momento | Responsável | Ação |
 |---|---|---|
 | T−30 minutos | Follow-up → mídia | Envia a gravação da equipe como áudio OGG/Opus. |

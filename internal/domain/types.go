@@ -113,6 +113,7 @@ type Decision struct {
 }
 
 type Effect struct {
+	ManualReminder      bool      `json:"manual_reminder,omitempty"`
 	MediaURL            string    `json:"media_url,omitempty"`
 	ReplyRoot           string    `json:"reply_root,omitempty"`
 	ReplyPart           int       `json:"reply_part,omitempty"`
