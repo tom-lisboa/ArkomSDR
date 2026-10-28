@@ -1,0 +1,9 @@
+{
+  "name": "Pessoa Exemplo",
+  "phone": "+5565999999999",
+  "consent": true,
+  "consent_text_version": "demo-v1",
+  "revenue": 0,
+  "channel": "gateway",
+  "timezone": "America/Cuiaba"
+}

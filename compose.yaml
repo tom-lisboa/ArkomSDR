@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: bia
+      POSTGRES_PASSWORD: bia_local_only
+      POSTGRES_DB: bia
+    ports:
+      - "127.0.0.1:54329:5432"
+    volumes:
+      - bia_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bia -d bia"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6389:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - bia_redis:/data
+volumes:
+  bia_redis:
+  bia_pg:

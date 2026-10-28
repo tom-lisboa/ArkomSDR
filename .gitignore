@@ -1,0 +1,26 @@
+.env
+.env.*
+!.env.example
+.local/
+bin/
+/bia
+coverage.out
+*.test
+*.log
+.DS_Store
+
+# Local operational evidence, media, databases and private keys
+docs/*result.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.dump
+*.backup
+*.sqlite*
+*.tar.gz
+*.mp3
+*.wav
+*.ogg
+*.opus
+*.m4a

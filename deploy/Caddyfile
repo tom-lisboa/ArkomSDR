@@ -1,0 +1,26 @@
+{
+    email tools@bilhon.com
+}
+
+https://24.199.100.186 {
+    tls {
+        issuer acme {
+            dir https://acme-v02.api.letsencrypt.org/directory
+            profile shortlived
+        }
+    }
+    header X-Content-Type-Options nosniff
+    header Cache-Control no-store
+    handle /voice/* {
+        reverse_proxy 127.0.0.1:8081
+    }
+    handle /webhooks/test-form/* {
+        reverse_proxy 127.0.0.1:8080
+    }
+    handle /healthz {
+        reverse_proxy 127.0.0.1:8080
+    }
+    handle {
+        respond "Not found" 404
+    }
+}

@@ -1,0 +1,9 @@
+[Unit]
+Description=Arkom Bia PostgreSQL local backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/arkom-bia/current/backup.sh
+UMask=0077

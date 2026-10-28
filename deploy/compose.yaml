@@ -1,0 +1,91 @@
+name: arkom-bia
+
+x-runtime: &runtime
+  image: arkom-bia:${BIA_RELEASE:?set BIA_RELEASE}
+  env_file: /etc/arkom-bia/runtime.env
+  restart: unless-stopped
+  init: true
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 64
+  mem_limit: 160m
+  stop_grace_period: 30s
+  logging:
+    driver: local
+    options:
+      max-size: 10m
+      max-file: "3"
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    env_file: /etc/arkom-bia/postgres.env
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    shm_size: 128m
+    mem_limit: 512m
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U bia -d bia"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+    logging:
+      driver: local
+      options: {max-size: 10m, max-file: "3"}
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: [redis-server, --appendonly, "yes", --maxmemory, 64mb, --maxmemory-policy, noeviction]
+    volumes:
+      - redis:/data
+    mem_limit: 128m
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+    logging:
+      driver: local
+      options: {max-size: 10m, max-file: "3"}
+  migrate:
+    <<: *runtime
+    profiles: [tools]
+    restart: "no"
+    command: [-migrate]
+  api:
+    <<: *runtime
+    command: [-role, api]
+    ports: ["127.0.0.1:8080:8080"]
+  context:
+    <<: *runtime
+    command: [-role, context]
+  execution:
+    <<: *runtime
+    command: [-role, execution]
+  media:
+    <<: *runtime
+    mem_limit: 384m
+    environment:
+      GOMEMLIMIT: 256MiB
+    command: [-role, media]
+  scheduling:
+    <<: *runtime
+    command: [-role, scheduling]
+  followup:
+    <<: *runtime
+    command: [-role, followup]
+  voice:
+    <<: *runtime
+    command: [-role, voice]
+    ports: ["127.0.0.1:8081:8081"]
+
+volumes:
+  postgres:
+  redis:

@@ -1,0 +1,1649 @@
+{
+  "name": "[ARKOM] Bia SDR IA — WhatsApp Comercial",
+  "sha256": "f3c99fd421681c0102f48f12aec4373a9ed10fa9729aee1ffbd92de3f0fa5f97",
+  "nodes": [
+    {
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.inbound_router"
+      ],
+      "targets": []
+    },
+    {
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Bia: A cada 10 min?",
+        "CM: Pendentes",
+        "PG: Avisos de reserva",
+        "PG: Watermark"
+      ]
+    },
+    {
+      "name": "PG: Watermark",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [],
+      "targets": [
+        "Numeros"
+      ]
+    },
+    {
+      "name": "DC: Conversas",
+      "type": "n8n-nodes-base.httpRequest",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "httpHeaderAuth"
+      ],
+      "dependencies": [],
+      "targets": [
+        "Parse conversas"
+      ]
+    },
+    {
+      "name": "Parse conversas",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 3888,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "DC: Mensagens"
+      ]
+    },
+    {
+      "name": "DC: Mensagens",
+      "type": "n8n-nodes-base.httpRequest",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "httpHeaderAuth"
+      ],
+      "dependencies": [],
+      "targets": [
+        "Bia: Áudios novos"
+      ]
+    },
+    {
+      "name": "Preparar",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 20313,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.bia_agenda_clickmax_vale",
+        "funil_aplicacao.bia_vagas_cm_v1",
+        "funil_aplicacao.eh_lead_teste",
+        "funil_aplicacao.inbound_router",
+        "funil_aplicacao.presenca_da_call",
+        "funil_aplicacao.site_whatsapp_vale"
+      ],
+      "targets": [
+        "CM: Cursor",
+        "Cursor",
+        "Filter novos"
+      ]
+    },
+    {
+      "name": "Filter novos",
+      "type": "n8n-nodes-base.filter",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "PG: Lead+Dedup"
+      ]
+    },
+    {
+      "name": "PG: Lead+Dedup",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [],
+      "targets": [
+        "PG: Contexto não-vai"
+      ]
+    },
+    {
+      "name": "Montar prompt",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 619152,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.bia_nao_vai",
+        "funil_aplicacao.bia_nao_vai_marcar",
+        "funil_aplicacao.inbound_router",
+        "funil_aplicacao.site_whatsapp_passo",
+        "funil_aplicacao.site_whatsapp_vale",
+        "public.crm_fila_enfileirar"
+      ],
+      "targets": [
+        "Filter gerar"
+      ]
+    },
+    {
+      "name": "Filter gerar",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Precisa LLM?",
+        "SQL blocked"
+      ]
+    },
+    {
+      "name": "Parse Claude",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 593659,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.bia_nao_vai",
+        "funil_aplicacao.bia_nao_vai_marcar",
+        "funil_aplicacao.inbound_router",
+        "funil_aplicacao.site_whatsapp_passo",
+        "funil_aplicacao.site_whatsapp_vale",
+        "public.crm_fila_enfileirar"
+      ],
+      "targets": [
+        "Refazer?"
+      ]
+    },
+    {
+      "name": "IF Enviar",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "CM: Resposta",
+        "Explodir bolhas",
+        "PG: Finalizar"
+      ]
+    },
+    {
+      "name": "Explodir bolhas",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 893,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "DC: Send Leo",
+        "PG: Finalizar"
+      ]
+    },
+    {
+      "name": "DC: Send Leo",
+      "type": "n8n-nodes-base.httpRequest",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "httpHeaderAuth"
+      ],
+      "dependencies": [],
+      "targets": [
+        "Bia: Site pós-envio"
+      ]
+    },
+    {
+      "name": "IF Flags",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "PG: Flags"
+      ]
+    },
+    {
+      "name": "PG: Flags",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [],
+      "targets": []
+    },
+    {
+      "name": "IF Nota PD",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "CRM: Nota"
+      ]
+    },
+    {
+      "name": "IF Atividade PD",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "CRM: Destinatários do alerta"
+      ]
+    },
+    {
+      "name": "IF Cancelar",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Cancelar no Cal"
+      ]
+    },
+    {
+      "name": "Cancelar no Cal",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 4624,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Bia: Avisar cancelamento?",
+        "Bia: Contexto pós-ação",
+        "CM: Avisar cancelamento?"
+      ]
+    },
+    {
+      "name": "IF Agendar",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Agendar no Cal"
+      ]
+    },
+    {
+      "name": "Agendar no Cal",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 16182,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "IF Book falhou"
+      ]
+    },
+    {
+      "name": "IF Book falhou",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Bia: Contexto pós-ação",
+        "Bia: Espera Booking→CRM",
+        "Canal: Avisar falha booking",
+        "Canal: Confirmar book",
+        "PG: Retomar cadencia"
+      ]
+    },
+    {
+      "name": "DC: Confirmar book",
+      "type": "n8n-nodes-base.httpRequest",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "httpHeaderAuth"
+      ],
+      "dependencies": [],
+      "targets": []
+    },
+    {
+      "name": "Avisar falha booking",
+      "type": "n8n-nodes-base.httpRequest",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "httpHeaderAuth"
+      ],
+      "dependencies": [],
+      "targets": []
+    },
+    {
+      "name": "SQL blocked",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 593648,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.bia_nao_vai",
+        "funil_aplicacao.bia_nao_vai_marcar",
+        "funil_aplicacao.inbound_router",
+        "funil_aplicacao.site_whatsapp_passo",
+        "funil_aplicacao.site_whatsapp_vale",
+        "public.crm_fila_enfileirar"
+      ],
+      "targets": [
+        "PG: Finalizar"
+      ]
+    },
+    {
+      "name": "PG: Finalizar",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [],
+      "targets": []
+    },
+    {
+      "name": "Numeros",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 965,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "DC: Conversas"
+      ]
+    },
+    {
+      "name": "PG: Retomar cadencia",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [],
+      "targets": []
+    },
+    {
+      "name": "Cursor",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 3908,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.inbound_router"
+      ],
+      "targets": [
+        "PG: Cursor"
+      ]
+    },
+    {
+      "name": "PG: Cursor",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [],
+      "targets": []
+    },
+    {
+      "name": "Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "anthropicApi"
+      ],
+      "dependencies": [],
+      "targets": [
+        "Parse Claude"
+      ]
+    },
+    {
+      "name": "Claude 2",
+      "type": "n8n-nodes-base.httpRequest",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "anthropicApi"
+      ],
+      "dependencies": [],
+      "targets": [
+        "Parse Claude 2"
+      ]
+    },
+    {
+      "name": "Parse Claude 2",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 593659,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.bia_nao_vai",
+        "funil_aplicacao.bia_nao_vai_marcar",
+        "funil_aplicacao.inbound_router",
+        "funil_aplicacao.site_whatsapp_passo",
+        "funil_aplicacao.site_whatsapp_vale",
+        "public.crm_fila_enfileirar"
+      ],
+      "targets": [
+        "Bia: Marcar não-vai?",
+        "IF Agendar",
+        "IF Atividade PD",
+        "IF Cancelar",
+        "IF Enviar",
+        "IF Flags",
+        "IF Nota PD"
+      ]
+    },
+    {
+      "name": "Precisa LLM?",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Claude",
+        "Parse Claude"
+      ]
+    },
+    {
+      "name": "Refazer?",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Bia: Marcar não-vai?",
+        "Claude 2",
+        "IF Agendar",
+        "IF Atividade PD",
+        "IF Cancelar",
+        "IF Enviar",
+        "IF Flags",
+        "IF Nota PD"
+      ]
+    },
+    {
+      "name": "Bia: Espera Booking→CRM",
+      "type": "n8n-nodes-base.wait",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Bia: Contexto pós-ação"
+      ]
+    },
+    {
+      "name": "Bia: Contexto pós-ação",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 2868,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Bia: Pós-ação vale?"
+      ]
+    },
+    {
+      "name": "Bia: Pós-ação vale?",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Bia: Plano Pipedrive",
+        "Bia: Resumo pós-ação"
+      ]
+    },
+    {
+      "name": "Bia: Plano Pipedrive",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 595025,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.bia_nao_vai",
+        "funil_aplicacao.bia_nao_vai_marcar",
+        "funil_aplicacao.inbound_router",
+        "funil_aplicacao.site_whatsapp_passo",
+        "funil_aplicacao.site_whatsapp_vale",
+        "public.crm_fila_enfileirar"
+      ],
+      "targets": [
+        "Bia: Há escritas?"
+      ]
+    },
+    {
+      "name": "Bia: Há escritas?",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Bia: Resumo pós-ação",
+        "CRM: Enfileirar (pós-ação)"
+      ]
+    },
+    {
+      "name": "Bia: Resumo pós-ação",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 594874,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.bia_nao_vai",
+        "funil_aplicacao.bia_nao_vai_marcar",
+        "funil_aplicacao.inbound_router",
+        "funil_aplicacao.site_whatsapp_passo",
+        "funil_aplicacao.site_whatsapp_vale",
+        "public.crm_fila_enfileirar"
+      ],
+      "targets": [
+        "IF Nota pós-ação",
+        "PG: Log pós-ação"
+      ]
+    },
+    {
+      "name": "IF Nota pós-ação",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "CRM: Nota pós-ação"
+      ]
+    },
+    {
+      "name": "PG: Log pós-ação",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [],
+      "targets": []
+    },
+    {
+      "name": "Bia: A cada 10 min?",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 65,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "PG: Candidatos follow-up",
+        "PG: Restaurar booked_at",
+        "PG: Retomar quem remarcou"
+      ]
+    },
+    {
+      "name": "PG: Retomar quem remarcou",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [],
+      "targets": []
+    },
+    {
+      "name": "PG: Restaurar booked_at",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [],
+      "targets": []
+    },
+    {
+      "name": "PG: Candidatos follow-up",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [
+        "funil_aplicacao.bia_agenda_clickmax_vale",
+        "funil_aplicacao.bia_vagas_cm_v1"
+      ],
+      "targets": [
+        "Canal: Mensagens follow-up"
+      ]
+    },
+    {
+      "name": "DC: Mensagens follow-up",
+      "type": "n8n-nodes-base.httpRequest",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "httpHeaderAuth"
+      ],
+      "dependencies": [],
+      "targets": [
+        "Bia: Preparar follow-up privado"
+      ]
+    },
+    {
+      "name": "Bia: Montar follow-up",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 597134,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.bia_nao_vai",
+        "funil_aplicacao.bia_nao_vai_marcar",
+        "funil_aplicacao.inbound_router",
+        "funil_aplicacao.site_whatsapp_passo",
+        "funil_aplicacao.site_whatsapp_vale",
+        "public.crm_fila_enfileirar"
+      ],
+      "targets": [
+        "Bia: Follow-up vale?"
+      ]
+    },
+    {
+      "name": "Bia: Follow-up vale?",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "PG: Log follow-up"
+      ]
+    },
+    {
+      "name": "Bia: Follow-up gravado?",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Canal: Enviar follow-up"
+      ]
+    },
+    {
+      "name": "PG: Log follow-up",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [],
+      "targets": [
+        "Bia: Follow-up gravado?"
+      ]
+    },
+    {
+      "name": "DC: Enviar follow-up",
+      "type": "n8n-nodes-base.httpRequest",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "httpHeaderAuth"
+      ],
+      "dependencies": [],
+      "targets": []
+    },
+    {
+      "name": "Bia: Áudios novos",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 594936,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.bia_nao_vai",
+        "funil_aplicacao.bia_nao_vai_marcar",
+        "funil_aplicacao.inbound_router",
+        "funil_aplicacao.site_whatsapp_passo",
+        "funil_aplicacao.site_whatsapp_vale",
+        "public.crm_fila_enfileirar"
+      ],
+      "targets": [
+        "Tem áudio?"
+      ]
+    },
+    {
+      "name": "Tem áudio?",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Bia: Juntar áudios",
+        "Bia: Transcrever áudios"
+      ]
+    },
+    {
+      "name": "Bia: Transcrever áudios",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Bia: Aplicar transcrições"
+      ]
+    },
+    {
+      "name": "Bia: Aplicar transcrições",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 594723,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.bia_nao_vai",
+        "funil_aplicacao.bia_nao_vai_marcar",
+        "funil_aplicacao.inbound_router",
+        "funil_aplicacao.site_whatsapp_passo",
+        "funil_aplicacao.site_whatsapp_vale",
+        "public.crm_fila_enfileirar"
+      ],
+      "targets": [
+        "Bia: Juntar áudios"
+      ]
+    },
+    {
+      "name": "Bia: Juntar áudios",
+      "type": "n8n-nodes-base.merge",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Bia: Ordem original"
+      ]
+    },
+    {
+      "name": "Bia: Ordem original",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 788,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Preparar"
+      ]
+    },
+    {
+      "name": "Bia: Preparar data privada",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 594407,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.bia_nao_vai",
+        "funil_aplicacao.bia_nao_vai_marcar",
+        "funil_aplicacao.inbound_router",
+        "funil_aplicacao.site_whatsapp_passo",
+        "funil_aplicacao.site_whatsapp_vale",
+        "public.crm_fila_enfileirar"
+      ],
+      "targets": [
+        "Bia: Data privada?"
+      ]
+    },
+    {
+      "name": "Bia: Data privada?",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Bia: Consultar data privada",
+        "Montar prompt"
+      ]
+    },
+    {
+      "name": "Bia: Consultar data privada",
+      "type": "n8n-nodes-base.httpRequest",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "httpHeaderAuth"
+      ],
+      "dependencies": [],
+      "targets": [
+        "Bia: Receber data privada"
+      ]
+    },
+    {
+      "name": "Bia: Receber data privada",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 147,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Montar prompt"
+      ]
+    },
+    {
+      "name": "Bia: Preparar follow-up privado",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 596118,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.bia_nao_vai",
+        "funil_aplicacao.bia_nao_vai_marcar",
+        "funil_aplicacao.inbound_router",
+        "funil_aplicacao.site_whatsapp_passo",
+        "funil_aplicacao.site_whatsapp_vale",
+        "public.crm_fila_enfileirar"
+      ],
+      "targets": [
+        "Bia: Follow-up privado?"
+      ]
+    },
+    {
+      "name": "Bia: Follow-up privado?",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Bia: Consultar follow-up privado",
+        "Bia: Montar follow-up"
+      ]
+    },
+    {
+      "name": "Bia: Consultar follow-up privado",
+      "type": "n8n-nodes-base.httpRequest",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "httpHeaderAuth"
+      ],
+      "dependencies": [],
+      "targets": [
+        "Bia: Receber follow-up privado"
+      ]
+    },
+    {
+      "name": "Bia: Receber follow-up privado",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 152,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Bia: Montar follow-up"
+      ]
+    },
+    {
+      "name": "Bia: Avisar cancelamento?",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "DC: Confirmar cancelamento"
+      ]
+    },
+    {
+      "name": "DC: Confirmar cancelamento",
+      "type": "n8n-nodes-base.httpRequest",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "httpHeaderAuth"
+      ],
+      "dependencies": [],
+      "targets": []
+    },
+    {
+      "name": "CRM: Nota",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [
+        "public.crm_fila_enfileirar"
+      ],
+      "targets": []
+    },
+    {
+      "name": "CRM: Destinatários do alerta",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 1046,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "CRM: Tarefa (alerta)"
+      ]
+    },
+    {
+      "name": "CRM: Tarefa (alerta)",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [
+        "public.crm_fila_enfileirar"
+      ],
+      "targets": []
+    },
+    {
+      "name": "CRM: Enfileirar (pós-ação)",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [
+        "public.crm_fila_enfileirar"
+      ],
+      "targets": [
+        "Bia: Resumo pós-ação"
+      ]
+    },
+    {
+      "name": "CRM: Nota pós-ação",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [
+        "public.crm_fila_enfileirar"
+      ],
+      "targets": []
+    },
+    {
+      "name": "PG: Avisos de reserva",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [
+        "funil_aplicacao.bia_cm_reserva_avisado",
+        "funil_aplicacao.bia_cm_reserva_avisos_v1",
+        "funil_aplicacao.bia_vagas_cm_v1"
+      ],
+      "targets": [
+        "Bia: Montar aviso"
+      ]
+    },
+    {
+      "name": "Bia: Montar aviso",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 29185,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Bia: Aviso vale?"
+      ]
+    },
+    {
+      "name": "Bia: Aviso vale?",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Bia: Resultado do aviso",
+        "PG: Link curto aviso"
+      ]
+    },
+    {
+      "name": "DC: Enviar aviso",
+      "type": "n8n-nodes-base.httpRequest",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "httpHeaderAuth"
+      ],
+      "dependencies": [],
+      "targets": [
+        "DC: Aviso conferir envio"
+      ]
+    },
+    {
+      "name": "Bia: Resultado do aviso",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 23550,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Bia: Aviso reler?"
+      ]
+    },
+    {
+      "name": "PG: Aviso concluído",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [
+        "funil_aplicacao.bia_cm_reserva_avisado",
+        "funil_aplicacao.inbound_router",
+        "public.crm_fila_enfileirar"
+      ],
+      "targets": []
+    },
+    {
+      "name": "Bia: Site pós-envio",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 898,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "DC: Site conferir envio"
+      ]
+    },
+    {
+      "name": "DC: Site conferir envio",
+      "type": "n8n-nodes-base.httpRequest",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "httpHeaderAuth"
+      ],
+      "dependencies": [],
+      "targets": [
+        "Bia: Site passo"
+      ]
+    },
+    {
+      "name": "Bia: Site passo",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 18160,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.site_whatsapp_passo",
+        "funil_aplicacao.site_whatsapp_vale"
+      ],
+      "targets": [
+        "Bia: Site reler?"
+      ]
+    },
+    {
+      "name": "Bia: Site reler?",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "DC: Site conferir de novo",
+        "PG: Site passo"
+      ]
+    },
+    {
+      "name": "DC: Site conferir de novo",
+      "type": "n8n-nodes-base.httpRequest",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "httpHeaderAuth"
+      ],
+      "dependencies": [],
+      "targets": [
+        "Bia: Site passo (2ª leitura)"
+      ]
+    },
+    {
+      "name": "Bia: Site passo (2ª leitura)",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 17973,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.site_whatsapp_passo",
+        "funil_aplicacao.site_whatsapp_vale"
+      ],
+      "targets": [
+        "PG: Site passo"
+      ]
+    },
+    {
+      "name": "PG: Site passo",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [],
+      "targets": []
+    },
+    {
+      "name": "DC: Aviso conferir envio",
+      "type": "n8n-nodes-base.httpRequest",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "httpHeaderAuth"
+      ],
+      "dependencies": [],
+      "targets": [
+        "Bia: Resultado do aviso"
+      ]
+    },
+    {
+      "name": "Bia: Aviso reler?",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Bia: Aviso espera",
+        "PG: Aviso concluído"
+      ]
+    },
+    {
+      "name": "Bia: Aviso espera",
+      "type": "n8n-nodes-base.wait",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "DC: Aviso conferir de novo"
+      ]
+    },
+    {
+      "name": "DC: Aviso conferir de novo",
+      "type": "n8n-nodes-base.httpRequest",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "httpHeaderAuth"
+      ],
+      "dependencies": [],
+      "targets": [
+        "Bia: Resultado do aviso (2ª leitura)"
+      ]
+    },
+    {
+      "name": "Bia: Resultado do aviso (2ª leitura)",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 23549,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "PG: Aviso concluído"
+      ]
+    },
+    {
+      "name": "PG: Contexto não-vai",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [
+        "funil_aplicacao.bia_nao_vai_contexto_v1"
+      ],
+      "targets": [
+        "Bia: Contexto não-vai"
+      ]
+    },
+    {
+      "name": "Bia: Contexto não-vai",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 615,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Bia: Preparar data privada"
+      ]
+    },
+    {
+      "name": "Bia: Marcar não-vai?",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "PG: Marcar não-vai"
+      ]
+    },
+    {
+      "name": "PG: Marcar não-vai",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [],
+      "targets": []
+    },
+    {
+      "name": "PG: Link curto aviso",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [
+        "funil_aplicacao.link_curto_no_texto"
+      ],
+      "targets": [
+        "Bia: Trocar link"
+      ]
+    },
+    {
+      "name": "Bia: Trocar link",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 2985,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Canal: Enviar aviso"
+      ]
+    },
+    {
+      "name": "CM: Pendentes",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [
+        "funil_aplicacao.bia_canal_historico_v1",
+        "funil_aplicacao.bia_canal_pendentes_v1",
+        "funil_aplicacao.inbound_router"
+      ],
+      "targets": [
+        "CM: Conversas"
+      ]
+    },
+    {
+      "name": "CM: Conversas",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 21457,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.inbound_router"
+      ],
+      "targets": [
+        "Preparar"
+      ]
+    },
+    {
+      "name": "CM: Cursor",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 21161,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.inbound_router"
+      ],
+      "targets": [
+        "PG: CM Cursor"
+      ]
+    },
+    {
+      "name": "PG: CM Cursor",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [],
+      "targets": []
+    },
+    {
+      "name": "CM: Resposta",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 21737,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.inbound_router"
+      ],
+      "targets": [
+        "CM: Pedido",
+        "PG: Finalizar"
+      ]
+    },
+    {
+      "name": "CM: Avisar cancelamento?",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "CM: Montar cancelamento"
+      ]
+    },
+    {
+      "name": "Canal: Confirmar book",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "CM: Montar book",
+        "DC: Confirmar book"
+      ]
+    },
+    {
+      "name": "Canal: Avisar falha booking",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Avisar falha booking",
+        "CM: Montar falha booking"
+      ]
+    },
+    {
+      "name": "Canal: Enviar follow-up",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "CM: Montar follow-up",
+        "DC: Enviar follow-up"
+      ]
+    },
+    {
+      "name": "Canal: Enviar aviso",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "CM: Montar aviso",
+        "DC: Enviar aviso"
+      ]
+    },
+    {
+      "name": "Canal: Mensagens follow-up",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "CM: Mensagens follow-up",
+        "DC: Mensagens follow-up"
+      ]
+    },
+    {
+      "name": "CM: Montar book",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 21453,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.inbound_router"
+      ],
+      "targets": [
+        "CM: Pedido"
+      ]
+    },
+    {
+      "name": "CM: Montar falha booking",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 21465,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.inbound_router"
+      ],
+      "targets": [
+        "CM: Pedido"
+      ]
+    },
+    {
+      "name": "CM: Montar cancelamento",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 21472,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.inbound_router"
+      ],
+      "targets": [
+        "CM: Pedido"
+      ]
+    },
+    {
+      "name": "CM: Montar follow-up",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 21466,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.inbound_router"
+      ],
+      "targets": [
+        "CM: Pedido"
+      ]
+    },
+    {
+      "name": "CM: Montar aviso",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 21331,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.inbound_router"
+      ],
+      "targets": [
+        "CM: Pedido"
+      ]
+    },
+    {
+      "name": "CM: Mensagens follow-up",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [
+        "funil_aplicacao.bia_canal_historico_v1"
+      ],
+      "targets": [
+        "Bia: Preparar follow-up privado"
+      ]
+    },
+    {
+      "name": "CM: Pedido",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [],
+      "targets": [
+        "CM: Pode enviar?"
+      ]
+    },
+    {
+      "name": "CM: Pode enviar?",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "CM: Enviar",
+        "CM: Ler envio"
+      ]
+    },
+    {
+      "name": "CM: Enviar",
+      "type": "n8n-nodes-base.httpRequest",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "httpHeaderAuth"
+      ],
+      "dependencies": [],
+      "targets": [
+        "CM: Ler envio"
+      ]
+    },
+    {
+      "name": "CM: Ler envio",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 21440,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.inbound_router"
+      ],
+      "targets": [
+        "CM: Repetir?"
+      ]
+    },
+    {
+      "name": "CM: Repetir?",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "CM: Espera",
+        "CM: É aviso?",
+        "PG: CM Desfecho"
+      ]
+    },
+    {
+      "name": "CM: Espera",
+      "type": "n8n-nodes-base.wait",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "CM: Enviar de novo"
+      ]
+    },
+    {
+      "name": "CM: Enviar de novo",
+      "type": "n8n-nodes-base.httpRequest",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "httpHeaderAuth"
+      ],
+      "dependencies": [],
+      "targets": [
+        "CM: Ler envio (final)"
+      ]
+    },
+    {
+      "name": "CM: Ler envio (final)",
+      "type": "n8n-nodes-base.code",
+      "disabled": false,
+      "code_bytes": 21440,
+      "credential_types": [],
+      "dependencies": [
+        "funil_aplicacao.inbound_router"
+      ],
+      "targets": [
+        "CM: É aviso?",
+        "PG: CM Desfecho"
+      ]
+    },
+    {
+      "name": "PG: CM Desfecho",
+      "type": "n8n-nodes-base.postgres",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [
+        "postgres"
+      ],
+      "dependencies": [
+        "funil_aplicacao.inbound_router",
+        "public.crm_fila_enfileirar"
+      ],
+      "targets": []
+    },
+    {
+      "name": "CM: É aviso?",
+      "type": "n8n-nodes-base.if",
+      "disabled": false,
+      "code_bytes": 0,
+      "credential_types": [],
+      "dependencies": [],
+      "targets": [
+        "Bia: Resultado do aviso"
+      ]
+    }
+  ]
+}
