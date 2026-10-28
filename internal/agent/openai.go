@@ -91,6 +91,7 @@ func (a *OpenAI) Run(ctx context.Context, s domain.State, e domain.Event, slots 
 			d.Message = ""
 		}
 	}
+	*d = normalizeTextDecision(s, e, *d)
 	out.ResponseID = res.ID
 	out.InputTokens = res.Usage.InputTokens
 	out.UsedPrevious = params.PreviousResponseID.Value != ""

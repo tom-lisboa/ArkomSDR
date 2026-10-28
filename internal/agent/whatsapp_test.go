@@ -9,10 +9,41 @@ import (
 	"testing"
 	"time"
 
+	"arkom/bia/internal/conversation"
 	"arkom/bia/internal/domain"
 	openai "github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 )
+
+func TestTextCleanupPreservesActionsAndUsefulContent(t *testing.T) {
+	d := domain.Decision{Action: "offer_slots", OfferSlotIDs: []string{"a", "b"}, Message: "Perfeito!\n\nEntendi, dá pra avaliar isso na reunião — com o especialista."}
+	got := normalizeTextDecision(domain.State{}, domain.Event{}, d)
+	if got.Message != "Dá pra avaliar isso na reunião, com o especialista." || got.Action != d.Action || len(got.OfferSlotIDs) != 2 {
+		t.Fatal(got)
+	}
+	d = domain.Decision{Action: "reply", Message: `Você escreveu "Perfeito" e pediu ajuda com seu atendimento.`}
+	if got := normalizeTextDecision(domain.State{}, domain.Event{}, d); got.Message != d.Message {
+		t.Fatal("removed quoted customer content", got)
+	}
+}
+
+func TestBookingAcknowledgmentDoesNotBecomePresenceConfirmation(t *testing.T) {
+	s := domain.State{Booking: &domain.Booking{ID: "booking"}, History: []domain.Turn{{Role: "assistant", Text: "Seu diagnóstico está marcado."}}}
+	d := domain.Decision{Action: "confirm", Evidence: "Ok"}
+	if got := normalizeTextDecision(s, domain.Event{Text: "Ok"}, d); got.Action != "reply" || got.Message != "Combinado." {
+		t.Fatal(got)
+	}
+	e := domain.Event{Text: "Ok", Context: &conversation.Window{History: []conversation.Message{{Role: "assistant", Text: "Você confirma sua presença?"}}}}
+	if got := normalizeTextDecision(s, e, d); got.Action != "confirm" {
+		t.Fatal("ignored actual confirmation question", got)
+	}
+	if got := normalizeTextDecision(domain.State{}, domain.Event{Text: "Ok"}, domain.Decision{Action: "offer_slots"}); got.Action != "offer_slots" {
+		t.Fatal("blocked first-contact acceptance", got)
+	}
+	if got := normalizeTextDecision(s, domain.Event{Text: "Confirmo minha presença"}, d); got.Action != "confirm" {
+		t.Fatal("blocked explicit confirmation", got)
+	}
+}
 
 func TestWhatsAppContextHasLocalLabelsAndCalendarFailure(t *testing.T) {
 	now := time.Date(2026, 10, 28, 18, 0, 0, 0, time.UTC)

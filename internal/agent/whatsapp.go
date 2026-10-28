@@ -2,14 +2,77 @@ package agent
 
 import (
 	_ "embed"
+	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
 	"arkom/bia/internal/domain"
 )
 
 //go:embed whatsapp_prompt.txt
 var whatsappPrompt string
+
+var fillerOpening = regexp.MustCompile(`(?i)^(perfeito|entendi|ótima pergunta|que ótimo|faz todo sentido|com certeza|fico feliz)([!.,: ]+|$)`)
+
+// These are presentation rules for WhatsApp only. Operational decisions still
+// pass through the domain's booking, consent and delivery checks.
+func normalizeTextDecision(s domain.State, e domain.Event, d domain.Decision) domain.Decision {
+	if s.Booking != nil && shortAcknowledgment(e.Text) {
+		last := ""
+		for _, h := range s.History {
+			if h.Role == "assistant" {
+				last = h.Text
+			}
+		}
+		if e.Context != nil {
+			last = ""
+			for _, h := range e.Context.History {
+				if h.Role == "assistant" {
+					last = h.Text
+				}
+			}
+		}
+		// An acknowledgment to a statement is not a new presence confirmation.
+		// If the assistant asked a question, preserve the planner's interpretation.
+		if last != "" && !strings.Contains(last, "?") {
+			return domain.Decision{Action: "reply", Message: "Combinado.", Reason: "booking_acknowledgment"}
+		}
+	}
+	d.Message = strings.ReplaceAll(d.Message, " — ", ", ")
+	d.Message = strings.ReplaceAll(d.Message, "—", ", ")
+	blocks := strings.Split(d.Message, "\n\n")
+	out := make([]string, 0, len(blocks))
+	for _, block := range blocks {
+		block = strings.TrimSpace(block)
+		for {
+			clean := strings.TrimSpace(fillerOpening.ReplaceAllString(block, ""))
+			if clean == block {
+				break
+			}
+			block = clean
+		}
+		if block == "" {
+			continue
+		}
+		runes := []rune(block)
+		runes[0] = unicode.ToUpper(runes[0])
+		out = append(out, string(runes))
+	}
+	d.Message = strings.Join(out, "\n\n")
+	if d.Action == "reply" && d.Message == "" {
+		d.Message = "Combinado."
+	}
+	return d
+}
+
+func shortAcknowledgment(text string) bool {
+	switch strings.Trim(strings.ToLower(strings.TrimSpace(text)), ".! ") {
+	case "ok", "okay", "obrigado", "obrigada", "certo", "combinado":
+		return true
+	}
+	return false
+}
 
 func textInstructions(brand, agentID string) string {
 	return strings.ReplaceAll(whatsappPrompt, "{{brand}}", brand) + "\nEspecialidade: " + agentID + ". " + specialty(agentID)

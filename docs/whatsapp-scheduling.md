@@ -4,6 +4,10 @@ O prompt de WhatsApp está em `internal/agent/whatsapp_prompt.txt`. Ele é indep
 
 O objetivo informado no formulário já basta para avançar. Ao aceitar continuar ou explicar uma necessidade, o agente reconhece a mensagem e solicita `offer_slots`. Sem objetivo, cabe no máximo uma pergunta de contexto. As vagas reais e seus rótulos de data/fuso entram no contexto a cada execução. O modelo pode escolher dois IDs válidos conforme a preferência do lead; o Go monta os horários visíveis, sem expor IDs técnicos.
 
+O estilo incorpora a revisão comercial v2: respostas diretas, uma ideia por bolha, menos repetição de nome, elogios e emojis. Dúvidas de preço, tempo e adequação recebem resposta antes da oferta. “Vou pensar” e “vou olhar e te aviso” recebem espaço para decidir, sem pergunta ou insistência. A resposta sobre ser IA é transparente e considera se já existe reserva. Condições de gratuidade, bônus ou entrega não são ampliadas por uma reformulação comercial. Sem link na reserva, não há promessa de convite ou envio posterior.
+
+Essa revisão modifica o atendimento do WhatsApp. Uma normalização de texto remove aberturas automáticas e um “ok” depois do aviso de reserva recebe uma resposta breve, sem virar outra confirmação de presença. Respostas a perguntas explícitas de presença continuam válidas. Mantém o modelo, o ritmo de agrupamento/envio e o roteiro de ligação existentes. A naturalidade é avaliada junto com a correção da ação: uma resposta simpática que deixa de oferecer horários quando deveria avançar não atende ao objetivo.
+
 Respostas como “o primeiro”, “a segunda opção”, “às 14h” ou um dia com opção única são validadas contra os horários oferecidos. “Sim” para duas opções, negação e escolhas ambíguas não reservam. A reserva e a confirmação pertencem ao worker de agenda, em transação PostgreSQL; uma proposta da IA nunca confirma uma reunião por si só.
 
 Agenda vazia e falha na consulta têm mensagens diferentes, sem link inexistente nem novo questionário. A pendência é registrada no CRM local. Não há promessa de retorno automático nesse estado.
