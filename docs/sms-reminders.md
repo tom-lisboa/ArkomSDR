@@ -114,3 +114,5 @@ Validação local: PostgreSQL isolado, API Twilio simulada, T−5, ausência de 
 WhatsApp, repetição/reinício, consentimento, remarcação/cancelamento, shadow e falha
 ambígua. Não foi enviado SMS real durante a publicação; o primeiro teste no aparelho
 deve partir do formulário com autorização e do botão de demonstração.
+
+Diagnóstico de erros, consulta de estado e atualização da autorização de SMS: [integração do formulário](test-form-troubleshooting.md).

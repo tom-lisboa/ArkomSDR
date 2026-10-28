@@ -52,6 +52,9 @@ var smsSchema string
 //go:embed form_booking.sql
 var formBookingSchema string
 
+//go:embed preparation.sql
+var preparationSchema string
+
 var ErrConflict = errors.New("idempotency key reused with different payload")
 var ErrLease = errors.New("lease lost; stale worker cannot commit")
 
@@ -137,6 +140,9 @@ func (d *DB) Migrate(ctx context.Context) error {
 	if _, e = tx.Exec(ctx, formBookingSchema); e != nil {
 		return e
 	}
+	if _, e = tx.Exec(ctx, preparationSchema); e != nil {
+		return e
+	}
 	return tx.Commit(ctx)
 }
 func (d *DB) Close() { d.Pool.Close() }
@@ -160,7 +166,7 @@ func (d *DB) Submit(ctx context.Context, e domain.Event, mode string) (bool, err
 		return false, err
 	}
 	fingerprintEvent := e
-	if e.Kind == "form.submitted" || e.Kind == "form.contact_requested" {
+	if e.Kind == "form.submitted" || e.Kind == "form.contact_requested" || e.Kind == "contact.sms_consent" {
 		fingerprintEvent.At = time.Time{}
 	}
 	fp, _ := json.Marshal(fingerprintEvent)

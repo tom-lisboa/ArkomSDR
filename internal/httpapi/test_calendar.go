@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"github.com/jackc/pgx/v5"
 	"net/http"
 	"time"
 
@@ -114,19 +115,25 @@ func calendarError(w http.ResponseWriter, err error) bool {
 		code, status = "idempotency_conflict", 409
 	case errors.As(err, &blocked):
 		code, status = blocked.Code, 409
+		if code == "test_consent_rate_limit" {
+			status = 429
+		}
 		if code == "test_submission_not_found" || code == "slot_not_found" {
 			status = 404
 		}
 	case errors.As(err, &provider):
 		code, status = provider.Code, 409
 	}
-	write(w, status, map[string]string{"error": code})
+	writeActionError(w, status, code)
 	return true
 }
 
 func (s *Server) formBooking(r *http.Request, id string) (*domain.Booking, error) {
 	var raw []byte
 	err := s.DB.Pool.QueryRow(r.Context(), `SELECT payload FROM bia_go.bookings WHERE operation_id=$1 AND cancelled_at IS NULL`, "form-booking:"+id).Scan(&raw)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, &store.FormBookingError{Code: "booking_no_longer_active"}
+	}
 	if err != nil {
 		return nil, err
 	}

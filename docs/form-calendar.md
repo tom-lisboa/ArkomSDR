@@ -129,7 +129,7 @@ O worker de agenda aplica o evento confirmado antes dos próximos efeitos de ate
 
 O contexto de cada Run informa `meeting_status: upcoming` ou `not_scheduled`. Com reunião futura marcada, a Bia reforça data/hora/fuso, responde às dúvidas sobre a reunião e evita nova qualificação ou oferta de agenda. Só apresenta alternativas quando a pessoa pede remarcação. Sem reserva, conduz para o agendamento.
 
-A abertura aprovada continua exatamente `Oi, tudo bem?\n\nRetomando nossa conversa por aqui`. Fora da janela do WhatsApp, ela é enviada pelo template aprovado. A confirmação detalhada aguarda a pessoa responder para abrir a janela; a reserva já fica confirmada no formulário e no banco durante essa espera. Não prometemos link de sala, pois nenhum está configurado.
+A abertura usa a reserva atual: com reunião marcada, já informa data, horário, fuso e duração reais, inclusive fora da janela quando o template correspondente estiver aprovado. Com objetivo conhecido, aproveita o que foi informado; sem objetivo, faz uma única pergunta de preparação. Sem reserva, convida a escolher um horário. Não prometemos link de sala, pois nenhum está configurado. A confirmação separada é suprimida quando a abertura já cobriu a mesma reserva.
 
 ## Validação
 

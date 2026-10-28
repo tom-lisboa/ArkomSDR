@@ -14,6 +14,10 @@ func (d *DB) ReconcileMeetingReminders(ctx context.Context, now time.Time, live 
 	return d.reconcileReminders(ctx, now, live, domain.MeetingSequence)
 }
 
+func (d *DB) ReconcilePreparation(ctx context.Context, now time.Time, live bool) error {
+	return d.reconcileReminders(ctx, now, live, domain.PreparationSequence)
+}
+
 func (d *DB) ReconcileSMSReminders(ctx context.Context, now time.Time, live bool) error {
 	return d.reconcileReminders(ctx, now, live, domain.SMSSequence)
 }

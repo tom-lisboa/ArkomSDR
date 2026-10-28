@@ -175,6 +175,15 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 	if ok, why := domain.Deliverable(s, fx, now); !ok {
 		return true, w.DB.Finish(ctx, j, s, nil, "skipped", map[string]string{"reason": why})
 	}
+	if fx.Purpose == "booking_confirmation" {
+		var openingPending bool
+		if err := w.DB.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM bia_go.jobs WHERE lead_id=$1 AND kind='effect' AND status IN ('pending','running') AND payload->>'purpose'='form_contact')`, s.ID).Scan(&openingPending); err != nil {
+			return true, err
+		}
+		if openingPending {
+			return true, w.DB.DeferJob(ctx, j, now.Add(5*time.Second), "awaiting_form_opening")
+		}
+	}
 	if fx.Kind != "crm" {
 		conv, version := fx.ConversationID, fx.ConversationVersion
 		if domain.IsMeetingReminder(fx) {
@@ -295,8 +304,18 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 			if fx.Purpose == "followup" {
 				s.LastFollowup = &now
 			}
+			if fx.Purpose == "meeting_preparation" {
+				s.LastPreparationAt = &now
+			}
 			if fx.Purpose == "form_contact" {
 				s.LastFormContactAt = &now
+				s.LastFormBookingID = ""
+				if domain.ContactOpening(s, w.Policy, now).Kind != "unbooked" {
+					s.LastFormBookingID = s.Booking.ID
+				}
+				if w.Policy.MeetingPreparation {
+					follow = append(follow, domain.PreparationSequence(s, now)...)
+				}
 			}
 		}
 	case "crm":

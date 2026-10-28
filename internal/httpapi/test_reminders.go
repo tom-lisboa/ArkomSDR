@@ -41,7 +41,7 @@ func (s *Server) testReminder(w http.ResponseWriter, r *http.Request) {
 	var blocked *store.TestReminderError
 	switch {
 	case errors.Is(err, store.ErrConflict):
-		write(w, 409, map[string]string{"error": "idempotency_conflict"})
+		writeActionError(w, 409, "idempotency_conflict")
 		return
 	case errors.As(err, &blocked):
 		code := 409
@@ -53,7 +53,7 @@ func (s *Server) testReminder(w http.ResponseWriter, r *http.Request) {
 		case "reminder_audio_not_ready", "voice_not_enabled", "sms_not_enabled":
 			code = 503
 		}
-		write(w, code, map[string]string{"error": blocked.Code})
+		writeActionError(w, code, blocked.Code)
 		return
 	case err != nil:
 		write(w, 503, map[string]string{"error": "storage_unavailable"})

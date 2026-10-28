@@ -13,23 +13,25 @@ import (
 )
 
 type Config struct {
-	SMSFrom                            string
-	Availability                       providers.DailyAvailability
-	FormAutoContact                    bool
-	FormContentSID                     string
-	ReminderAudio                      remindermedia.Asset
-	Window                             store.WindowPolicy
-	MessagingProvider, TestPhone       string
-	TestFormToken                      string
-	Voice                              Voice
-	RedisURL, MediaModel               string
-	Address, DSN, Token, Mode          string
-	OpenAIKey, OpenAIModel, AudioModel string
-	MediaHosts                         []string
-	Policy                             domain.Policy
-	Workers                            int
-	PerLeadDaily, GlobalHourly         int
-	GatewayURL, GatewayToken           string
+	PreparationContentSID               string
+	SMSFrom                             string
+	Availability                        providers.DailyAvailability
+	FormAutoContact                     bool
+	FormContentSID                      string
+	BookedContentSID, BookedQuestionSID string
+	ReminderAudio                       remindermedia.Asset
+	Window                              store.WindowPolicy
+	MessagingProvider, TestPhone        string
+	TestFormToken                       string
+	Voice                               Voice
+	RedisURL, MediaModel                string
+	Address, DSN, Token, Mode           string
+	OpenAIKey, OpenAIModel, AudioModel  string
+	MediaHosts                          []string
+	Policy                              domain.Policy
+	Workers                             int
+	PerLeadDaily, GlobalHourly          int
+	GatewayURL, GatewayToken            string
 }
 
 func env(k, d string) string {
@@ -69,6 +71,14 @@ func Load() (Config, error) {
 	c.TestFormToken = os.Getenv("BIA_TEST_FORM_TOKEN")
 	c.FormAutoContact = os.Getenv("BIA_FORM_AUTO_CONTACT") == "true"
 	c.FormContentSID = os.Getenv("TWILIO_FORM_CONTACT_CONTENT_SID")
+	c.PreparationContentSID = os.Getenv("TWILIO_PREPARATION_CONTENT_SID")
+	c.BookedContentSID = os.Getenv("TWILIO_BOOKED_CONTACT_CONTENT_SID")
+	c.BookedQuestionSID = os.Getenv("TWILIO_BOOKED_QUESTION_CONTENT_SID")
+	for _, sid := range []string{c.BookedContentSID, c.BookedQuestionSID, c.PreparationContentSID} {
+		if sid != "" && (len(sid) != 34 || !strings.HasPrefix(sid, "HX")) {
+			return c, errors.New("invalid booked template SID")
+		}
+	}
 	if c.FormContentSID != "" && (len(c.FormContentSID) != 34 || !strings.HasPrefix(c.FormContentSID, "HX")) {
 		return c, errors.New("invalid TWILIO_FORM_CONTACT_CONTENT_SID")
 	}
@@ -114,6 +124,7 @@ func Load() (Config, error) {
 		return c, err
 	}
 	c.Policy.DisableFollowups = os.Getenv("BIA_DISABLE_FOLLOWUPS") == "true"
+	c.Policy.MeetingPreparation = os.Getenv("BIA_MEETING_PREPARATION_ENABLED") == "true"
 	c.Policy.MeetingReminders = os.Getenv("BIA_MEETING_REMINDERS_ENABLED") == "true"
 	c.Policy.SMSReminders = os.Getenv("BIA_SMS_REMINDERS_ENABLED") == "true"
 	c.SMSFrom = os.Getenv("TWILIO_SMS_FROM")
@@ -169,6 +180,9 @@ func Load() (Config, error) {
 	}
 	c.Voice = v
 	c.Policy.WhatsAppPhone = v.Sender
+	if c.Policy.MeetingPreparation && (c.MessagingProvider != "twilio" || c.PreparationContentSID == "" || c.TestPhone != "") {
+		return c, errors.New("meeting preparation requires Twilio, an approved preparation template and unrestricted recipient configuration")
+	}
 	if c.Policy.SMSReminders && (c.SMSFrom == "" || v.Account == "" || v.AuthToken == "" || c.TestPhone != "") {
 		return c, errors.New("SMS reminders require a configured SMS sender, Twilio credentials and unrestricted recipient configuration")
 	}

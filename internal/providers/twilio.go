@@ -19,7 +19,9 @@ import (
 // TwilioMessaging records an attempt before making a non-idempotent POST.
 // An interrupted attempt without a SID requires review; it is never resent.
 type TwilioMessaging struct {
+	PreparationContentSID                             string
 	FormContentSID, ContentBaseURL                    string
+	BookedContentSID, BookedQuestionSID, TimeZone     string
 	Pool                                              *pgxpool.Pool
 	Account, AuthToken, Sender, AllowedPhone, BaseURL string
 	Client                                            *http.Client
@@ -96,13 +98,37 @@ func (t *TwilioMessaging) Send(ctx context.Context, key string, s domain.State, 
 		return Receipt{}, &Failure{Code: "twilio_invalid_text"}
 	}
 	if purpose == "form_contact" && !messageWindowOpen(s, now) {
-		if text != domain.FormContactText {
+		zone := t.TimeZone
+		if zone == "" {
+			zone = "America/Cuiaba"
+		}
+		opening := domain.ContactOpening(s, domain.Policy{TimeZone: zone}, now)
+		if text != opening.Text {
 			return Receipt{}, &Failure{Code: "form_template_text_mismatch"}
 		}
-		if err := t.formTemplateReady(ctx); err != nil {
+		sid := t.FormContentSID
+		if opening.Kind == "booked" {
+			sid = t.BookedContentSID
+		}
+		if opening.Kind == "booked_question" {
+			sid = t.BookedQuestionSID
+		}
+		if err := t.templateReady(ctx, sid); err != nil {
 			return Receipt{}, err
 		}
-		return t.send(ctx, key, s, text, url.Values{"ContentSid": {t.FormContentSID}}, now)
+		variables, _ := json.Marshal(opening.Variables)
+		return t.send(ctx, key, s, text, url.Values{"ContentSid": {sid}, "ContentVariables": {string(variables)}}, now)
+	}
+	if purpose == "meeting_preparation" && !messageWindowOpen(s, now) {
+		opening := domain.PreparationOpening(s)
+		if text != opening.Text {
+			return Receipt{}, &Failure{Code: "preparation_template_text_mismatch"}
+		}
+		if err := t.templateReady(ctx, t.PreparationContentSID); err != nil {
+			return Receipt{}, err
+		}
+		variables, _ := json.Marshal(opening.Variables)
+		return t.send(ctx, key, s, text, url.Values{"ContentSid": {t.PreparationContentSID}, "ContentVariables": {string(variables)}}, now)
 	}
 	if purpose == "booking_confirmation" && !messageWindowOpen(s, now) {
 		return Receipt{}, &Deferred{Code: "booking_confirmation_awaiting_whatsapp", After: time.Minute}
@@ -165,16 +191,16 @@ func (t *TwilioMessaging) send(ctx context.Context, key string, s domain.State, 
 	return t.awaitSent(ctx, key, m)
 }
 
-func (t *TwilioMessaging) formTemplateReady(ctx context.Context) error {
+func (t *TwilioMessaging) templateReady(ctx context.Context, sid string) error {
 	wait := func(code string) error { return &Deferred{Code: code, After: time.Minute} }
-	if t.FormContentSID == "" {
+	if sid == "" {
 		return wait("form_template_not_configured")
 	}
 	base := t.ContentBaseURL
 	if base == "" {
 		base = "https://content.twilio.com"
 	}
-	req, err := http.NewRequestWithContext(ctx, "GET", base+"/v1/Content/"+url.PathEscape(t.FormContentSID)+"/ApprovalRequests", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", base+"/v1/Content/"+url.PathEscape(sid)+"/ApprovalRequests", nil)
 	if err != nil {
 		return &Failure{Code: "invalid_template_request"}
 	}

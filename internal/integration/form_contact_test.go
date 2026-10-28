@@ -180,7 +180,7 @@ func TestTemplateApprovalDefersThenSendsWithoutBody(t *testing.T) {
 	if posts != 1 {
 		t.Fatal(posts)
 	}
-	if _, err := tw.Send(ctx, jobID, st, domain.FormContactText, "form_contact", now); err != nil {
+	if _, err := tw.Send(ctx, jobID, st, domain.ContactOpening(st, policy(), now).Text, "form_contact", now); err != nil {
 		t.Fatal(err)
 	}
 	if posts != 1 {

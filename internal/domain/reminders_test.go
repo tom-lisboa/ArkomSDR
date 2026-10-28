@@ -5,6 +5,55 @@ import (
 	"time"
 )
 
+func TestPreparationTimingAndCurrentBookingGuards(t *testing.T) {
+	now := time.Date(2026, 10, 28, 15, 0, 0, 0, time.UTC)
+	s := State{ID: "lead", Profile: Form{Consent: true}, LastFormContactAt: &now, Booking: &Booking{ID: "booking", Start: now.Add(2 * time.Hour)}}
+	fx := PreparationSequence(s, now)
+	if len(fx) != 1 || !fx[0].Due.Equal(now.Add(15*time.Minute)) || !fx[0].Expires.Equal(now.Add(20*time.Minute)) {
+		t.Fatal(fx)
+	}
+	if next := PreparationSequence(s, now.Add(time.Minute)); next[0].ID != fx[0].ID {
+		t.Fatal("restart changed identity")
+	}
+	if len(PreparationSequence(s, now.Add(20*time.Minute))) != 0 {
+		t.Fatal("late catch-up")
+	}
+	for _, change := range []string{"cancel", "reschedule", "optout", "pause", "human", "consent"} {
+		changed := s
+		b := *s.Booking
+		changed.Booking = &b
+		switch change {
+		case "cancel":
+			changed.Booking = nil
+		case "reschedule":
+			changed.Booking.Start = b.Start.Add(time.Hour)
+		case "optout":
+			changed.OptedOut = true
+		case "pause":
+			changed.Paused = true
+		case "human":
+			changed.Human = true
+		case "consent":
+			changed.Profile.Consent = false
+		}
+		if ok, _ := Deliverable(changed, fx[0], fx[0].Due); ok {
+			t.Fatal("guard failed", change)
+		}
+	}
+	s.Booking.Start = now.Add(45 * time.Minute)
+	if len(PreparationSequence(s, now)) != 0 {
+		t.Fatal("overlaps final reminder window")
+	}
+	s.Booking.Start = now.Add(47 * time.Minute)
+	if got := PreparationSequence(s, now); len(got) != 1 || !got[0].Expires.Equal(now.Add(17*time.Minute)) {
+		t.Fatal(got)
+	}
+	s.LastFormContactAt = nil
+	if len(PreparationSequence(s, now)) != 0 {
+		t.Fatal("scheduled before successful opening")
+	}
+}
+
 func TestMeetingSequenceTimingAndIdentity(t *testing.T) {
 	now := time.Date(2026, 10, 28, 15, 0, 0, 0, time.UTC)
 	s := State{ID: "lead", Booking: &Booking{ID: "booking", Start: now.Add(time.Hour)}}

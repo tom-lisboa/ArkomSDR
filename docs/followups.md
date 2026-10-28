@@ -8,8 +8,9 @@ uma etapa por clique usando os mesmos workers, mesmo com a cadência desligada.
 
 | Momento | Responsável | Ação |
 |---|---|---|
+| 15 minutos após a abertura | Follow-up | Pede um exemplo prático para preparar a reunião, sem depoimento. |
 | T−30 minutos | Follow-up → mídia | Envia a gravação da equipe como áudio OGG/Opus. |
-| T−15 minutos | Follow-up | Envia texto com horário, fuso e link da reserva atual. |
+| T−15 minutos | Follow-up | Envia texto com horário e fuso; inclui link apenas se existir na reserva. |
 | Após confirmar o envio do texto | Follow-up → voz | Solicita permissão pelo botão nativo do WhatsApp. |
 | Após o cliente permitir | Voz → agenda | Confere a reserva e inicia uma única ligação de lembrete. |
 | T−5 minutos | Follow-up → SMS | Envia lembrete por SMS aos contatos que autorizaram esse canal. |
@@ -21,6 +22,8 @@ O botão não autoriza a ligação sozinho: a resposta nativa precisa ser valida
 Sem aceite, não há chamada. A ligação pode começar após T−15, quando o cliente
 aceitar, mas nunca depois do início da reunião. A IA de voz continua limitada a
 lembrar a reunião e registrar dúvidas; não remarca nem cancela por conta própria.
+
+A preparação tem ativação independente por `BIA_MEETING_PREPARATION_ENABLED` e usa `TWILIO_PREPARATION_CONTENT_SID` aprovado fora da janela de atendimento. Só ocorre com reserva futura, respeita horário de contato e termina antes dos 30 minutos finais da reunião. [Detalhes e recuperação após reinício](test-form-troubleshooting.md#preparação-15-minutos-após-a-abertura).
 
 ## Estado de ativação
 

@@ -33,6 +33,9 @@ func New(base worker.Worker) *Worker {
 		if why != "" || due.After(now) || !domain.IsMeetingReminder(fx) {
 			return due, why
 		}
+		if fx.Purpose == "meeting_preparation" {
+			return due, ""
+		}
 		if fx.Purpose == "meeting_sms" {
 			if w.runtime.SMSSender == nil {
 				return time.Time{}, "sms_not_enabled"
@@ -61,6 +64,13 @@ func (w *Worker) RunScheduler(ctx context.Context) {
 	tick := time.NewTicker(30 * time.Second)
 	defer tick.Stop()
 	for {
+		if w.runtime.Policy.MeetingPreparation {
+			step, cancel := context.WithTimeout(ctx, 20*time.Second)
+			if err := w.runtime.DB.ReconcilePreparation(step, time.Now().UTC(), w.runtime.Live); err != nil && ctx.Err() == nil {
+				slog.Error("preparation reconciliation failed")
+			}
+			cancel()
+		}
 		if w.runtime.Policy.SMSReminders {
 			step, cancel := context.WithTimeout(ctx, 20*time.Second)
 			if err := w.runtime.DB.ReconcileSMSReminders(step, time.Now().UTC(), w.runtime.Live); err != nil && ctx.Err() == nil {
@@ -142,6 +152,10 @@ func NextContact(p domain.Policy, s domain.State, fx domain.Effect, now time.Tim
 			return time.Time{}, why
 		}
 		return now, ""
+	} else if fx.Purpose == "meeting_preparation" {
+		if !p.MeetingPreparation || p.TestPhone != "" {
+			return time.Time{}, "meeting_preparation_disabled"
+		}
 	} else if domain.IsMeetingReminder(fx) {
 		if !p.MeetingReminders || p.TestPhone != "" {
 			return time.Time{}, "meeting_reminders_disabled"

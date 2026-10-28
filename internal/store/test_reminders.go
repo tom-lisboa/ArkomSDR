@@ -85,11 +85,21 @@ func (d *DB) QueueTestReminder(ctx context.Context, id, submission, phone, actio
 		return deny("whatsapp_reply_required")
 	}
 	if action == "sms" {
+		var pending bool
+		if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM bia_go.jobs WHERE lead_id=$1 AND kind='event' AND payload->>'kind'='contact.sms_consent' AND status IN ('pending','running'))`, s.ID).Scan(&pending); err != nil {
+			return "", false, err
+		}
+		if pending {
+			return deny("contact_update_pending")
+		}
 		if !smsEnabled {
 			return deny("sms_not_enabled")
 		}
-		if !s.Profile.SMSConsent || domain.SMSDestination(s.Profile) == "" {
+		if !s.Profile.SMSConsent {
 			return deny("sms_consent_required")
+		}
+		if domain.SMSDestination(s.Profile) == "" {
+			return deny("sms_phone_required")
 		}
 	}
 	if action == "audio" && !audioReady {

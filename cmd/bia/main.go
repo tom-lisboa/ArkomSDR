@@ -72,6 +72,10 @@ func run() error {
 	if c.MessagingProvider == "twilio" {
 		twilioMessages = &providers.TwilioMessaging{Pool: db.Pool, Account: c.Voice.Account, AuthToken: c.Voice.AuthToken, Sender: c.Voice.Sender, AllowedPhone: c.TestPhone, Client: providers.NewHTTP()}
 		twilioMessages.FormContentSID = c.FormContentSID
+		twilioMessages.PreparationContentSID = c.PreparationContentSID
+		twilioMessages.BookedContentSID = c.BookedContentSID
+		twilioMessages.BookedQuestionSID = c.BookedQuestionSID
+		twilioMessages.TimeZone = c.Policy.TimeZone
 		messenger = twilioMessages
 	}
 	calendar := &providers.LocalCalendar{Pool: db.Pool}

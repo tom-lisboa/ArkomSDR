@@ -191,3 +191,5 @@ Pare a consulta no estado terminal, após 10 minutos ou ao sair da página.
 | 503 `sms_not_enabled` | Configurar o remetente SMS no servidor. |
 
 Nenhum desses erros deve ser mostrado como envio concluído.
+
+Diagnóstico de erros, consulta de estado e atualização da autorização de SMS: [integração do formulário](test-form-troubleshooting.md).

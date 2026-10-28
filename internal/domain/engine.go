@@ -105,6 +105,23 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 		}
 	case "ownership.changed":
 		s.Owner = e.Owner
+	case "contact.sms_consent":
+		if e.SMSConsent == nil {
+			return finish()
+		}
+		if *e.SMSConsent && (s.OptedOut || s.Paused || s.Human || !s.Profile.Consent) {
+			return finish()
+		}
+		if *e.SMSConsent && SMSDestination(Form{Phone: s.Profile.Phone, SMSPhone: e.SMSPhone}) == "" {
+			return finish()
+		}
+		s.Profile.SMSConsent = *e.SMSConsent
+		s.Profile.SMSPhone = ""
+		if *e.SMSConsent {
+			s.Profile.SMSPhone = e.SMSPhone
+		}
+		s.Profile.SMSConsentVersion = "test-form-sms-v1"
+		add("crm", "sms_consent", fmt.Sprintf("Preferência SMS: %t; origem: %s", *e.SMSConsent, e.Reason), now, now.Add(24*time.Hour))
 	case "contact.opt_out":
 		s.OptedOut = true
 		s.Paused = true
@@ -164,6 +181,9 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 		}
 		if p.SMSReminders {
 			r.Effects = append(r.Effects, SMSSequence(s, now)...)
+		}
+		if p.MeetingPreparation {
+			r.Effects = append(r.Effects, PreparationSequence(s, now)...)
 		}
 		add("crm", "booking", "Reserva confirmada pelo provedor: "+b.ID, now, now.Add(24*time.Hour)).Booking = &b
 	case "booking.cancelled":
@@ -498,6 +518,9 @@ func Deliverable(s State, fx Effect, now time.Time) (bool, string) {
 	if fx.BookingID != "" && (s.Booking == nil || s.Booking.ID != fx.BookingID) {
 		return false, "stale_booking"
 	}
+	if fx.Purpose == "meeting_preparation" && s.LastPreparationAt != nil && (s.LastFormContactAt == nil || !s.LastPreparationAt.Before(*s.LastFormContactAt)) {
+		return false, "preparation_already_sent"
+	}
 	if IsMeetingReminder(fx) {
 		if fx.Purpose == "meeting_sms" && (!s.Profile.SMSConsent || SMSDestination(s.Profile) == "") {
 			return false, "sms_consent_required"
@@ -516,6 +539,9 @@ func Deliverable(s State, fx Effect, now time.Time) (bool, string) {
 		return false, "stale_booking_time"
 	}
 	if fx.Kind == "send" {
+		if fx.Purpose == "booking_confirmation" && s.Booking != nil && s.LastFormBookingID == s.Booking.ID && s.LastFormContactAt != nil && !s.LastFormContactAt.Before(s.LastBookingEventAt) {
+			return false, "covered_by_form_opening"
+		}
 		if fx.Purpose == "form_contact" {
 			if s.Paused {
 				return false, "paused"
@@ -552,6 +578,12 @@ func Deliverable(s State, fx Effect, now time.Time) (bool, string) {
 }
 
 func Render(s State, fx Effect, p Policy, now time.Time) string {
+	if fx.Purpose == "meeting_preparation" {
+		return PreparationOpening(s).Text
+	}
+	if fx.Purpose == "form_contact" || fx.Purpose == "welcome" {
+		return ContactOpening(s, p, now).Text
+	}
 	if fx.Purpose == "meeting_sms" {
 		return SMSReminderText(s, p)
 	}

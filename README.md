@@ -142,3 +142,5 @@ O [lembrete SMS em T−5](docs/sms-reminders.md) usa o mesmo worker de follow-up
 com autorização própria no formulário e botão opcional `/reminders/sms` para demonstração.
 
 Disponibilidade e reserva pelo formulário: [contrato dos endpoints](docs/form-calendar.md).
+
+Abertura com confirmação da reserva, preparação após 15 minutos e correção dos erros do formulário: [contrato e diagnóstico](docs/test-form-troubleshooting.md).

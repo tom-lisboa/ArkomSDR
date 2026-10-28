@@ -11,6 +11,8 @@ import (
 )
 
 type Event struct {
+	SMSConsent *bool  `json:"sms_consent,omitempty"`
+	SMSPhone   string `json:"sms_phone,omitempty"`
 	// CalendarUnavailable is internal execution context, never accepted from webhooks.
 	CalendarUnavailable bool                      `json:"-"`
 	ConversationID      string                    `json:"conversation_id,omitempty"`
@@ -82,6 +84,8 @@ type Turn struct {
 }
 
 type State struct {
+	LastPreparationAt  *time.Time `json:"last_preparation_at,omitempty"`
+	LastFormBookingID  string     `json:"last_form_booking_id,omitempty"`
 	ID                 string     `json:"id"`
 	Profile            Form       `json:"profile"`
 	Owner              string     `json:"owner"`
@@ -147,18 +151,19 @@ type Result struct {
 }
 
 type Policy struct {
-	SMSReminders     bool
-	WhatsAppPhone    string
-	MeetingReminders bool
-	DisableFollowups bool
-	TestPhone        string
-	Brand            string
-	SchedulingURL    string
-	TimeZone         string
-	QuietStart       int
-	QuietEnd         int
-	FollowupAfter    time.Duration
-	Reminders        []time.Duration
+	MeetingPreparation bool
+	SMSReminders       bool
+	WhatsAppPhone      string
+	MeetingReminders   bool
+	DisableFollowups   bool
+	TestPhone          string
+	Brand              string
+	SchedulingURL      string
+	TimeZone           string
+	QuietStart         int
+	QuietEnd           int
+	FollowupAfter      time.Duration
+	Reminders          []time.Duration
 }
 
 func (p Policy) Zone(s State) *time.Location {
@@ -279,6 +284,13 @@ func ValidateEvent(e Event) error {
 	case "schedule.preference":
 		if strings.TrimSpace(e.Preference) == "" || len(e.Preference) > 500 {
 			return errors.New("schedule preference required, max 500 bytes")
+		}
+	case "contact.sms_consent":
+		if e.SMSConsent == nil {
+			return errors.New("explicit SMS consent required")
+		}
+		if phone, err := NormalizePhone(e.SMSPhone); err != nil || phone != e.SMSPhone {
+			return errors.New("invalid SMS phone")
 		}
 	case "contact.opt_out", "human.takeover", "human.release", "cadence.resume":
 	case "ownership.changed":

@@ -231,3 +231,140 @@ func TestWebConfirmationWaitsForWhatsAppWithoutProviderCall(t *testing.T) {
 		t.Fatal(n)
 	}
 }
+
+func TestBookedOpeningTemplateAndNoDuplicateConfirmation(t *testing.T) {
+	db := setup(t)
+	ctx := context.Background()
+	now := time.Now()
+	s := testState("booked-opening", now)
+	s.Profile.Goal = "Quero vender mais"
+	s.LastInbound = time.Time{}
+	s.Booking = &domain.Booking{ID: "booked", Start: now.Add(24 * time.Hour), End: now.Add(24*time.Hour + 45*time.Minute)}
+	s.LastBookingEventAt = now
+	opening := domain.Effect{ID: "fx/opening", LeadID: s.ID, Kind: "send", Purpose: "form_contact", Due: now, Expires: now.Add(time.Hour)}
+	confirmation := domain.Effect{ID: "fx/confirmation", LeadID: s.ID, Kind: "send", Purpose: "booking_confirmation", Text: "confirmado", BookingID: s.Booking.ID, BookingStart: s.Booking.Start, Due: now, Expires: s.Booking.Start}
+	publishEffects(t, db, "seed-opening", s, opening, confirmation)
+	sid := "HX" + strings.Repeat("4", 32)
+	posts := 0
+	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "ApprovalRequests") {
+			if !strings.Contains(r.URL.Path, sid) {
+				t.Error("wrong template")
+			}
+			fmt.Fprint(w, `{"whatsapp":{"status":"approved"}}`)
+			return
+		}
+		if r.Method == "POST" {
+			posts++
+			r.ParseForm()
+			var vars map[string]string
+			json.Unmarshal([]byte(r.Form.Get("ContentVariables")), &vars)
+			if r.Form.Get("ContentSid") != sid || vars["4"] != "45" || vars["5"] != s.Profile.Goal || r.Form.Get("Body") != "" {
+				t.Error("template mismatch", r.Form)
+			}
+		}
+		fmt.Fprintf(w, `{"sid":%q,"status":"sent"}`, "SM"+strings.Repeat("5", 32))
+	}))
+	defer mock.Close()
+	w := runtimeWorker(db, now, &countingMessenger{})
+	w.Policy.MeetingPreparation = true
+	w.Messenger = &providers.TwilioMessaging{Pool: db.Pool, Sender: voiceSender, Client: mock.Client(), BaseURL: mock.URL, ContentBaseURL: mock.URL, BookedContentSID: sid}
+	// Scheduler may win the race; it must wait rather than send duplicate copy.
+	sw := schedulingworker.New(*w, &providers.LocalCalendar{Pool: db.Pool})
+	if done, err := sw.Once(ctx); err != nil || !done {
+		t.Fatal(done, err)
+	}
+	step(t, w, true)
+	current, err := db.Lead(ctx, s.ID)
+	if err != nil || current.LastFormBookingID != "booked" || posts != 1 {
+		t.Fatal(current, err, posts)
+	}
+	preparation := domain.PreparationSequence(current, now)
+	if len(preparation) != 1 || !preparation[0].Due.Equal(current.LastFormContactAt.Add(15*time.Minute)) {
+		t.Fatal(preparation)
+	}
+	assertJob(t, db, preparation[0].ID, "followup", "pending")
+	db.Pool.Exec(ctx, `UPDATE bia_go.jobs SET due_at=now() WHERE id=$1`, confirmation.ID)
+	if done, err := sw.Once(ctx); err != nil || !done {
+		t.Fatal(done, err)
+	}
+	job, err := db.Job(ctx, confirmation.ID)
+	if err != nil || job.Status != "skipped" || posts != 1 {
+		t.Fatal(job, err, posts)
+	}
+}
+
+func TestSMSConsentRepairWithoutNewOutreachOrBooking(t *testing.T) {
+	db := setup(t)
+	ctx := context.Background()
+	now := time.Now()
+	s := testState(domain.LeadKey("+557799749058"), now)
+	s.Profile.Phone = "+557799749058"
+	s.Profile.SMSConsent = false
+	s.Profile.SMSPhone = ""
+	s.Booking = &domain.Booking{ID: "already-booked", Start: now.Add(24 * time.Hour), End: now.Add(24*time.Hour + 45*time.Minute)}
+	publishEffects(t, db, "seed-consent", s)
+	profile := s.Profile
+	profile.Phone = "+5577999749058"
+	if _, _, err := db.RegisterTestForm(ctx, "consent-form", profile); err != nil {
+		t.Fatal(err)
+	}
+	db.Pool.Exec(ctx, `UPDATE bia_go.test_forms SET claimed_by=$1,claimed_at=now(),contact_event_id='existing' WHERE id='consent-form'`, s.ID)
+	key := strings.Repeat("c", 48)
+	base := "/webhooks/test-form/" + key
+	h := (&httpapi.Server{DB: db, TestFormToken: key, Mode: "live", SMSEnabled: true}).Handler()
+	identity := `{"phone":"+5577999749058","submission_id":"consent-form"}`
+	r := calendarCall(h, "POST", base+"/reminders/sms", "sms-before", identity)
+	if r.Code != 409 || !strings.Contains(r.Body.String(), `"next_action":"request_sms_consent"`) {
+		t.Fatal(r.Code, r.Body)
+	}
+	if r = calendarCall(h, "POST", base+"/sms-consent", "missing", identity); r.Code != 422 {
+		t.Fatal(r.Code, r.Body)
+	}
+	body := strings.TrimSuffix(identity, "}") + `,"sms_consent":true}`
+	if r = calendarCall(h, "POST", base+"/sms-consent", "wrong", strings.Replace(body, "consent-form", "someone-else", 1)); r.Code != 404 {
+		t.Fatal(r.Code)
+	}
+	for range 2 {
+		r = calendarCall(h, "POST", base+"/sms-consent", "optin", body)
+		if r.Code != 202 {
+			t.Fatal(r.Code, r.Body)
+		}
+	}
+	if r = calendarCall(h, "POST", base+"/sms-consent", "optin", strings.Replace(body, "true", "false", 1)); r.Code != 409 {
+		t.Fatal(r.Code, r.Body)
+	}
+	if r = calendarCall(h, "POST", base+"/reminders/sms", "sms-pending", identity); r.Code != 409 || !strings.Contains(r.Body.String(), "contact_update_pending") {
+		t.Fatal(r.Code, r.Body)
+	}
+	w := runtimeWorker(db, now, &countingMessenger{})
+	step(t, w, true)
+	current, err := db.Lead(ctx, s.ID)
+	if err != nil || !current.Profile.SMSConsent || domain.SMSDestination(current.Profile) != "+5577999749058" || current.Booking.ID != s.Booking.ID {
+		t.Fatal(current, err)
+	}
+	if r = calendarCall(h, "POST", base+"/test-status", "", identity); r.Code != 200 || !strings.Contains(r.Body.String(), `"sms_consent":true`) {
+		t.Fatal(r.Code, r.Body)
+	}
+	if r = calendarCall(h, "POST", base+"/reminders/sms", "sms-after", identity); r.Code != 202 {
+		t.Fatal(r.Code, r.Body)
+	}
+	var count int
+	db.Pool.QueryRow(ctx, `SELECT count(*) FROM bia_go.jobs WHERE payload->>'purpose'='form_contact'`).Scan(&count)
+	if count != 0 {
+		t.Fatal("consent resent opening")
+	}
+	// Revocation takes effect before any pending SMS effect can execute.
+	r = calendarCall(h, "POST", base+"/sms-consent", "revoke", strings.Replace(body, "true", "false", 1))
+	if r.Code != 202 {
+		t.Fatal(r.Code, r.Body)
+	}
+	step(t, w, true) // earlier CRM may run only after the revocation event
+	current, err = db.Lead(ctx, s.ID)
+	if err != nil || current.Profile.SMSConsent {
+		t.Fatal(current, err)
+	}
+	if ok, _ := domain.Deliverable(current, domain.Effect{Kind: "send_sms", Purpose: "meeting_sms", BookingID: s.Booking.ID, Expires: now.Add(time.Hour)}, now); ok {
+		t.Fatal("revoked SMS still deliverable")
+	}
+}

@@ -88,13 +88,9 @@ Resposta HTTP 202:
 
 `BIA_FORM_AUTO_CONTACT=true` ativa o contato automático no mesmo webhook. Quando desligado, o vínculo antigo por código continua disponível por compatibilidade. Shadow retorna `queued_for_simulation` e não envia mensagens reais.
 
-A primeira mensagem é fixa:
+A primeira mensagem usa o cadastro e a reserva atual: se já houver reunião, confirma data, hora, fuso e duração. Aproveita o objetivo informado; só pergunta sobre a necessidade quando esse dado não existe. Sem reunião, apresenta a Bia e convida a escolher um horário. Não inclui link de sala.
 
-> Oi, tudo bem?
->
-> Retomando nossa conversa por aqui
-
-Dentro da janela de atendimento, sai como texto. Fora dela, o worker usa `TWILIO_FORM_CONTACT_CONTENT_SID`, com o template em `deploy/form-contact-template.json`. O template precisa estar aprovado pela Meta; a submissão do formulário **não abre nem altera a janela do WhatsApp**. A margem usada pelo código é de 23 horas desde a última mensagem recebida.
+Dentro da janela de atendimento, sai como texto. Fora dela, o worker seleciona um dos três templates de abertura configurados. Os templates precisam estar aprovados pela Meta; a submissão do formulário **não abre nem altera a janela do WhatsApp**. A margem usada pelo código é de 23 horas desde a última mensagem recebida. Veja os [textos e variáveis da abertura](test-form-troubleshooting.md#nova-abertura).
 
 O worker consulta a aprovação pela API antes de cada envio fora da janela. Enquanto estiver pendente, mantém o mesmo job aguardando, sem consumir tentativas nem transferir o atendimento a um humano. A mensagem expira após 24 horas se o impedimento persistir. `contact_queued` não garante aprovação nem entrega.
 
@@ -116,3 +112,5 @@ Referências: [janela e templates](https://www.twilio.com/docs/whatsapp/key-conc
 ## Agendamento pelo formulário
 
 O formulário aceita `slot_id` opcional para reservar antes do contato automático. Consulte `GET {WEBHOOK}/availability` e envie o ID escolhido na submissão; para submissões já concluídas, use `POST {WEBHOOK}/bookings`. Contrato completo e exemplos em [Agenda no formulário](form-calendar.md).
+
+Diagnóstico de erros, consulta de estado e atualização da autorização de SMS: [integração do formulário](test-form-troubleshooting.md).

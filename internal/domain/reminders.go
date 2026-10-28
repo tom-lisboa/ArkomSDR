@@ -33,5 +33,30 @@ func MeetingSequence(s State, now time.Time) []Effect {
 }
 
 func IsMeetingReminder(fx Effect) bool {
-	return fx.Purpose == "meeting_audio" || fx.Purpose == "meeting_call" || fx.Purpose == "meeting_sms"
+	return fx.Purpose == "meeting_preparation" || fx.Purpose == "meeting_audio" || fx.Purpose == "meeting_call" || fx.Purpose == "meeting_sms"
+}
+
+// Preparation is measured from the successful opening, not from the meeting.
+// It never catches up late or competes with the final 30-minute reminder window.
+func PreparationSequence(s State, now time.Time) []Effect {
+	if s.LastFormContactAt == nil || s.Booking == nil || s.Booking.Outcome != "" {
+		return nil
+	}
+	if s.LastPreparationAt != nil && !s.LastPreparationAt.Before(*s.LastFormContactAt) {
+		return nil
+	}
+	due := s.LastFormContactAt.Add(15 * time.Minute)
+	cutoff := s.Booking.Start.Add(-30 * time.Minute)
+	if !due.Before(cutoff) {
+		return nil
+	}
+	expires := due.Add(5 * time.Minute)
+	if cutoff.Before(expires) {
+		expires = cutoff
+	}
+	if !now.Before(expires) {
+		return nil
+	}
+	key := fmt.Sprintf("%x", sha256.Sum256([]byte(s.ID+"\x00"+s.Booking.ID+"\x00"+s.Booking.Start.UTC().Format(time.RFC3339Nano))))
+	return []Effect{{ID: "fx/meeting:" + key + ":meeting_preparation", LeadID: s.ID, Kind: "send", Purpose: "meeting_preparation", Due: due, Expires: expires, BookingID: s.Booking.ID, BookingStart: s.Booking.Start}}
 }
