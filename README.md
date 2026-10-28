@@ -132,7 +132,7 @@ Implementado em código, com ativação separada e desligada até instalar a gra
 - Quinze minutos antes: enviar a mensagem de lembrete e solicitar autorização de chamada. A ligação só pode ocorrer após autorização nativa válida.
 - O worker de follow-up coordena a sequência no PostgreSQL, confere a reserva atual e impede duplicidade após reinício, remarcação ou cancelamento.
 
-O arquivo de áudio ainda precisa ser disponibilizado. Consulte [instalação, ativação e limites da janela do WhatsApp](docs/followups.md). Os comprovantes operacionais e as credenciais permanecem nos arquivos locais ignorados pelo Git.
+A gravação `1-daqui-a-pouco-A.mp3` foi instalada como OGG/Opus no servidor em 28/10/2026; a cadência T−30/T−15 está ativada. Consulte [instalação, ativação e limites da janela do WhatsApp](docs/followups.md). Os comprovantes operacionais e as credenciais permanecem nos arquivos locais ignorados pelo Git.
 
 Para apresentações, os [endpoints de demonstração](docs/demo-triggers.md) permitem
 acionar o áudio e o fluxo de autorização/ligação por dois botões no formulário,

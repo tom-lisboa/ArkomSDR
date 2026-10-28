@@ -27,8 +27,11 @@ A preparação tem ativação independente por `BIA_MEETING_PREPARATION_ENABLED`
 
 ## Estado de ativação
 
-`BIA_MEETING_REMINDERS_ENABLED=false` é o padrão e permanece assim no servidor
-até instalar o áudio definitivo. Não existe gravação de demonstração na aplicação.
+`BIA_MEETING_REMINDERS_ENABLED=false` continua sendo o padrão de instalação.
+No servidor de teste, a cadência foi ativada em 28/10/2026 após instalar a gravação
+`1-daqui-a-pouco-A.mp3` fornecida pelo usuário: 19,28 segundos, convertida para
+OGG/Opus mono 48 kHz. O arquivo permanece fora do Git e foi validado por checksum,
+decodificação completa e acesso HTTPS público.
 Os templates aprovados para mensagens fora da janela de atendimento ainda não
 estão integrados a esta cadência. O código usa uma margem conservadora de **23
 horas desde a última mensagem recebida**. Com a janela fechada, registra
@@ -110,7 +113,9 @@ status. `GET /v1/jobs/{id}` informa resultado/motivo de descarte; IDs contendo `
 devem ser codificados no segmento da URL. `GET /v1/voice/{id}` informa o convite e a
 ligação. Os testes isolados cobrem sequência entre workers, remarcação, cancelamento,
 permissão tardia, falha no texto, ambiguidade no envio do áudio, reinício e migração.
-O teste real de reprodução do áudio e da cadência ainda depende do arquivo da equipe.
+O arquivo está instalado e disponível para o botão manual de 30 minutos. A reprodução
+no aparelho ainda precisa ser confirmada em um teste; a validação de publicação
+não enviou mensagem de áudio por conta própria.
 
 Referências: [mídia no WhatsApp pela Twilio](https://www.twilio.com/docs/whatsapp/tutorial/send-and-receive-media-messages-whatsapp-nodejs)
 e [WhatsApp Business Calling](https://www.twilio.com/docs/voice/whatsapp-business-calling).
