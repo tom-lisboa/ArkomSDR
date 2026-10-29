@@ -1,12 +1,12 @@
 {
-  "friendly_name": "arkom_abertura_atendimento_v3",
+  "friendly_name": "arkom_abertura_curta_v1",
   "language": "pt_BR",
   "variables": {
     "1": "Ana"
   },
   "types": {
     "twilio/text": {
-      "body": "Oi, {{1}}! Sou a Bia, assistente de IA da Arkom. Recebi seu cadastro para conversar com nosso time sobre como aplicar IA no seu negócio.\n\nVamos escolher um horário para essa conversa?"
+      "body": "Oi, {{1}}! Sou a Bia, IA da Arkom. Recebi seu cadastro.\n\nVamos escolher um horário para conversar?"
     }
   }
 }

@@ -14,31 +14,32 @@ import (
 )
 
 type Config struct {
-	MeetingStartContentSID              string
-	Specialists                         bool
-	DecisionsModel                      string
-	IntroVideoEnabled                   bool
-	IntroVideoContentSID                string
-	IntroVideo                          casemedia.Asset
-	PreparationContentSID               string
-	SMSFrom                             string
-	Availability                        providers.DailyAvailability
-	FormAutoContact                     bool
-	FormContentSID                      string
-	BookedContentSID, BookedQuestionSID string
-	ReminderAudio                       remindermedia.Asset
-	Window                              store.WindowPolicy
-	MessagingProvider, TestPhone        string
-	TestFormToken                       string
-	Voice                               Voice
-	RedisURL, MediaModel                string
-	Address, DSN, Token, Mode           string
-	OpenAIKey, OpenAIModel, AudioModel  string
-	MediaHosts                          []string
-	Policy                              domain.Policy
-	Workers                             int
-	PerLeadDaily, GlobalHourly          int
-	GatewayURL, GatewayToken            string
+	MeetingStartContentSID                        string
+	Specialists                                   bool
+	DecisionsModel                                string
+	IntroVideoEnabled                             bool
+	IntroVideoContentSID                          string
+	IntroVideo                                    casemedia.Asset
+	PreparationContentSID                         string
+	SMSFrom                                       string
+	Availability                                  providers.DailyAvailability
+	FormAutoContact                               bool
+	FormContentSID                                string
+	FormContextContentSID, FormContextQuestionSID string
+	BookedContentSID, BookedQuestionSID           string
+	ReminderAudio                                 remindermedia.Asset
+	Window                                        store.WindowPolicy
+	MessagingProvider, TestPhone                  string
+	TestFormToken                                 string
+	Voice                                         Voice
+	RedisURL, MediaModel                          string
+	Address, DSN, Token, Mode                     string
+	OpenAIKey, OpenAIModel, AudioModel            string
+	MediaHosts                                    []string
+	Policy                                        domain.Policy
+	Workers                                       int
+	PerLeadDaily, GlobalHourly                    int
+	GatewayURL, GatewayToken                      string
 }
 
 func env(k, d string) string {
@@ -83,11 +84,13 @@ func Load() (Config, error) {
 	c.TestFormToken = os.Getenv("BIA_TEST_FORM_TOKEN")
 	c.FormAutoContact = os.Getenv("BIA_FORM_AUTO_CONTACT") == "true"
 	c.FormContentSID = os.Getenv("TWILIO_FORM_CONTACT_CONTENT_SID")
+	c.FormContextContentSID = os.Getenv("TWILIO_FORM_CONTEXT_CONTENT_SID")
+	c.FormContextQuestionSID = os.Getenv("TWILIO_FORM_CONTEXT_QUESTION_CONTENT_SID")
 	c.PreparationContentSID = os.Getenv("TWILIO_PREPARATION_CONTENT_SID")
 	c.MeetingStartContentSID = os.Getenv("TWILIO_MEETING_START_CONTENT_SID")
 	c.BookedContentSID = os.Getenv("TWILIO_BOOKED_CONTACT_CONTENT_SID")
 	c.BookedQuestionSID = os.Getenv("TWILIO_BOOKED_QUESTION_CONTENT_SID")
-	for _, sid := range []string{c.BookedContentSID, c.BookedQuestionSID, c.PreparationContentSID, c.MeetingStartContentSID} {
+	for _, sid := range []string{c.BookedContentSID, c.BookedQuestionSID, c.PreparationContentSID, c.MeetingStartContentSID, c.FormContextContentSID, c.FormContextQuestionSID} {
 		if sid != "" && (len(sid) != 34 || !strings.HasPrefix(sid, "HX")) {
 			return c, errors.New("invalid booked template SID")
 		}

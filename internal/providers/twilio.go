@@ -23,6 +23,7 @@ type TwilioMessaging struct {
 	IntroVideoContentSID                              string
 	PreparationContentSID                             string
 	FormContentSID, ContentBaseURL                    string
+	FormContextContentSID, FormContextQuestionSID     string
 	BookedContentSID, BookedQuestionSID, TimeZone     string
 	Pool                                              *pgxpool.Pool
 	Account, AuthToken, Sender, AllowedPhone, BaseURL string
@@ -119,6 +120,25 @@ func (t *TwilioMessaging) Send(ctx context.Context, key string, s domain.State, 
 			return Receipt{}, err
 		}
 		variables, _ := json.Marshal(opening.Variables)
+		return t.send(ctx, key, s, text, url.Values{"ContentSid": {sid}, "ContentVariables": {string(variables)}}, now)
+	}
+	if purpose == "form_context" && !messageWindowOpen(s, now) {
+		zone := t.TimeZone
+		if zone == "" {
+			zone = "America/Cuiaba"
+		}
+		o := domain.ContactContextOpening(s, domain.Policy{TimeZone: zone}, now)
+		if text != o.Text || text == "" {
+			return Receipt{}, &Failure{Code: "form_context_template_text_mismatch"}
+		}
+		sid := t.FormContextContentSID
+		if o.Kind == "booked_context_question" {
+			sid = t.FormContextQuestionSID
+		}
+		if err := t.templateReady(ctx, sid); err != nil {
+			return Receipt{}, err
+		}
+		variables, _ := json.Marshal(o.Variables)
 		return t.send(ctx, key, s, text, url.Values{"ContentSid": {sid}, "ContentVariables": {string(variables)}}, now)
 	}
 	if purpose == "meeting_preparation" && !messageWindowOpen(s, now) {

@@ -20,8 +20,8 @@ flowchart TD
     F11 -->|Abertura enviada há menos de 15 minutos| FCOOL["Descartar duplicação pelo intervalo mínimo"]
     F11 -->|Sim| F12{"Há reunião futura no estado atual?"}
     F12 -->|Não| FUN["Abertura sem reserva: convidar a escolher horário"]
-    F12 -->|Sim, com objetivo| FGO["Confirmar data, hora, fuso, duração e objetivo informado"]
-    F12 -->|Sim, sem objetivo| FQ["Confirmar reunião e fazer uma pergunta de preparação"]
+    F12 -->|Sim, com objetivo| FGO["Confirmação curta: data, hora, fuso e duração"]
+    F12 -->|Sim, sem objetivo| FQ["Mesma confirmação curta da reunião"]
     FUN --> FSEND["Enviar pelo WhatsApp"]
     FGO --> FSEND
     FQ --> FSEND
@@ -32,9 +32,16 @@ flowchart TD
     FAP -->|Não| FWAIT["Adiar o mesmo job até aprovação ou expiração"]
     FAP -->|Sim| FTXT
     FTXT --> FOK["Registrar envio e horário da abertura"]
+    FOK --> FCTX["Com reserva: segunda mensagem curta em 2 segundos; objetivo ou pergunta de preparação"]
+    FCTX --> FCTCHECK{"Reserva e contato continuam válidos, sem nova resposta?"}
+    FCTCHECK -->|Não| FCTSKIP["Descartar continuação antiga"]
+    FCTCHECK -->|Sim| FCTSEND["Enviar contexto: texto na sessão ou template próprio aprovado fora dela"]
     FOK --> FPREP["Se houver reunião, avaliar preparação em mais 15 minutos"]
     FOK --> FV["Criar job de vídeo único por contato, elegível em 2 segundos"]
-    FV --> FVD{"Abertura entregue ou lida?"}
+    FV --> FCTWAIT{"Segunda mensagem ainda pendente?"}
+    FCTWAIT -->|Sim| FCTHOLD["Adiar vídeo enquanto a abertura termina"]
+    FCTHOLD --> FCTWAIT
+    FCTWAIT -->|Não| FVD{"Abertura entregue ou lida?"}
     FVD -->|Ainda não| FVW["Adiar; vídeo expira após 15 minutos"]
     FVW --> FVD
     FVD -->|Falhou| FVF["Registrar falha opcional; manter conversa"]

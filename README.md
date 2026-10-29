@@ -154,3 +154,5 @@ Avaliação repetível da conversa, com cenários fictícios e API real, sem dis
 Disponibilidade e reserva pelo formulário: [contrato dos endpoints](docs/form-calendar.md).
 
 Abertura com confirmação da reserva, preparação após 15 minutos e correção dos erros do formulário: [contrato e diagnóstico](docs/test-form-troubleshooting.md).
+
+A [abertura em mensagens curtas](docs/short-opening.md) divide confirmação e contexto em duas mensagens, com templates próprios para o primeiro contato automático.

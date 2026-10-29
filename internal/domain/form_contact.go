@@ -8,9 +8,11 @@ import (
 
 // These patterns are mirrored in approved WhatsApp content assets. Values are
 // generated only from the current profile and confirmed booking, never the LLM.
-const FormContactText = "Oi, {{1}}! Sou a Bia, assistente de IA da Arkom. Recebi seu cadastro para conversar com nosso time sobre como aplicar IA no seu negócio.\n\nVamos escolher um horário para essa conversa?"
-const BookedContactText = "Oi, {{1}}! Sou a Bia, assistente de IA da Arkom. Sua reunião com nosso time está confirmada para {{2}}, no fuso {{3}}, com duração de {{4}} minutos.\n\nNa conversa, vamos entender seu negócio e avaliar onde a IA pode ajudar. Seu objetivo informado foi: {{5}}. Esse será o ponto de partida da reunião.\n\nSe tiver alguma dúvida antes da conversa, pode me chamar por aqui."
-const BookedQuestionText = "Oi, {{1}}! Sou a Bia, assistente de IA da Arkom. Sua reunião com nosso time está confirmada para {{2}}, no fuso {{3}}, com duração de {{4}} minutos.\n\nNa conversa, vamos entender seu negócio e avaliar onde a IA pode ajudar.\n\nPara preparar a conversa: o que mais consome seu tempo hoje no negócio, atendimento, vendas ou operação?"
+const FormContactText = "Oi, {{1}}! Sou a Bia, IA da Arkom. Recebi seu cadastro.\n\nVamos escolher um horário para conversar?"
+const BookedContactText = "Oi, {{1}}! Sou a Bia, IA da Arkom. Sua reunião está confirmada para {{2}} ({{3}}), por {{4}} minutos."
+const BookedQuestionText = BookedContactText
+const BookedContextText = "Na reunião, vamos avaliar onde a IA pode ajudar. Seu foco: {{1}}.\n\nAlguma dúvida antes da conversa?"
+const BookedContextQuestionText = "Na reunião, vamos avaliar onde a IA pode ajudar na sua empresa.\n\nO que mais toma seu tempo hoje: atendimento, vendas ou operação?"
 
 type Opening struct {
 	Kind, Text string
@@ -26,7 +28,7 @@ func ContactOpening(s State, p Policy, now time.Time) Opening {
 		}
 		return v
 	}
-	name := clean(firstName(s.Profile.Name), 60)
+	name := clean(firstName(s.Profile.Name), 20)
 	if name == "" {
 		name = "tudo bem"
 	}
@@ -36,13 +38,12 @@ func ContactOpening(s State, p Policy, now time.Time) Opening {
 		b := s.Booking
 		out.Kind = "booked_question"
 		pattern = BookedQuestionText
-		out.Variables["2"] = b.Start.In(p.Zone(s)).Format("02/01/2006 às 15:04")
+		out.Variables["2"] = b.Start.In(p.Zone(s)).Format("02/01 às 15:04")
 		out.Variables["3"] = p.Zone(s).String()
 		out.Variables["4"] = fmt.Sprint(int(b.End.Sub(b.Start).Minutes()))
-		if goal := strings.TrimRight(clean(s.Profile.Goal, 220), ".!?"); goal != "" {
+		if goal := strings.TrimRight(clean(s.Profile.Goal, 90), ".!?"); goal != "" {
 			out.Kind = "booked"
 			pattern = BookedContactText
-			out.Variables["5"] = goal
 		}
 	}
 	// Replace only template placeholders, never placeholders inside user data.
@@ -52,6 +53,34 @@ func ContactOpening(s State, p Policy, now time.Time) Opening {
 	}
 	out.Text = strings.NewReplacer(pairs...).Replace(pattern)
 	return out
+}
+
+// ContactContextOpening is a distinct, approved short bubble. The full form
+// objective stays in State; the display excerpt only bounds this opening.
+func ContactContextOpening(s State, p Policy, now time.Time) Opening {
+	if s.Booking == nil || s.Booking.Outcome != "" || !s.Booking.Start.After(now) || !s.Booking.End.After(s.Booking.Start) {
+		return Opening{}
+	}
+	o := Opening{Kind: "booked_context_question", Text: BookedContextQuestionText, Variables: map[string]string{}}
+	goal := strings.TrimRight(strings.Join(strings.Fields(s.Profile.Goal), " "), ".!?")
+	if goal != "" {
+		r := []rune(goal)
+		if len(r) > 90 {
+			goal = string(r[:89]) + "…"
+		}
+		o.Kind = "booked_context"
+		o.Variables["1"] = goal
+		o.Text = strings.ReplaceAll(BookedContextText, "{{1}}", goal)
+	}
+	return o
+}
+
+func ContactContextSequence(s State, openingID string, p Policy, now time.Time) []Effect {
+	o := ContactContextOpening(s, p, now)
+	if openingID == "" || o.Text == "" {
+		return nil
+	}
+	return []Effect{{ID: openingID + ":context", LeadID: s.ID, Kind: "send", Purpose: "form_context", Text: o.Text, AfterMessageID: openingID, Due: now.Add(2 * time.Second), Expires: minTime(now.Add(15*time.Minute), s.Booking.Start), BookingID: s.Booking.ID, BookingStart: s.Booking.Start, TriggerAt: now}}
 }
 
 const PreparationText = "Oi, {{1}}! Uma dica para aproveitar melhor sua reunião com o time da Arkom: separe um exemplo de tarefa que toma tempo no dia a dia do negócio.\n\nPode ser uma conversa de atendimento, uma etapa de vendas ou uma rotina da operação. Não precisa montar apresentação; esse exemplo ajuda a deixar a conversa mais prática."

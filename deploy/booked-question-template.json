@@ -1,15 +1,15 @@
 {
-  "friendly_name": "arkom_reuniao_preparacao_v1",
+  "friendly_name": "arkom_confirmacao_curta_v1",
   "language": "pt_BR",
   "variables": {
     "1": "Ana",
-    "2": "30/10/2026 às 14:00",
+    "2": "30/10 às 14:00",
     "3": "America/Cuiaba",
     "4": "45"
   },
   "types": {
     "twilio/text": {
-      "body": "Oi, {{1}}! Sou a Bia, assistente de IA da Arkom. Sua reunião com nosso time está confirmada para {{2}}, no fuso {{3}}, com duração de {{4}} minutos.\n\nNa conversa, vamos entender seu negócio e avaliar onde a IA pode ajudar.\n\nPara preparar a conversa: o que mais consome seu tempo hoje no negócio, atendimento, vendas ou operação?"
+      "body": "Oi, {{1}}! Sou a Bia, IA da Arkom. Sua reunião está confirmada para {{2}} ({{3}}), por {{4}} minutos."
     }
   }
 }

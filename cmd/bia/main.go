@@ -77,6 +77,8 @@ func run() error {
 	if c.MessagingProvider == "twilio" {
 		twilioMessages = &providers.TwilioMessaging{Pool: db.Pool, Account: c.Voice.Account, AuthToken: c.Voice.AuthToken, Sender: c.Voice.Sender, AllowedPhone: c.TestPhone, Client: providers.NewHTTP()}
 		twilioMessages.FormContentSID = c.FormContentSID
+		twilioMessages.FormContextContentSID = c.FormContextContentSID
+		twilioMessages.FormContextQuestionSID = c.FormContextQuestionSID
 		twilioMessages.PreparationContentSID = c.PreparationContentSID
 		twilioMessages.MeetingStartContentSID = c.MeetingStartContentSID
 		twilioMessages.IntroVideoContentSID = c.IntroVideoContentSID

@@ -259,7 +259,7 @@ func TestBookedOpeningTemplateAndNoDuplicateConfirmation(t *testing.T) {
 			r.ParseForm()
 			var vars map[string]string
 			json.Unmarshal([]byte(r.Form.Get("ContentVariables")), &vars)
-			if r.Form.Get("ContentSid") != sid || vars["4"] != "45" || vars["5"] != s.Profile.Goal || r.Form.Get("Body") != "" {
+			if r.Form.Get("ContentSid") != sid || vars["4"] != "45" || len(vars) != 4 || r.Form.Get("Body") != "" {
 				t.Error("template mismatch", r.Form)
 			}
 		}

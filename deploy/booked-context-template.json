@@ -1,0 +1,12 @@
+{
+  "friendly_name": "arkom_contexto_curto_v1",
+  "language": "pt_BR",
+  "variables": {
+    "1": "melhorar o atendimento"
+  },
+  "types": {
+    "twilio/text": {
+      "body": "Na reunião, vamos avaliar onde a IA pode ajudar. Seu foco: {{1}}.\n\nAlguma dúvida antes da conversa?"
+    }
+  }
+}

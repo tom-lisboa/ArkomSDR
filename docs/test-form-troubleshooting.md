@@ -78,13 +78,13 @@ Essa operação preserva o histórico, a reserva e o formulário; não manda uma
 
 ## Nova abertura
 
-Três templates pt_BR, com valores vindos do banco e sem geração livre:
+Templates pt_BR, com valores vindos do banco e sem geração livre. A [abertura curta](short-opening.md) separa a reserva em duas mensagens:
 
 - Sem reunião: apresenta a Bia e convida a escolher um horário.
-- Reunião + objetivo informado: confirma data/hora/fuso/duração e aproveita o objetivo, sem repetir a pergunta.
-- Reunião sem objetivo: confirma os dados e pergunta uma única vez o que mais consome tempo no negócio.
+- Reunião + objetivo informado: confirma data/hora/fuso/duração na primeira; aproveita o objetivo na segunda, sem repetir a pergunta.
+- Reunião sem objetivo: confirma os dados na primeira e faz uma única pergunta de preparação na segunda.
 
-Os textos estão em `deploy/form-contact-template.json`, `deploy/booked-contact-template.json` e `deploy/booked-question-template.json`. A configuração usa `TWILIO_FORM_CONTACT_CONTENT_SID`, `TWILIO_BOOKED_CONTACT_CONTENT_SID` e `TWILIO_BOOKED_QUESTION_CONTENT_SID`.
+Os textos estão em `deploy/form-contact-template.json`, `deploy/booked-contact-template.json`, `deploy/booked-context-template.json` e `deploy/booked-context-question-template.json`. A configuração usa `TWILIO_FORM_CONTACT_CONTENT_SID`, `TWILIO_BOOKED_CONTACT_CONTENT_SID`, `TWILIO_FORM_CONTEXT_CONTENT_SID` e `TWILIO_FORM_CONTEXT_QUESTION_CONTENT_SID`. O alias `TWILIO_BOOKED_QUESTION_CONTENT_SID` aponta para a mesma confirmação curta.
 
 Não há link fictício, promessa de reunião em grupo nem depoimento inventado. A duração é a da reserva (45 minutos na grade atual). Os lembretes T−30/T−15/T−5 são independentes.
 

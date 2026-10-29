@@ -566,6 +566,9 @@ func Deliverable(s State, fx Effect, now time.Time) (bool, string) {
 	if fx.Purpose == "intro_video" && (s.Paused || !s.Profile.Consent) {
 		return false, "intro_video_contact_blocked"
 	}
+	if fx.Purpose == "form_context" && (s.Paused || !s.Profile.Consent || s.Booking == nil || s.Booking.Outcome != "" || !s.Booking.Start.After(now)) {
+		return false, "opening_context_superseded"
+	}
 	if fx.BookingID != "" && (s.Booking == nil || s.Booking.ID != fx.BookingID) {
 		return false, "stale_booking"
 	}
@@ -636,6 +639,9 @@ func Deliverable(s State, fx Effect, now time.Time) (bool, string) {
 }
 
 func Render(s State, fx Effect, p Policy, now time.Time) string {
+	if fx.Purpose == "form_context" {
+		return ContactContextOpening(s, p, now).Text
+	}
 	if fx.Purpose == "meeting_start" {
 		return MeetingStartOpening(s, p).Text
 	}

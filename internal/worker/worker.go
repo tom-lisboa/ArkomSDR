@@ -209,6 +209,15 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 			return true, w.DB.DeferJob(ctx, j, now.Add(5*time.Second), "awaiting_form_opening")
 		}
 	}
+	if fx.Purpose == "intro_video" {
+		var contextPending bool
+		if err := w.DB.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM bia_go.jobs WHERE lead_id=$1 AND kind='effect' AND status IN ('pending','running') AND payload->>'purpose'='form_context')`, s.ID).Scan(&contextPending); err != nil {
+			return true, err
+		}
+		if contextPending {
+			return true, w.DB.DeferJob(ctx, j, now.Add(2*time.Second), "awaiting_opening_context")
+		}
+	}
 	if fx.Kind != "crm" {
 		conv, version := fx.ConversationID, fx.ConversationVersion
 		if domain.IsMeetingReminder(fx) || fx.Purpose == "intro_video" {
@@ -349,6 +358,7 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 				if w.Policy.MeetingPreparation {
 					follow = append(follow, domain.PreparationSequence(s, now)...)
 				}
+				follow = append(follow, domain.ContactContextSequence(s, j.ID, w.Policy, now)...)
 			}
 			if fx.Purpose == "form_contact" || fx.Purpose == "welcome" {
 				follow = append(follow, domain.IntroVideoSequence(s, j.ID, w.IntroVideoURL, now)...)
@@ -383,7 +393,7 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 		// Never fabricate a success message after a timeout or unknown response.
 		if fx.Kind != "crm" {
 			// Optional outreach failures must not take over the WhatsApp conversation.
-			if fx.Kind != "send_sms" && fx.Kind != "send_video" && fx.Purpose != "meeting_start" {
+			if fx.Kind != "send_sms" && fx.Kind != "send_video" && fx.Purpose != "meeting_start" && fx.Purpose != "form_context" {
 				s.Human = true
 			}
 			s.Reasons = append(s.Reasons, f.Code)
