@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -152,5 +153,27 @@ func TestPublicFormRateLimitAndExpiredCode(t *testing.T) {
 	db.Pool.QueryRow(ctx, `SELECT count(*) FROM bia_go.test_forms WHERE claimed_at IS NOT NULL`).Scan(&count)
 	if count != 0 {
 		t.Fatal("expired form claimed")
+	}
+}
+
+func TestValidFormSMSAndBrazilianTimezonesRemainAccepted(t *testing.T) {
+	db := setup(t)
+	key := strings.Repeat("z", 48)
+	h := (&httpapi.Server{DB: db, TestFormToken: key, VoiceSender: voiceSender, Policy: policy(), Mode: "shadow"}).Handler()
+	zones := []string{"America/Sao_Paulo", "America/Bahia", "America/Fortaleza", "America/Recife", "America/Maceio", "America/Belem", "America/Araguaina", "America/Manaus", "America/Cuiaba", "America/Campo_Grande", "America/Porto_Velho", "America/Boa_Vista", "America/Rio_Branco", "America/Noronha"}
+	for i, zone := range zones {
+		body := map[string]any{"name": "Teste isolado", "company": "Exemplo", "phone": fmt.Sprintf("+556599999%04d", i), "revenue": 0, "goal": "Atender clientes", "consent": true, "sms_consent": i%2 == 0, "timezone": zone}
+		raw, _ := json.Marshal(body)
+		req := httptest.NewRequest("POST", "/webhooks/test-form/"+key, bytes.NewReader(raw))
+		req.Header.Set("Idempotency-Key", fmt.Sprintf("tz-%d", i))
+		out := httptest.NewRecorder()
+		h.ServeHTTP(out, req)
+		if out.Code != 202 {
+			t.Fatal(zone, out.Code, out.Body.String())
+		}
+	}
+	var forms, leads, jobs int
+	if err := db.Pool.QueryRow(context.Background(), `SELECT (SELECT count(*) FROM bia_go.test_forms),(SELECT count(*) FROM bia_go.leads),(SELECT count(*) FROM bia_go.jobs)`).Scan(&forms, &leads, &jobs); err != nil || forms != len(zones) || leads != 0 || jobs != 0 {
+		t.Fatal(forms, leads, jobs, err)
 	}
 }

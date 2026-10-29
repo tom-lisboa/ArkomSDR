@@ -49,12 +49,12 @@ func (s *Server) testForm(w http.ResponseWriter, r *http.Request) {
 	}
 	id := r.Header.Get("Idempotency-Key")
 	if !domain.ValidID(id) || len(id) > 100 {
-		write(w, 422, map[string]string{"error": "valid_idempotency_key_required"})
+		testValidationError(w, r, "valid_idempotency_key_required", "Idempotency-Key")
 		return
 	}
 	phone, e := domain.NormalizePhone(input.Phone)
 	if e != nil {
-		write(w, 422, map[string]string{"error": "phone_must_be_e164"})
+		testValidationError(w, r, "phone_must_be_e164", "phone")
 		return
 	}
 	f := domain.Form{Name: strings.TrimSpace(input.Name), Company: strings.TrimSpace(input.Company), Phone: phone, Email: strings.TrimSpace(input.Email), Revenue: input.Revenue, Goal: strings.TrimSpace(input.Goal), TimeZone: input.TimeZone, Consent: input.Consent, ConsentTextVersion: "test-form-v1", Source: "test_form", Channel: "gateway"}
@@ -64,19 +64,19 @@ func (s *Server) testForm(w http.ResponseWriter, r *http.Request) {
 		f.SMSConsentVersion = "test-form-sms-v1"
 	}
 	if !f.Consent {
-		write(w, 422, map[string]string{"error": "test_contact_consent_required"})
+		testValidationError(w, r, "test_contact_consent_required", "consent")
 		return
 	}
 	if f.TimeZone == "" {
 		f.TimeZone = s.Policy.TimeZone
 	}
 	if e = domain.ValidateEvent(domain.Event{ID: id, LeadID: domain.LeadKey(phone), Kind: "form.submitted", At: time.Now(), Form: &f}); e != nil {
-		write(w, 422, map[string]string{"error": e.Error()})
+		testValidationError(w, r, e.Error(), formValidationFields(e.Error(), f)...)
 		return
 	}
 	if input.SlotID != "" {
 		if !domain.ValidID(input.SlotID) || len(input.SlotID) > 200 {
-			write(w, 422, map[string]string{"error": "invalid_slot_id"})
+			testValidationError(w, r, "invalid_slot_id", "slot_id")
 			return
 		}
 		if s.Calendar == nil || !s.FormAutoContact || s.Mode != "live" {

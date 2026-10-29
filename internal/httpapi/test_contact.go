@@ -19,7 +19,7 @@ func readTestIdentity(w http.ResponseWriter, r *http.Request) (testIdentity, boo
 	}
 	phone, err := domain.NormalizePhone(in.Phone)
 	if err != nil || !domain.ValidID(in.SubmissionID) || len(in.SubmissionID) > 100 {
-		write(w, 422, map[string]string{"error": "valid_phone_and_submission_required"})
+		testValidationError(w, r, "valid_phone_and_submission_required", "phone", "submission_id")
 		return in, false
 	}
 	in.Phone = phone
@@ -35,7 +35,7 @@ func (s *Server) testSMSConsent(w http.ResponseWriter, r *http.Request) {
 	}
 	id := r.Header.Get("Idempotency-Key")
 	if in.SMSConsent == nil || !domain.ValidID(id) || len(id) > 100 {
-		write(w, 422, map[string]string{"error": "explicit_sms_consent_and_idempotency_key_required"})
+		testValidationError(w, r, "explicit_sms_consent_and_idempotency_key_required", "sms_consent", "Idempotency-Key")
 		return
 	}
 	ev, duplicate, err := s.DB.QueueSMSConsent(r.Context(), id, in.SubmissionID, in.Phone, *in.SMSConsent, s.Mode)

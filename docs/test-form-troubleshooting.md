@@ -90,6 +90,20 @@ Não há link fictício, promessa de reunião em grupo nem depoimento inventado.
 
 Fora da janela do WhatsApp, o backend verifica aprovação e envia `ContentSid` + `ContentVariables`, sem `Body`. Enquanto a aprovação está pendente, aguarda sem forçar envio nem interromper a conversa. [Contrato de variáveis da Twilio](https://www.twilio.com/docs/content/using-variables-with-content-api).
 
+## HTTP 422 no formulário
+
+Diagnóstico publicado em 29/10/2026, release `r-0f74b0b7c0b4`. Verificação local com a suíte completa e race detector passou. A página consultou a agenda de Cuiabá com HTTP 200 e 175 vagas disponíveis no momento da conferência. A contagem é um retrato dessa consulta, não uma promessa de disponibilidade.
+
+Uma rejeição de validação não cria cadastro, reserva ou mensagem. O backend mantém o código `error` existente e agora também devolve `message` em português, `campos`, `request_ref`, `retryable: false` e `next_action: correct_fields`. A mesma requisição inválida continuará sendo rejeitada; corrija o campo antes de reenviar. Conflitos de idempotência continuam separados, em HTTP 409.
+
+Exemplo: selecionar SMS com celular brasileiro sem o nono dígito gera `error: "SMS consent requires its version and the original mobile number"` e `campos: ["phone"]`. Não inferimos nem acrescentamos um dígito ao telefone de SMS. Isso é uma causa possível de 422; não comprova o motivo de uma submissão anterior cujo corpo não foi registrado.
+
+O log `test_form_validation_rejected` registra apenas código, campos e uma referência derivada por hash da chave idempotente. Não registra telefone, nome, objetivo, corpo, credenciais ou URL com chave do webhook. `request_ref` serve para correlação, não para autenticação nem consulta de dados.
+
+A página de teste consultada em 29/10/2026 exibe apenas o status quando a API intermediária falha, ocultando o conteúdo de `resposta`. O frontend deve propagar `resposta.message`, destacar `resposta.campos` e exibir a referência quando precisar de diagnóstico. O backend não controla esse aviso da página.
+
+Verificação isolada: formulários válidos nos 14 fusos apresentados na página foram aceitos, alternando SMS true/false, sem criar leads ou jobs reais. Testes também cobrem nome ausente, limites de perfil, telefone, consentimento, faturamento negativo e fuso inválido, além da ausência de dados pessoais nas respostas e nos logs de rejeição.
+
 ## Preparação 15 minutos após a abertura
 
 Com `BIA_MEETING_PREPARATION_ENABLED=true` e `TWILIO_PREPARATION_CONTENT_SID` aprovado, o worker de follow-up agenda uma mensagem 15 minutos após o envio bem-sucedido da abertura, desde que exista uma reunião futura. A mensagem pede para separar um exemplo de tarefa que consome tempo; não contém depoimento, link ou nova sequência de qualificação. Texto em `deploy/preparation-template.json`.

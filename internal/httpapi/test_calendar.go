@@ -28,7 +28,7 @@ func (s *Server) testAvailability(w http.ResponseWriter, r *http.Request) {
 	}
 	zone, err := time.LoadLocation(tz)
 	if err != nil || tz == "" {
-		write(w, 422, map[string]string{"error": "invalid_timezone"})
+		testValidationError(w, r, "invalid_timezone", "timezone")
 		return
 	}
 	now := time.Now()
@@ -36,7 +36,7 @@ func (s *Server) testAvailability(w http.ResponseWriter, r *http.Request) {
 	if date := r.URL.Query().Get("date"); date != "" {
 		start, err = time.ParseInLocation("2006-01-02", date, zone)
 		if err != nil {
-			write(w, 422, map[string]string{"error": "invalid_date"})
+			testValidationError(w, r, "invalid_date", "date")
 			return
 		}
 	}
@@ -84,12 +84,12 @@ func (s *Server) testBooking(w http.ResponseWriter, r *http.Request) {
 	}
 	id := r.Header.Get("Idempotency-Key")
 	if !domain.ValidID(id) || len(id) > 100 || !domain.ValidID(in.SubmissionID) || len(in.SubmissionID) > 100 || !domain.ValidID(in.SlotID) || len(in.SlotID) > 200 {
-		write(w, 422, map[string]string{"error": "valid_submission_slot_and_idempotency_key_required"})
+		testValidationError(w, r, "valid_submission_slot_and_idempotency_key_required", "submission_id", "slot_id", "Idempotency-Key")
 		return
 	}
 	phone, err := domain.NormalizePhone(in.Phone)
 	if err != nil {
-		write(w, 422, map[string]string{"error": "phone_must_be_e164"})
+		testValidationError(w, r, "phone_must_be_e164", "phone")
 		return
 	}
 	b, duplicate, err := s.DB.ReserveTestForm(r.Context(), id, in.SubmissionID, phone, in.SlotID, s.Mode)

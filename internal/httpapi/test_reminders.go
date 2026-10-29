@@ -29,12 +29,12 @@ func (s *Server) testReminder(w http.ResponseWriter, r *http.Request) {
 	}
 	id := r.Header.Get("Idempotency-Key")
 	if !domain.ValidID(id) || len(id) > 100 || !domain.ValidID(input.SubmissionID) || len(input.SubmissionID) > 100 {
-		write(w, 422, map[string]string{"error": "valid_submission_and_idempotency_key_required"})
+		testValidationError(w, r, "valid_submission_and_idempotency_key_required", "submission_id", "Idempotency-Key")
 		return
 	}
 	phone, err := domain.NormalizePhone(input.Phone)
 	if err != nil {
-		write(w, 422, map[string]string{"error": "phone_must_be_e164"})
+		testValidationError(w, r, "phone_must_be_e164", "phone")
 		return
 	}
 	job, duplicate, err := s.DB.QueueTestReminder(r.Context(), id, input.SubmissionID, phone, action, s.Mode, s.ReminderAudio.Ready(), s.VoiceEnabled, s.SMSEnabled)
