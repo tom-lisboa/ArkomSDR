@@ -160,3 +160,5 @@ A [abertura em mensagens curtas](docs/short-opening.md) divide confirmação e c
 [Direct response por etapa](docs/direct-response.md): chamadas para ação específicas e datas/horas locais sem códigos técnicos de fuso nas mensagens.
 
 Botões nativos de resposta rápida: [etapas, configuração e validação](docs/quick-replies.md).
+
+Backend do painel de gestão em Go: [contrato, métricas, controle humano e autenticação](docs/management-backend.md). Contrato OpenAPI: [openapi.json](internal/management/openapi.json).

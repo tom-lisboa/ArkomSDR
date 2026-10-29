@@ -44,6 +44,9 @@ func (w *Worker) Run(ctx context.Context) {
 func (w *Worker) Once(parent context.Context) (bool, error) {
 	ctx, cancel := context.WithTimeout(parent, 30*time.Second)
 	defer cancel()
+	if worked, err := w.stopRequested(ctx); worked || err != nil {
+		return worked, err
+	}
 	var token [16]byte
 	if _, e := rand.Read(token[:]); e != nil {
 		return false, e

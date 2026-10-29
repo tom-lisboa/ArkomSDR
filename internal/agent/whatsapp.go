@@ -122,6 +122,7 @@ func textContext(s domain.State, e domain.Event, slots []domain.Slot, scheduling
 		"allowed_actions": dialogueAllowedActions(s),
 		"response_goal":   dialogueResponseGoal(s),
 		"meeting_status":  meetingStatus,
+		"meeting_results": s.MeetingResults,
 		"customer":        domain.CustomerContext(s, s.Booking, p),
 		"profile":         map[string]any{"company": s.Profile.Company, "name": s.Profile.Name, "goal": s.Profile.Goal, "revenue": s.Profile.Revenue, "timezone": zone.String()},
 		"history":         history, "booking": s.Booking, "offered": labels(s.Offered), "available_slots": labels(slots),

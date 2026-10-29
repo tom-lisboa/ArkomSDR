@@ -61,6 +61,9 @@ var introVideoSchema string
 //go:embed meeting_start.sql
 var meetingStartSchema string
 
+//go:embed management.sql
+var managementSchema string
+
 var ErrConflict = errors.New("idempotency key reused with different payload")
 var ErrLease = errors.New("lease lost; stale worker cannot commit")
 
@@ -154,6 +157,9 @@ func (d *DB) Migrate(ctx context.Context) error {
 		return e
 	}
 	if _, e = tx.Exec(ctx, meetingStartSchema); e != nil {
+		return e
+	}
+	if _, e = tx.Exec(ctx, managementSchema); e != nil {
 		return e
 	}
 	return tx.Commit(ctx)
@@ -344,6 +350,16 @@ func (d *DB) Finish(ctx context.Context, j Job, s domain.State, effects []domain
 	}
 	if ct.RowsAffected() != 1 {
 		return ErrLease
+	}
+	// Keep outcome history even when a later meeting replaces the current booking.
+	if j.Kind == "event" && s.Booking != nil && (s.Booking.Outcome == "attended" || s.Booking.Outcome == "no_show") {
+		var event domain.Event
+		if json.Unmarshal(j.Payload, &event) == nil && (event.Kind == "attendance.attended" || event.Kind == "attendance.no_show") && event.BookingID == s.Booking.ID {
+			_, e = tx.Exec(ctx, `INSERT INTO bia_go.meeting_attendance(booking_id,lead_id,starts_at,ends_at,outcome,recorded_at,source) VALUES($1,$2,$3,$4,$5,$6,'event') ON CONFLICT(booking_id) DO UPDATE SET outcome=excluded.outcome,recorded_at=excluded.recorded_at,source='event',actor_id=NULL WHERE meeting_attendance.recorded_at<excluded.recorded_at`, s.Booking.ID, s.ID, s.Booking.Start, s.Booking.End, s.Booking.Outcome, event.At)
+			if e != nil {
+				return e
+			}
+		}
 	}
 	// Pending invitations cannot survive a cancellation, reschedule or contact
 	// pause. Completed/in-flight calls keep their provider audit history.

@@ -14,6 +14,9 @@ https://24.199.100.186 {
     handle /voice/* {
         reverse_proxy 127.0.0.1:8081
     }
+    handle /v1/management/* {
+        reverse_proxy 127.0.0.1:8080
+    }
     handle /webhooks/test-form/* {
         reverse_proxy 127.0.0.1:8080
     }

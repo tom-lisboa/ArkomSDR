@@ -20,6 +20,7 @@ import (
 	"arkom/bia/internal/contextworker"
 	"arkom/bia/internal/followupworker"
 	"arkom/bia/internal/httpapi"
+	"arkom/bia/internal/management"
 	"arkom/bia/internal/mediaworker"
 	"arkom/bia/internal/providers"
 	"arkom/bia/internal/quickreply"
@@ -27,9 +28,12 @@ import (
 	"arkom/bia/internal/store"
 	"arkom/bia/internal/voiceworker"
 	"arkom/bia/internal/worker"
+	"bufio"
+	"fmt"
 	openai "github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 	"github.com/redis/go-redis/v9"
+	"strings"
 )
 
 func main() {
@@ -40,6 +44,8 @@ func main() {
 }
 func run() error {
 	migrate := flag.Bool("migrate", false, "Apply schema to the configured isolated database and exit")
+	createManagementUser := flag.String("management-create-user", "", "Create a staff user; read password from stdin and exit")
+	managementRole := flag.String("management-user-role", "admin", "Role for staff user: viewer, operator, admin")
 	role := flag.String("role", "all", "Process role: api, context, execution, media, scheduling, followup, voice, all")
 	flag.Parse()
 	switch *role {
@@ -60,6 +66,18 @@ func run() error {
 	defer db.Close()
 	if *migrate {
 		return db.Migrate(ctx)
+	}
+	if *createManagementUser != "" {
+		password, e := bufio.NewReader(os.Stdin).ReadString('\n')
+		if e != nil && len(password) == 0 {
+			return errors.New("password required on stdin")
+		}
+		u, e := management.CreateUser(ctx, db, *createManagementUser, *createManagementUser, strings.TrimRight(password, "\r\n"), *managementRole)
+		if e != nil {
+			return errors.New("cannot create management user")
+		}
+		fmt.Println("Staff user created:", u.Username, u.ID, u.Role)
+		return nil
 	}
 	var planner agent.Planner = agent.Offline{}
 	if c.OpenAIKey != "" {
@@ -197,6 +215,13 @@ func run() error {
 		return nil
 	}
 	api := &httpapi.Server{IntroVideo: c.IntroVideo, ReminderAudio: c.ReminderAudio, TestFormToken: c.TestFormToken, DB: db, Calendar: calendar, Token: c.Token, Mode: c.Mode, Policy: c.Policy, VoiceSender: c.Voice.Sender, VoiceEnabled: c.Voice.Enabled}
+	if c.ManagementEnabled {
+		panel := &management.Server{DB: db, Mode: c.Mode, Policy: c.Policy, Origins: c.ManagementOrigins, Download: &providers.Downloader{Account: c.Voice.Account, AuthToken: c.Voice.AuthToken, HTTP: providers.MediaHTTP()}}
+		if c.Voice.PublicURL != "" {
+			panel.Origins = append(panel.Origins, c.Voice.PublicURL)
+		}
+		api.Management = panel.Handler()
+	}
 	api.FormAutoContact = c.FormAutoContact
 	api.SMSEnabled = c.SMSFrom != ""
 	srv := &http.Server{Addr: c.Address, Handler: api.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}

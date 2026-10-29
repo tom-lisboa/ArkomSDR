@@ -77,3 +77,19 @@ func TestQuickRepliesRequireCompleteTemplateSet(t *testing.T) {
 		t.Setenv(key, "HX"+strings.Repeat("c", 32))
 	}
 }
+
+func TestManagementOriginsMustBeExactAndExplicit(t *testing.T) {
+	for k, v := range map[string]string{"BIA_MODE": "shadow", "BIA_DATABASE_URL": "postgres://unused", "BIA_API_TOKEN": strings.Repeat("x", 32), "BIA_MESSAGING_PROVIDER": "gateway", "BIA_MANAGEMENT_ENABLED": "true", "BIA_MANAGEMENT_ORIGINS": "https://staff.example,http://localhost:3000"} {
+		t.Setenv(k, v)
+	}
+	c, err := Load()
+	if err != nil || !c.ManagementEnabled || len(c.ManagementOrigins) != 2 {
+		t.Fatal(c.ManagementOrigins, err)
+	}
+	for _, origin := range []string{"*", "https://staff.example/path", "https://staff.example?x=y", "http://localhost:3000/other", "http://staff.example"} {
+		t.Setenv("BIA_MANAGEMENT_ORIGINS", origin)
+		if _, err = Load(); err == nil {
+			t.Fatal("unsafe/misconfigured origin accepted", origin)
+		}
+	}
+}

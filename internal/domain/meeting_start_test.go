@@ -83,3 +83,25 @@ func TestConfirmAtMeetingStartKeepsReservationAndDoesNotMarkAttendance(t *testin
 		t.Fatal("CTA is not recognized")
 	}
 }
+
+func TestManualOperatorReplyRequiresTakeoverAndOpenWindow(t *testing.T) {
+	now := time.Now().UTC()
+	s := State{Owner: "go", Profile: Form{Consent: true}, LastInbound: now.Add(-time.Minute)}
+	fx := Effect{Kind: "send", Purpose: "human_reply", OperatorID: "operator", Expires: now.Add(time.Minute)}
+	if ok, _ := Deliverable(s, fx, now); ok {
+		t.Fatal("manual reply without takeover")
+	}
+	s.Human = true
+	if ok, why := Deliverable(s, fx, now); !ok {
+		t.Fatal(why)
+	}
+	s.OptedOut = true
+	if ok, _ := Deliverable(s, fx, now); ok {
+		t.Fatal("manual reply bypassed opt-out")
+	}
+	s.OptedOut = false
+	s.LastInbound = now.Add(-24 * time.Hour)
+	if ok, _ := Deliverable(s, fx, now); ok {
+		t.Fatal("manual reply bypassed WhatsApp window")
+	}
+}

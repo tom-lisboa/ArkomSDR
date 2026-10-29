@@ -220,6 +220,7 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 		b.Outcome = strings.TrimPrefix(e.Kind, "attendance.")
 		s.Booking = &b
 		s.Stage = b.Outcome
+		s.RecordMeetingResult(MeetingResult{BookingID: b.ID, Start: b.Start, Outcome: b.Outcome, RecordedAt: e.At})
 		add("crm", b.Outcome, "Presença informada pela integração: "+b.Outcome, now, now.Add(24*time.Hour))
 		if b.Outcome == "no_show" {
 			due := p.NextContact(now, s)
@@ -564,6 +565,15 @@ func Deliverable(s State, fx Effect, now time.Time) (bool, string) {
 	}
 	if s.OptedOut {
 		return false, "opted_out"
+	}
+	if fx.OperatorID != "" {
+		if fx.Kind != "send" || fx.Purpose != "human_reply" || !s.Human || s.Paused || !s.Profile.Consent || s.Owner != "go" {
+			return false, "human_reply_not_permitted"
+		}
+		if s.LastInbound.IsZero() || now.Sub(s.LastInbound) >= 23*time.Hour {
+			return false, "whatsapp_window_closed"
+		}
+		return true, ""
 	}
 	if s.Human {
 		return false, "human_takeover"

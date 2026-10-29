@@ -19,6 +19,7 @@ import (
 )
 
 type Server struct {
+	Management      http.Handler
 	IntroVideo      casemedia.Asset
 	SMSEnabled      bool
 	FormAutoContact bool
@@ -34,6 +35,9 @@ type Server struct {
 
 func (s *Server) Handler() http.Handler {
 	m := http.NewServeMux()
+	if s.Management != nil {
+		m.Handle("/v1/management/", s.Management)
+	}
 	m.Handle("/media/reminders/", s.ReminderAudio)
 	m.Handle(casemedia.Prefix, s.IntroVideo)
 	m.Handle("GET /v1/followups", s.auth(http.HandlerFunc(s.followupStatus)))

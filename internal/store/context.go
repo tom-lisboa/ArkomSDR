@@ -232,7 +232,7 @@ func (d *DB) ApplyContext(ctx context.Context, t Task, p WindowPolicy, now time.
 			return hint, e
 		}
 
-		_, e = tx.Exec(ctx, `INSERT INTO bia_go.conversation_messages(id,conversation_id,role,body,occurred_at,run_id) VALUES($1,$2,'assistant',$3,$4,'delivered') ON CONFLICT DO NOTHING`, r.ID, r.ConversationID, r.Text, r.At)
+		_, e = tx.Exec(ctx, `INSERT INTO bia_go.conversation_messages(id,conversation_id,role,body,occurred_at,run_id,event) VALUES($1,$2,'assistant',$3,$4,'delivered',jsonb_build_object('operator_id',$5::text)) ON CONFLICT DO NOTHING`, r.ID, r.ConversationID, r.Text, r.At, r.OperatorID)
 		if e != nil {
 			return hint, e
 		}
@@ -277,13 +277,14 @@ func (d *DB) FlushWindow(ctx context.Context, candidate string, p WindowPolicy, 
 		}
 		return h, tx.Commit(ctx)
 	}
-	rows, e := tx.Query(ctx, `SELECT m.id,m.body,m.event,m.occurred_at,
+	rows, e := tx.Query(ctx, `SELECT m.id,m.body,m.event,m.occurred_at,m.received_at,
  COALESCE((SELECT string_agg('['||a.kind||'] '||a.body,E'\n' ORDER BY a.id) FROM bia_go.media_assets a WHERE a.message_id=m.id AND a.status='ready'),''),
  EXISTS(SELECT 1 FROM bia_go.media_assets a WHERE a.message_id=m.id AND a.status='failed')
  FROM bia_go.conversation_messages m WHERE conversation_id=$1 AND role='user' AND run_id IS NULL ORDER BY occurred_at,seq LIMIT 32`, h.ID)
 	if e != nil {
 		return h, e
 	}
+	var latestReceived time.Time
 	var buttonCount int
 	var buttonPayload string
 	var ev domain.Event
@@ -293,9 +294,9 @@ func (d *DB) FlushWindow(ctx context.Context, candidate string, p WindowPolicy, 
 	for rows.Next() {
 		var id, text, media string
 		var raw []byte
-		var at time.Time
+		var at, received time.Time
 		var mf bool
-		if e = rows.Scan(&id, &text, &raw, &at, &media, &mf); e != nil {
+		if e = rows.Scan(&id, &text, &raw, &at, &received, &media, &mf); e != nil {
 			rows.Close()
 			return h, e
 		}
@@ -307,6 +308,9 @@ func (d *DB) FlushWindow(ctx context.Context, candidate string, p WindowPolicy, 
 		if e = json.Unmarshal(raw, &ev); e != nil {
 			rows.Close()
 			return h, e
+		}
+		if received.After(latestReceived) {
+			latestReceived = received
 		}
 		if ev.ButtonPayload != "" {
 			buttonCount++
@@ -335,7 +339,7 @@ func (d *DB) FlushWindow(ctx context.Context, candidate string, p WindowPolicy, 
 		return h, tx.Commit(ctx)
 	}
 	runID := "run/" + hash([]byte(strings.Join(ids, "\x00")))[:32]
-	window := conversation.Window{ConversationID: h.ID, RunID: runID, Version: h.Version, MessageIDs: ids, MediaFailed: failed, Heads: map[string]conversation.Head{}}
+	window := conversation.Window{ReceivedAt: latestReceived, ConversationID: h.ID, RunID: runID, Version: h.Version, MessageIDs: ids, MediaFailed: failed, Heads: map[string]conversation.Head{}}
 	if e = json.Unmarshal(headsRaw, &window.Heads); e != nil {
 		return h, e
 	}

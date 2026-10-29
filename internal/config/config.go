@@ -7,6 +7,7 @@ import (
 	"arkom/bia/internal/remindermedia"
 	"arkom/bia/internal/store"
 	"errors"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -14,6 +15,8 @@ import (
 )
 
 type Config struct {
+	ManagementEnabled                             bool
+	ManagementOrigins                             []string
 	QuickReplies                                  providers.QuickReplyConfig
 	MeetingStartContentSID                        string
 	Specialists                                   bool
@@ -51,6 +54,16 @@ func env(k, d string) string {
 }
 func Load() (Config, error) {
 	c := Config{RedisURL: env("BIA_REDIS_URL", "redis://127.0.0.1:6389/0"), MediaModel: os.Getenv("OPENAI_MEDIA_MODEL"), Address: env("BIA_ADDR", "127.0.0.1:8080"), DSN: os.Getenv("BIA_DATABASE_URL"), Token: os.Getenv("BIA_API_TOKEN"), Mode: env("BIA_MODE", "shadow"), OpenAIKey: os.Getenv("OPENAI_API_KEY"), OpenAIModel: os.Getenv("OPENAI_MODEL"), AudioModel: os.Getenv("OPENAI_AUDIO_MODEL"), GatewayURL: os.Getenv("BIA_GATEWAY_URL"), GatewayToken: os.Getenv("BIA_GATEWAY_TOKEN"), Workers: 4}
+	c.ManagementEnabled = os.Getenv("BIA_MANAGEMENT_ENABLED") == "true"
+	for _, origin := range strings.Split(os.Getenv("BIA_MANAGEMENT_ORIGINS"), ",") {
+		if origin = strings.TrimSpace(origin); origin != "" {
+			parsed, e := url.Parse(origin)
+			if e != nil || parsed.Host == "" || parsed.User != nil || (parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.Fragment != "" || (parsed.Scheme != "https" && !(parsed.Scheme == "http" && parsed.Hostname() == "localhost" && parsed.Port() != "")) {
+				return c, errors.New("invalid management origin")
+			}
+			c.ManagementOrigins = append(c.ManagementOrigins, strings.TrimRight(origin, "/"))
+		}
+	}
 	c.Specialists = os.Getenv("BIA_SPECIALISTS_ENABLED") == "true"
 	c.DecisionsModel = env("OPENAI_DECISIONS_MODEL", "gpt-6-luna")
 	if c.Specialists && (c.OpenAIKey == "" || c.DecisionsModel != "gpt-6-luna") {

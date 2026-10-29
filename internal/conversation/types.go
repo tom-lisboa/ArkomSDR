@@ -17,6 +17,7 @@ type Head struct {
 	InputTokens   int64     `json:"input_tokens"`
 }
 type Window struct {
+	ReceivedAt     time.Time       `json:"received_at,omitempty"`
 	ConversationID string          `json:"conversation_id"`
 	RunID          string          `json:"run_id"`
 	Version        int64           `json:"version"`
@@ -53,6 +54,7 @@ type MediaResult struct {
 	ErrorCode string `json:"error_code,omitempty"`
 }
 type Delivery struct {
+	OperatorID             string    `json:"operator_id,omitempty"`
 	ProviderConversationID string    `json:"provider_conversation_id,omitempty"`
 	ConversationID         string    `json:"conversation_id"`
 	ID                     string    `json:"id"`

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"strconv"
 	"time"
 
@@ -230,6 +231,9 @@ func (b *Bridge) Run(parent context.Context, tw *websocket.Conn, r Request, stre
 				return nil
 			}
 			if _, e = b.Repo.Active(ctx, r); e != nil {
+				if errors.Is(e, ErrBlocked) {
+					return nil
+				}
 				return e
 			}
 		case result := <-results:

@@ -136,7 +136,7 @@ func (s Repository) Claim(ctx context.Context, token string) (Request, error) {
  WHERE id=(SELECT id FROM bia_go.voice_requests WHERE state IN ('new','ready') AND due_at<=now() ORDER BY due_at,id FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING `+requestColumns, token))
 }
 func (s Repository) Finish(ctx context.Context, r Request, state, providerID, code string) error {
-	ct, e := s.DB.Pool.Exec(ctx, `UPDATE bia_go.voice_requests SET state=$3,permission_sid=CASE WHEN $4<>'' AND state='requesting' THEN $4 ELSE permission_sid END,call_sid=CASE WHEN $4<>'' AND state='dialing' THEN $4 ELSE call_sid END,error_code=NULLIF($5,''),due_at=CASE WHEN $3='awaiting_permission' THEN now()+interval '5 seconds' ELSE due_at END,lease_token=NULL,lease_until=NULL,updated_at=now() WHERE id=$1 AND lease_token=$2 AND lease_until>now()`, r.ID, r.Token, state, providerID, code)
+	ct, e := s.DB.Pool.Exec(ctx, `UPDATE bia_go.voice_requests SET state=$3,stop_state=CASE WHEN $4<>'' AND state='dialing' AND revoked_at IS NOT NULL THEN 'pending' ELSE stop_state END,permission_sid=CASE WHEN $4<>'' AND state='requesting' THEN $4 ELSE permission_sid END,call_sid=CASE WHEN $4<>'' AND state='dialing' THEN $4 ELSE call_sid END,error_code=NULLIF($5,''),due_at=CASE WHEN $3='awaiting_permission' THEN now()+interval '5 seconds' ELSE due_at END,lease_token=NULL,lease_until=NULL,updated_at=now() WHERE id=$1 AND lease_token=$2 AND lease_until>now()`, r.ID, r.Token, state, providerID, code)
 	if e != nil {
 		return e
 	}
@@ -213,7 +213,7 @@ func (s Repository) Status(ctx context.Context, id, sid, status string, seq int6
 	default:
 		return ErrBlocked
 	}
-	ct, e := s.DB.Pool.Exec(ctx, `UPDATE bia_go.voice_requests SET state=$3,callback_seq=$4,call_sid=$2,updated_at=now() WHERE id=$1 AND mode='live' AND (call_sid=$2 OR (call_sid IS NULL AND state='dialing')) AND callback_seq<$4 AND state IN ('dialing','queued','initiated','ringing','in-progress')`, id, sid, status, seq)
+	ct, e := s.DB.Pool.Exec(ctx, `UPDATE bia_go.voice_requests SET state=$3,stop_state=CASE WHEN $3 IN ('completed','canceled','failed','busy','no-answer') AND stop_state<>'' THEN 'done' ELSE stop_state END,callback_seq=$4,call_sid=$2,updated_at=now() WHERE id=$1 AND mode='live' AND (call_sid=$2 OR (call_sid IS NULL AND state='dialing')) AND callback_seq<$4 AND state IN ('dialing','queued','initiated','ringing','in-progress')`, id, sid, status, seq)
 	if e != nil {
 		return e
 	}

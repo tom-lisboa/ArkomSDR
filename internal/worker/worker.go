@@ -126,6 +126,13 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 		if e.Context != nil {
 			j.Run = &conversation.RunResult{ConversationID: e.Context.ConversationID, RunID: e.Context.RunID, Version: e.Context.Version}
 		}
+		inputAt := e.At
+		if e.Context != nil && !e.Context.ReceivedAt.IsZero() {
+			inputAt = e.Context.ReceivedAt
+		}
+		if e.Kind == "message.received" && !domain.IsOptOut(e.Text) && !s.AutomationSince.IsZero() && inputAt.Before(s.AutomationSince) {
+			return true, w.DB.Finish(ctx, j, s, nil, "skipped", map[string]string{"reason": "operator_control_superseded_input"})
+		}
 		d, buttonHandled := w.Buttons.Resolve(s, &e, w.Policy, now)
 		var routedAgent string
 		var slots []domain.Slot
@@ -340,7 +347,7 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 			if fx.Kind == "send_sms" {
 				text = "[SMS enviado] " + text
 			}
-			j.Delivery = &conversation.Delivery{ConversationID: fx.ConversationID, ProviderConversationID: s.Profile.ConversationID, ID: "outbound/" + j.ID, Text: text, At: now}
+			j.Delivery = &conversation.Delivery{OperatorID: fx.OperatorID, ConversationID: fx.ConversationID, ProviderConversationID: s.Profile.ConversationID, ID: "outbound/" + j.ID, Text: text, At: now}
 			domain.AppendTurn(&s, "assistant", text, now)
 			domain.RecordDialogueDelivery(&s, fx, text, now)
 			if s.FirstContactAt == nil {

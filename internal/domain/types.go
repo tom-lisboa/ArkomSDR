@@ -85,31 +85,33 @@ type Turn struct {
 }
 
 type State struct {
-	Dialogue           *DialogueState `json:"dialogue,omitempty"`
-	LastPreparationAt  *time.Time     `json:"last_preparation_at,omitempty"`
-	LastFormBookingID  string         `json:"last_form_booking_id,omitempty"`
-	ID                 string         `json:"id"`
-	Profile            Form           `json:"profile"`
-	Owner              string         `json:"owner"`
-	Stage              string         `json:"stage"`
-	CreatedAt          time.Time      `json:"created_at"`
-	LastInbound        time.Time      `json:"last_inbound"`
-	FirstContactAt     *time.Time     `json:"first_contact_at,omitempty"`
-	LastFormContactAt  *time.Time     `json:"last_form_contact_at,omitempty"`
-	OptedOut           bool           `json:"opted_out"`
-	Paused             bool           `json:"paused"`
-	Human              bool           `json:"human"`
-	Booking            *Booking       `json:"booking,omitempty"`
-	PreviousBooking    *Booking       `json:"previous_booking,omitempty"`
-	Offered            []Slot         `json:"offered"`
-	OfferVersion       string         `json:"offer_version"`
-	History            []Turn         `json:"history"`
-	LastFollowup       *time.Time     `json:"last_followup,omitempty"`
-	LastEventAt        time.Time      `json:"last_event_at"`
-	LastBookingEventAt time.Time      `json:"last_booking_event_at"`
-	LastAttendanceAt   time.Time      `json:"last_attendance_at"`
-	Reasons            []string       `json:"reasons"`
-	SchedulePreference string         `json:"schedule_preference,omitempty"`
+	AutomationSince    time.Time       `json:"automation_since,omitempty"`
+	MeetingResults     []MeetingResult `json:"meeting_results,omitempty"`
+	Dialogue           *DialogueState  `json:"dialogue,omitempty"`
+	LastPreparationAt  *time.Time      `json:"last_preparation_at,omitempty"`
+	LastFormBookingID  string          `json:"last_form_booking_id,omitempty"`
+	ID                 string          `json:"id"`
+	Profile            Form            `json:"profile"`
+	Owner              string          `json:"owner"`
+	Stage              string          `json:"stage"`
+	CreatedAt          time.Time       `json:"created_at"`
+	LastInbound        time.Time       `json:"last_inbound"`
+	FirstContactAt     *time.Time      `json:"first_contact_at,omitempty"`
+	LastFormContactAt  *time.Time      `json:"last_form_contact_at,omitempty"`
+	OptedOut           bool            `json:"opted_out"`
+	Paused             bool            `json:"paused"`
+	Human              bool            `json:"human"`
+	Booking            *Booking        `json:"booking,omitempty"`
+	PreviousBooking    *Booking        `json:"previous_booking,omitempty"`
+	Offered            []Slot          `json:"offered"`
+	OfferVersion       string          `json:"offer_version"`
+	History            []Turn          `json:"history"`
+	LastFollowup       *time.Time      `json:"last_followup,omitempty"`
+	LastEventAt        time.Time       `json:"last_event_at"`
+	LastBookingEventAt time.Time       `json:"last_booking_event_at"`
+	LastAttendanceAt   time.Time       `json:"last_attendance_at"`
+	Reasons            []string        `json:"reasons"`
+	SchedulePreference string          `json:"schedule_preference,omitempty"`
 }
 
 type Decision struct {
@@ -122,6 +124,7 @@ type Decision struct {
 }
 
 type Effect struct {
+	OperatorID          string            `json:"operator_id,omitempty"`
 	Dialogue            *DialogueDelivery `json:"dialogue,omitempty"`
 	AfterMessageID      string            `json:"after_message_id,omitempty"`
 	ManualReminder      bool              `json:"manual_reminder,omitempty"`
