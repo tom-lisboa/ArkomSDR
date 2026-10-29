@@ -1,0 +1,28 @@
+flowchart TD
+    L0["Chamada atendida e sessão autorizada"] --> LGET["Consultar reunião e briefing no worker de agenda"]
+    LGET --> LVALID{"Agenda ainda disponível e reserva correta?"}
+    LVALID -->|Não| LEND["Encerrar sem inventar dados"]
+    LVALID -->|Sim| LOPEN["Cumprimentar, confirmar identidade e lembrar data e hora"]
+    LOPEN --> LWHO{"É a pessoa certa?"}
+    LWHO -->|Não| LWRONG["Registrar nota de número incorreto e encerrar"]
+    LWHO -->|Sim| LASK["Perguntar se a reunião está de pé"]
+    LASK --> LRESP{"Resposta"}
+    LRESP -->|Confirma| LCONF["Registrar nota confirmed"]
+    LRESP -->|Quer remarcar| LREM["Registrar nota reschedule_request"]
+    LRESP -->|Quer cancelar| LCAN["Registrar nota cancel_request"]
+    LRESP -->|Tem dúvida| LQ["Responder com dados disponíveis; anotar pergunta se necessário"]
+    LRESP -->|Quer parar contato| LOUT["Aplicar pedido de saída e encerrar"]
+    LCONF --> LNOTE{"Agenda confirmou gravação da nota?"}
+    LREM --> LNOTE
+    LCAN --> LNOTE
+    LQ --> LNOTE
+    LNOTE -->|Sim| LACK["Pode dizer que anotou; não prometer alteração ou notificação"]
+    LNOTE -->|Não| LNACK["Não afirmar que registrou ou avisou alguém"]
+    LACK --> LBYE["Despedida e end_call"]
+    LNACK --> LBYE
+    LOPEN -->|Caixa postal| LVM["voicemail_detection: lembrete curto e encerramento"]
+    LOPEN -->|Silêncio ou dificuldade persistente| LSIL["Tentativas curtas conforme roteiro; encerrar"]
+    LBYE --> LPLAY["Aguardar reprodução da despedida e desligar"]
+    LPLAY --> LHIST["Enviar transcrições e fala reproduzida ao contexto"]
+    LVM --> LHIST
+    LSIL --> LHIST

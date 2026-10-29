@@ -1,0 +1,21 @@
+flowchart LR
+    I0["Conversas, resultados de agenda e entrega dos canais"] --> I1["Classificar desfecho e ponto de atrito"]
+    I1 --> I2{"Qual é a causa?"}
+    I2 -->|Regra, estado, fila ou integração| IC["Corrigir código ou configuração; criar regressão"]
+    I2 -->|Condução, intenção ou redação| IP["Revisar prompt e exemplos da especialidade"]
+    I2 -->|Falta um papel ou uma passagem| IA["Desenhar responsabilidade e contrato de novo agente"]
+    IC --> CASES["Casos de avaliação com contexto e resultado esperado"]
+    IP --> CASES
+    IA --> CASES
+    CASES --> OFF["Reexecutar casos gravados e testes sem contato real"]
+    OFF --> REVIEW["Revisão humana de fatos, agenda, tom e efeitos propostos"]
+    REVIEW --> PASS{"Versão aprovada?"}
+    PASS -->|Não| I2
+    PASS -->|Sim| VER["Versionar prompt, regra, modelo e contrato"]
+    VER --> DEMO["Teste controlado no formulário e nos canais"]
+    DEMO --> MET["Medir agendamento, comparecimento, bloqueios e custo"]
+    MET --> GOOD{"Melhorou sem regressão?"}
+    GOOD -->|Sim| DEPLOY["Promover versão e acompanhar"]
+    GOOD -->|Não| ROLL["Reverter versão e revisar causa"]
+    DEPLOY --> I0
+    ROLL --> I2

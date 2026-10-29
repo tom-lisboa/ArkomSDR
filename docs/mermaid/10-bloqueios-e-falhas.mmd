@@ -1,0 +1,27 @@
+flowchart TD
+    E0["Uma ação ficou pronta na fila"] --> E1{"Modo shadow?"}
+    E1 -->|Sim| ESIM["Registrar simulação; nenhuma ação externa"]
+    E1 -->|Não| E2{"Go é responsável pelo contato?"}
+    E2 -->|Não| ESKIP["Descartar ou bloquear com motivo"]
+    E2 -->|Sim| E3{"Consentimento, controle, reserva e prazo continuam válidos?"}
+    E3 -->|Não| ESKIP
+    E3 -->|Sim| E4{"Há entrada nova ou chamada em andamento?"}
+    E4 -->|Entrada nova| EN["Priorizar contexto novo; adiar lembrete ou descartar resposta antiga"]
+    E4 -->|Chamada ativa ou incerta| EV["Aguardar término ou revisão da chamada"]
+    E4 -->|Não| E5{"Horário e limites permitem executar?"}
+    E5 -->|Pode aguardar dentro da validade| EWAIT["Adiar o mesmo job; preservar identidade"]
+    E5 -->|Prazo ou limite definitivo vencido| ESKIP
+    E5 -->|Sim| ELEDGER["Registrar tentativa antes da operação externa"]
+    ELEDGER --> EOP["Executar no canal ou na agenda"]
+    EOP --> ER{"Resultado observado"}
+    ER -->|Sucesso| EDONE["Salvar resultado e publicar retorno ao contexto"]
+    ER -->|Pré-requisito ainda pendente| EWAIT
+    ER -->|Falha transitória segura para repetir| ERETRY["Repetir com limite e espera progressiva"]
+    ER -->|Resultado externo incerto| EUNC["Marcar uncertain; não repetir a mutação cegamente"]
+    ER -->|Falha definitiva| EDEAD["Marcar dead ou failed e registrar motivo"]
+    EUNC --> EREV["Revisão da tentativa e do provedor"]
+    EDEAD --> EREV
+    EREV --> ECHAN{"Qual operação falhou?"}
+    ECHAN -->|SMS opcional| ESMS["Registrar revisão sem tomar o atendimento do WhatsApp"]
+    ECHAN -->|Envio de texto, áudio ou outra ação crítica| EHUM["Pode ativar revisão humana e bloquear automação"]
+    ECHAN -->|Voz| EVO["Estado próprio de voz; uncertain pode segurar outros envios"]

@@ -1,0 +1,36 @@
+flowchart TD
+    W0["Evento da Twilio"] --> W1{"Assinatura, número e evento válidos?"}
+    W1 -->|Não| WR["Rejeitar o webhook"]
+    W1 -->|Sim| W2{"Tipo de evento"}
+    W2 -->|Permissão de chamada| WP["Worker de voz atualiza autorização"]
+    W2 -->|Ligação recebida| WH["Encerrar: atendimento de chamada recebida não está habilitado"]
+    W2 -->|Mensagem| W3["Consultar mensagem e anexos na Twilio; deduplicar"]
+    W3 --> W4["Localizar contato ou criar contato de WhatsApp direto"]
+    W4 --> W5["Contexto grava entrada durável no Postgres"]
+    W5 --> W6["Redis acelera o agrupamento; Postgres mantém a recuperação"]
+    W6 --> W7{"Há anexos no lote?"}
+    W7 -->|Não| WT["Esperar 5 segundos sem novo texto"]
+    W7 -->|Sim| WM["Worker de mídia prepara todos os anexos"]
+    WM --> WK{"Tipo da mídia"}
+    WK -->|Áudio| WA["Transcrever fala"]
+    WK -->|Imagem| WI["Extrair texto e fatos com visão"]
+    WK -->|PDF ou texto suportado| WD["Extrair conteúdo do documento"]
+    WK -->|Tipo inválido ou falha| WF["Marcar falha; não descartar silenciosamente"]
+    WA --> WS["Esperar 12 segundos entre fragmentos e 3 segundos após conclusão da mídia"]
+    WI --> WS
+    WD --> WS
+    WF --> WS
+    WT --> WN{"Chegou outro fragmento?"}
+    WS --> WN
+    WN -->|Sim| W6
+    WN -->|Não| WPEND{"Ainda há mídia pendente?"}
+    WPEND -->|Sim| WTIME["Aguardar conclusão; timeout de mídia em 120 segundos"]
+    WTIME --> WPEND
+    WPEND -->|Não| WFREEZE["Congelar um lote e publicar uma única Run"]
+    WFREEZE --> WHIST["Anexar perfil, reserva, histórico recente e memória do agente"]
+    WHIST --> WFAIL{"Lote contém falha de mídia?"}
+    WFAIL -->|Sim| WHUM["Encaminhar para revisão humana"]
+    WFAIL -->|Não| WEXEC["Enviar ao worker de execução"]
+    WEXEC --> WRET["Devolver resultado, mensagens enviadas e response_id ao contexto"]
+    WRET --> WNEXT["Próximo lote usa o estado atualizado"]
+    WNEXT --> W6

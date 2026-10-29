@@ -1,0 +1,32 @@
+flowchart TD
+    G0["Cliente quer escolher ou alterar horário"] --> G1{"Origem da escolha"}
+    G1 -->|Formulário| GF["Consultar disponibilidade e enviar slot_id"]
+    G1 -->|WhatsApp| GW["Consultar agenda para esta Run"]
+    GW --> GV{"Consulta de vagas"}
+    GV -->|Falhou| GE["Informar falha de consulta e registrar pendência"]
+    GV -->|Sem vagas| GN["Informar ausência de vagas e registrar pendência"]
+    GV -->|Tem vagas| GO["Oferecer até duas opções reais no fuso do cliente"]
+    GO --> GC{"Resposta escolhe uma opção sem ambiguidade?"}
+    GC -->|Não| GCL["Esclarecer a escolha; não criar reserva"]
+    GCL --> GO
+    GC -->|Sim| GS["Validar opção oferecida, antecedência e responsável"]
+    GF --> GS
+    GS --> GD{"Pedido repetido?"}
+    GD -->|Mesmo pedido já concluído| GEX["Retornar resultado existente"]
+    GD -->|Chave com outros dados| GCF["Conflito de idempotência"]
+    GD -->|Novo| GT["Bloquear identidade e vaga em transação"]
+    GT --> GP{"Vaga ainda disponível e contato elegível?"}
+    GP -->|Não| GER["Retornar conflito; recarregar vagas ou repetir se transitório"]
+    GP -->|Sim| GB{"Já existe uma reserva?"}
+    GB -->|Não| GNEW["Criar reserva e ocupar vaga"]
+    GB -->|Sim, pedido de remarcação| GR["Trocar reserva mantendo provedor e responsável"]
+    GB -->|Sim, tentativa de outra reserva pelo formulário| GAL["Retornar reserva existente via consulta; impedir duplicação"]
+    GNEW --> GCOM["Confirmar transação e publicar evento de agenda"]
+    GR --> GCOM
+    GCOM --> GSTATE["Atualizar contexto, confirmar horário e planejar cadência"]
+    GSTATE --> GINV["Lembretes da reserva antiga ficam inválidos"]
+    GX["Pedido explícito de cancelamento no WhatsApp"] --> GXC["Agenda cancela e libera a vaga"]
+    GXC --> GCLR["Limpar reserva atual, invalidar lembretes e confirmar cancelamento"]
+    GE --> GWAIT["Pendência sem reserva inventada"]
+    GN --> GWAIT
+    GWAIT --> GRETURN["Nova consulta depende de nova conversa ou ação operacional"]

@@ -1,0 +1,28 @@
+flowchart TD
+    P0["Cadastro e conversa"] --> P1{"Existe reunião futura?"}
+    P1 -->|Não| PNO["Atendimento busca agendamento"]
+    PNO --> PO{"Horários já foram oferecidos?"}
+    PO -->|Não e cliente em silêncio| PSIL["Aguardar; sem sequência própria de retomada da abertura"]
+    PO -->|Sim| P2H["Retomada em mais 2 horas<br/>IMPLEMENTADA, DESLIGADA"]
+    P2H -.-> PR["Se habilitada: perguntar se quer seguir; resposta volta à conversa"]
+    P1 -->|Sim| PBOOK["Agenda grava ou atualiza a reserva"]
+    PBOOK --> PSCHED["Scheduler reconcilia etapas a cada 30 segundos"]
+    PSCHED --> PT0["T0 mais 15 minutos<br/>Preparação por WhatsApp"]
+    PSCHED --> PT30["T menos 30 minutos<br/>Áudio pronto pelo worker de mídia"]
+    PSCHED --> PT15["T menos 15 minutos<br/>Texto e fluxo de autorização da chamada"]
+    PSCHED --> PT5["T menos 5 minutos<br/>SMS transacional"]
+    PT0 --> PC0{"Ainda antes de T menos 30, dentro da validade e do horário permitido?"}
+    PC0 -->|Sim| PREP["Pedir exemplo de tarefa para preparar a reunião"]
+    PC0 -->|Não| PSK0["Pular preparação; não enviar atrasada"]
+    PT30 --> PC30{"Sessão recente de WhatsApp, áudio pronto e contato liberado?"}
+    PC30 -->|Sim| PAUD["Enviar a gravação instalada"]
+    PC30 -->|Não| PSK30["Pular ou bloquear conforme o motivo"]
+    PT15 --> PC15{"Sessão recente e contato liberado?"}
+    PC15 -->|Sim| PCALL["Entrar no fluxo de permissão e ligação"]
+    PC15 -->|Não| PSK15["Não iniciar chamada por esse caminho"]
+    PT5 --> PC5{"Autorizou SMS e há celular válido?"}
+    PC5 -->|Sim| PSMS["Enviar SMS; não exige janela de WhatsApp"]
+    PC5 -->|Não| PSK5["Não enviar SMS"]
+    PBOOK --> POLD["Lembretes clássicos T menos 24h, 2h e 15min<br/>ALTERNATIVA INATIVA nesta configuração"]
+    PE["Evento explícito de no-show"] --> PREC["Recuperação por WhatsApp<br/>IMPLEMENTADA, ENVIO DESLIGADO"]
+    PREC -.-> PR

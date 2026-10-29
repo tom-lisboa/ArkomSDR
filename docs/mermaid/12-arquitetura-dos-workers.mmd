@@ -1,0 +1,27 @@
+flowchart LR
+    CLIENT["Cliente e formulário web"] --> API["API de cadastro, agenda e demonstração"]
+    CLIENT <--> TW["Twilio<br/>WhatsApp, chamada e SMS"]
+    TW --> WEB["Webhooks assinados"]
+    API <--> PG[("PostgreSQL<br/>Perfil, reserva, filas, histórico, resultados e notas")]
+    WEB --> CTX["Worker de contexto"]
+    CTX <--> PG
+    CTX <--> REDIS[("Redis<br/>Buffer e prazo rápido de agrupamento")]
+    CTX --> MEDIA["Worker de mídia<br/>Transcrição, visão e envio de gravação"]
+    MEDIA --> CTX
+    MEDIA <--> PG
+    CTX --> EXEC["Worker de execução<br/>Roteador e motor de decisões"]
+    EXEC <--> PG
+    EXEC <--> TEXTAI["OpenAI Responses<br/>Especialidade de texto selecionada"]
+    MEDIA <--> MEDIAAI["OpenAI<br/>Transcrição e extração de mídia"]
+    EXEC --> SCHED["Worker de agenda<br/>Eventos, reservas e caixa de consultas"]
+    SCHED <--> PG
+    PG --> FOLLOW["Worker de follow-up<br/>Scheduler e consumidor de cadências"]
+    FOLLOW --> MEDIA
+    FOLLOW --> VOICE["Worker de voz<br/>Permissão, tentativa e sessão"]
+    FOLLOW --> TW
+    EXEC --> TW
+    MEDIA --> TW
+    VOICE <--> TW
+    VOICE <--> REALTIME["OpenAI Realtime<br/>Prompt de lembrete"]
+    VOICE <-->|Consulta e nota via mailbox no Postgres| SCHED
+    VOICE --> CTX

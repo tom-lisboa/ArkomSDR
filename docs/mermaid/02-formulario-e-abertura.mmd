@@ -1,0 +1,35 @@
+flowchart TD
+    F0["Enviar formulário"] --> F1{"Campos, telefone, consentimento e chave válidos?"}
+    F1 -->|Não| FERR["HTTP 400 ou 422; corrigir o pedido"]
+    F1 -->|Sim| F2{"Mesma Idempotency-Key já existe?"}
+    F2 -->|Mesmo conteúdo| FDUP["Reutilizar submissão; não duplicar contato"]
+    F2 -->|Conteúdo diferente| F409["HTTP 409: conflito de idempotência"]
+    F2 -->|Não| F3["Salvar nome, empresa, receita, objetivo, fuso e consentimentos"]
+    F3 --> F4["Resolver telefone e variação brasileira com ou sem nono dígito"]
+    F4 --> F5["Reutilizar contato existente sem remover bloqueios"]
+    F5 --> F6{"Veio slot_id no mesmo pedido?"}
+    F6 -->|Sim| FAT["Ativação e reserva na mesma transação"]
+    FAT --> F7{"Reserva aceita?"}
+    F7 -->|Não| FBE["Retornar conflito ou indisponibilidade; não inventar confirmação"]
+    F7 -->|Sim| F8["Publicar cadastro e evento de reserva"]
+    F6 -->|Não| F8
+    F8 --> F9["Enfileirar abertura para daqui a 10 segundos"]
+    F9 --> F10["Se a página enviar a reserva depois, processá-la antes da abertura"]
+    F10 --> F11{"Pode contatar agora?"}
+    F11 -->|Pausa, saída, humano ou sem responsabilidade Go| FSTOP["Ação bloqueada ou descartada"]
+    F11 -->|Abertura enviada há menos de 15 minutos| FCOOL["Descartar duplicação pelo intervalo mínimo"]
+    F11 -->|Sim| F12{"Há reunião futura no estado atual?"}
+    F12 -->|Não| FUN["Abertura sem reserva: convidar a escolher horário"]
+    F12 -->|Sim, com objetivo| FGO["Confirmar data, hora, fuso, duração e objetivo informado"]
+    F12 -->|Sim, sem objetivo| FQ["Confirmar reunião e fazer uma pergunta de preparação"]
+    FUN --> FSEND["Enviar pelo WhatsApp"]
+    FGO --> FSEND
+    FQ --> FSEND
+    FSEND --> FT{"Janela de conversa aberta?"}
+    FT -->|Sim| FTXT["Enviar texto livre"]
+    FT -->|Não| FTM["Usar template correspondente aprovado"]
+    FTM --> FAP{"Template disponível e aprovado?"}
+    FAP -->|Não| FWAIT["Adiar o mesmo job até aprovação ou expiração"]
+    FAP -->|Sim| FTXT
+    FTXT --> FOK["Registrar envio e horário da abertura"]
+    FOK --> FPREP["Se houver reunião, avaliar preparação em mais 15 minutos"]

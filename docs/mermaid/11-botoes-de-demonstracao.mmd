@@ -1,0 +1,18 @@
+flowchart TD
+    D0["Mesmo formulário de teste"] --> DSTAT["Consultar test-status do telefone e submission_id"]
+    DSTAT --> DGUARD{"Contato liberado, submissão ativa e reunião futura?"}
+    DGUARD -->|Não| DERR["Mostrar motivo; corrigir estado antes de repetir"]
+    DGUARD -->|Sim| DVOICE{"Há solicitação de voz pendente, ativa ou incerta?"}
+    DVOICE -->|Sim| DWAIT["voice_request_in_progress; consultar a solicitação existente"]
+    DVOICE -->|Não| DT{"Botão escolhido"}
+    DT -->|30 minutos| DA["POST reminders/audio<br/>Exige áudio pronto e resposta recente no WhatsApp"]
+    DT -->|15 minutos| DC["POST reminders/call<br/>Exige voz habilitada e resposta recente no WhatsApp"]
+    DT -->|5 minutos| DS["POST reminders/sms<br/>Exige autorização SMS e celular válido"]
+    DA --> DID["Preservar Idempotency-Key e conteúdo nas repetições"]
+    DC --> DID
+    DS --> DID
+    DID --> DQ["HTTP 202 e job manual nos mesmos workers"]
+    DQ --> DRES["Consultar status_url até resultado da etapa"]
+    DRES --> DOUT{"Estado final"}
+    DOUT -->|Concluído| DOK["Conferir recebimento no aparelho e resultado do provedor"]
+    DOUT -->|Falhou, bloqueado ou incerto| DREVIEW["Usar código e chave para revisão; não criar UUIDs para contornar limite"]

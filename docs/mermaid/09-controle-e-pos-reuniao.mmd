@@ -1,0 +1,24 @@
+flowchart TD
+    S0["Cliente está no atendimento"] --> SE{"Evento ou comportamento"}
+    SE -->|Silêncio sem reunião e sem oferta| SSW["Aguardar; sem sequência específica ativa"]
+    SE -->|Silêncio após oferta| SOFF["Retomada mais 2h existe, mas está desligada"]
+    SE -->|Silêncio com reunião| SBOOK["Cadência continua se os requisitos de cada canal permitirem"]
+    SE -->|Vou pensar ou aviso depois| STHINK["Responder brevemente e respeitar decisão"]
+    SE -->|Pedido de pausa| SPAUSE["Pausar lembretes; a conversa pode continuar"]
+    SPAUSE --> SRES{"Evento operacional cadence.resume?"}
+    SRES -->|Sim e sem opt-out| SBACK["Liberar cadência elegível; não recriar etapas vencidas"]
+    SRES -->|Não| SHOLD["Manter pausa dos lembretes"]
+    SE -->|Pedido explícito para parar| SOPT["Opted-out e pausado; não enviar novos contatos"]
+    SOPT --> SNOFORM["Novo formulário ou mensagem não remove automaticamente o bloqueio"]
+    SE -->|Pedido de humano ou condição de revisão| SHUM["Human true; interromper ações automáticas"]
+    SHUM --> SHREL{"Evento human.release?"}
+    SHREL -->|Não| SHWAIT["Aguardar atendimento ou revisão"]
+    SHREL -->|Sim| SAUTO["Voltar à automação; preservar pausa e saída se existirem"]
+    SBOOK --> ST["Chega o horário da reunião"]
+    ST --> SAT{"Evento externo de resultado foi informado?"}
+    SAT -->|Não| SUNK["Resultado permanece desconhecido"]
+    SAT -->|attendance.attended| SDONE["Registrar comparecimento e encerrar esta cadência"]
+    SAT -->|attendance.no_show| SNS["Registrar falta e invalidar lembretes pré-reunião"]
+    SNS --> SRC["Recuperação de falta: envio desligado hoje"]
+    SRC -.->|Se habilitada e o cliente responder| SNEW["Agente recovery oferece novo caminho de agenda"]
+    SNEW --> SCYCLE["Reserva nova inicia nova cadência"]

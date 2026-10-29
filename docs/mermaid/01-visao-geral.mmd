@@ -1,0 +1,38 @@
+flowchart TD
+    C["Cliente chega à Arkom"] --> EN{"Como entrou?"}
+    EN -->|Formulário| F["Cadastro, consentimentos e opção de horário"]
+    EN -->|WhatsApp direto| W["Mensagem recebida e identidade do contato"]
+    F --> FC{"Contato autorizado e elegível?"}
+    FC -->|Não| BLOQ["Corrigir cadastro ou revisar bloqueio"]
+    FC -->|Sim| FB{"Já existe reunião futura?"}
+    FB -->|Sim| AB["Abertura confirma a reunião e aproveita o objetivo"]
+    FB -->|Não| AS["Abertura convida ao agendamento"]
+    W --> CT["Contexto agrupa texto, áudios e imagens"]
+    AB --> R{"Cliente responde?"}
+    AS --> R
+    R -->|Sim| CT
+    R -->|Não| ESP["Aguardar; não há retomada específica da abertura hoje"]
+    CT --> EX["Execução escolhe agente e valida a decisão em Go"]
+    EX --> INT{"Intenção e estado atual"}
+    INT -->|Sem reunião| AG["Consultar vagas e oferecer até dois horários"]
+    AG --> ESC{"Escolha válida?"}
+    ESC -->|Ainda não| CT
+    ESC -->|Sim| RES["Agenda própria grava a reserva no Postgres"]
+    RES --> BK["Reunião agendada"]
+    AB --> BK
+    INT -->|Já tem reunião| REF["Reforçar comparecimento e esclarecer dúvidas"]
+    REF --> BK
+    INT -->|Quer remarcar| REM["Consultar outras vagas e trocar reserva após sucesso"]
+    REM --> BK
+    INT -->|Quer cancelar| CAN["Cancelar reserva e invalidar lembretes antigos"]
+    INT -->|Pausa, saída ou humano| CTRL["Aplicar controle do contato"]
+    BK --> CAD["Follow-up: preparação, áudio, chamada e SMS"]
+    CAD --> MT["Horário da reunião"]
+    MT --> OUT{"Chegou evento de presença?"}
+    OUT -->|Não| SEM["Resultado desconhecido; não inferir falta"]
+    OUT -->|Compareceu| ATT["Registrar comparecimento"]
+    OUT -->|Faltou| NS["Registrar no-show"]
+    NS --> REC["Recuperação existe no código; desligada no ambiente atual"]
+    REC -.->|Se habilitada e houver resposta| CT
+    CAN --> RET["Novo agendamento depende de nova iniciativa ou conversa"]
+    CTRL --> RET

@@ -1,0 +1,29 @@
+flowchart TD
+    V0["Lembrete T menos 15 ou botão de demonstração"] --> VTXT["Enviar texto de convite no WhatsApp"]
+    VTXT --> VOK{"Texto teve envio confirmado?"}
+    VOK -->|Não| VSTOP["Não criar solicitação dependente; registrar falha"]
+    VOK -->|Sim| VREQ["Criar solicitação de voz vinculada à reserva"]
+    VREQ --> VGUARD{"Reserva futura e contato autorizado, sem pausa ou humano?"}
+    VGUARD -->|Não| VSKIP["Encerrar solicitação sem ligar"]
+    VGUARD -->|Sim| VPERM{"Há autorização permanente registrada?"}
+    VPERM -->|Sim| VREADY["Solicitação pronta para uma chamada"]
+    VPERM -->|Não| VLIM{"Pode pedir autorização dentro da sessão e dos limites?"}
+    VLIM -->|Não| VB["Bloquear ou expirar com motivo"]
+    VLIM -->|Sim| VBUT["Solicitar botão nativo VOICE_CALL_REQUEST"]
+    VBUT --> VDEL["Consultar resultado final da mensagem na Twilio"]
+    VDEL --> VR{"Resultado"}
+    VR -->|Erro 37010: permissão permanente já existe| VSAVE["Registrar autorização permanente"]
+    VSAVE --> VREADY
+    VR -->|Falha de entrega comum| VFAIL["Registrar falha; não presumir autorização"]
+    VR -->|Botão entregue| VANS{"Resposta do cliente"}
+    VANS -->|Aceita| VACC["Gravar permissão temporária ou permanente"]
+    VACC --> VREADY
+    VANS -->|Rejeita ou revoga| VREJ["Bloquear esta autorização e chamadas dependentes"]
+    VANS -->|Não responde| VWAIT["Aguardar até expiração; não ligar"]
+    VREADY --> VCURRENT["Reconsultar contato e worker de agenda"]
+    VCURRENT --> VDIAL["Twilio inicia a chamada no WhatsApp"]
+    VDIAL --> VCON{"Resultado da tentativa"}
+    VCON -->|Atendida| VAI["Abrir áudio em tempo real e conversa da Bia"]
+    VCON -->|busy ou no-answer| VNO["Registrar duração e estado; sem rediscagem automática"]
+    VCON -->|Falha confirmada| VE["Registrar erro do provedor"]
+    VCON -->|Resultado incerto| VUNC["Marcar uncertain; revisar antes de repetir"]
