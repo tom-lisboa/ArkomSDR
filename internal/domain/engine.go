@@ -15,6 +15,8 @@ func IsOptOut(text string) bool { return stopRE.MatchString(strings.TrimSpace(te
 
 var cancelRE = regexp.MustCompile(`(?i)^(por favor[, ]*)?(quero |pode |preciso )?(cancelar|cancele|cancela)( minha| a| essa| esta)? (reunião|reuniao|call|reserva|vaga)[.! ]*$`)
 var confirmRE = regexp.MustCompile(`(?i)^(sim[,! ]*)?(confirmo( minha presença| minha presenca)?|estarei (lá|la|presente)|vou participar|presença confirmada|presenca confirmada)[.! ]*$`)
+var casualAckRE = regexp.MustCompile(`(?i)^(claro|ok|okay|certo|combinado|fechou|beleza|perfeito)[.! ]*$`)
+var bareYesRE = regexp.MustCompile(`(?i)^(sim|s)[.! ]*$`)
 
 // Reduce is deterministic: it reads no clock, database or network. The planner
 // proposes a decision; booking, permission and delivery invariants live here.
@@ -95,7 +97,9 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 			s.Profile = f
 		}
 		if e.Kind == "form.contact_requested" && s.Profile.Consent && !s.OptedOut {
-			add("send", "form_contact", FormContactText, now, now.Add(24*time.Hour)).TriggerAt = e.At
+			// The form may submit before the page's separate booking request. Give
+			// that booking event a short head start so the opening reflects it.
+			add("send", "form_contact", FormContactText, now.Add(10*time.Second), now.Add(24*time.Hour)).TriggerAt = e.At
 			add("crm", "form_received", "Formulário recebido; contato automático enfileirado.", now, now.Add(24*time.Hour))
 		} else if first && s.Profile.Consent && !s.OptedOut {
 			// Initial contact is immediate after the explicit form request. Quiet
@@ -277,7 +281,11 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 				offer(&s, &r, e, slots, p, now)
 				break
 			}
-			if !confirmRE.MatchString(strings.TrimSpace(e.Text)) && !evidence(e, d) {
+			if casualAckRE.MatchString(strings.TrimSpace(e.Text)) {
+				message("reply", "Combinado. "+bookingText(*s.Booking, p, s))
+				break
+			}
+			if !confirmRE.MatchString(strings.TrimSpace(e.Text)) && !(bareYesRE.MatchString(strings.TrimSpace(e.Text)) && lastAssistantAskedAttendance(s)) {
 				handoff("ambiguous_confirmation")
 				break
 			}
@@ -446,6 +454,17 @@ func offer(s *State, r *Result, e Event, slots []Slot, p Policy, now time.Time) 
 func evidence(e Event, d Decision) bool {
 	return strings.TrimSpace(d.Evidence) != "" && strings.Contains(strings.ToLower(e.Text), strings.ToLower(d.Evidence))
 }
+
+func lastAssistantAskedAttendance(s State) bool {
+	for i := len(s.History) - 1; i >= 0; i-- {
+		if s.History[i].Role != "assistant" {
+			continue
+		}
+		text := strings.ToLower(s.History[i].Text)
+		return strings.Contains(text, "confirma sua presença") || strings.Contains(text, "confirmar sua presença") || strings.Contains(text, "confirma sua presenca") || strings.Contains(text, "confirmar sua presenca")
+	}
+	return false
+}
 func selectionEvidence(text string, slot Slot, offered []Slot, zone *time.Location, now time.Time) bool {
 	id, ok := selectedOffer(text, offered, zone, now)
 	return ok && id == slot.ID
@@ -588,7 +607,7 @@ func Render(s State, fx Effect, p Policy, now time.Time) string {
 		return SMSReminderText(s, p)
 	}
 	if fx.Purpose == "meeting_call" && s.Booking != nil {
-		return "Olá, " + firstName(s.Profile.Name) + "! Sou a Bia, assistente de IA da " + p.Brand + ". " + bookingText(*s.Booking, p, s) + " Posso te ligar para lembrar da reunião e ajudar com o acesso? Autorize no botão que vou enviar a seguir."
+		return "Olá, " + firstName(s.Profile.Name) + "! Sou a Bia, assistente de IA da " + p.Brand + ". " + bookingText(*s.Booking, p, s) + " Posso te ligar para lembrar da reunião e ajudar com o acesso? Se o WhatsApp mostrar a opção de permitir chamadas, toque em permitir."
 	}
 	if fx.Purpose != "reminder" || s.Booking == nil {
 		return fx.Text

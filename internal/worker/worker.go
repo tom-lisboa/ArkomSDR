@@ -164,7 +164,7 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 	}
 	if fx.VoiceRequestID != "" {
 		var allowed bool
-		e := w.DB.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM bia_go.voice_requests WHERE id=$1 AND lead_id=$2 AND mode=$3 AND revoked_at IS NULL AND permission_expires_at>now() AND state IN ('dialing','queued','initiated','ringing','in-progress'))`, fx.VoiceRequestID, s.ID, j.Mode).Scan(&allowed)
+		e := w.DB.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM bia_go.voice_requests WHERE id=$1 AND lead_id=$2 AND mode=$3 AND revoked_at IS NULL AND (permanent OR permission_expires_at>now()) AND state IN ('dialing','queued','initiated','ringing','in-progress'))`, fx.VoiceRequestID, s.ID, j.Mode).Scan(&allowed)
 		if e != nil {
 			return true, e
 		}

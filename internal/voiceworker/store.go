@@ -92,7 +92,18 @@ func (s Repository) create(ctx context.Context, id, lead, mode, sender, purpose 
 		expires = expected.Expires
 	}
 	scheduled := expected != nil && !manual
-	ct, e := tx.Exec(ctx, `INSERT INTO bia_go.voice_requests(id,lead_id,mode,sender,purpose,booking_id,booking_start,expires_at,scheduled_reminder,manual_reminder) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(id) DO NOTHING`, id, lead, mode, sender, purpose, st.Booking.ID, st.Booking.Start, expires, scheduled, manual)
+	state := "new"
+	var permissionAt *time.Time
+	if mode == "live" {
+		pErr := tx.QueryRow(ctx, `SELECT permission_at FROM bia_go.voice_requests WHERE lead_id=$1 AND sender=$2 AND mode='live' AND permanent AND permission_at IS NOT NULL AND revoked_at IS NULL ORDER BY permission_at DESC LIMIT 1`, lead, sender).Scan(&permissionAt)
+		if pErr != nil && !errors.Is(pErr, pgx.ErrNoRows) {
+			return false, pErr
+		}
+		if pErr == nil {
+			state = "ready"
+		}
+	}
+	ct, e := tx.Exec(ctx, `INSERT INTO bia_go.voice_requests(id,lead_id,mode,sender,purpose,state,booking_id,booking_start,expires_at,permission_at,permanent,scheduled_reminder,manual_reminder) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT(id) DO NOTHING`, id, lead, mode, sender, purpose, state, st.Booking.ID, st.Booking.Start, expires, permissionAt, permissionAt != nil, scheduled, manual)
 	if e != nil {
 		var pe *pgconn.PgError
 		if errors.As(e, &pe) && pe.Code == "23505" {
@@ -172,12 +183,25 @@ func (s Repository) Permission(ctx context.Context, eventID, phone, sender strin
 	} else {
 		// Each invitation authorizes at most one automatic call. Permanent platform
 		// permission does not start another campaign or bypass a new invitation.
-		_, e = tx.Exec(ctx, `UPDATE bia_go.voice_requests SET state='ready',permission_at=$3,permission_expires_at=$3+interval '7 days',permanent=$4,due_at=now(),updated_at=now() WHERE lead_id=$1 AND sender=$2 AND mode='live' AND state='awaiting_permission' AND date_trunc('second',created_at)<=$3 AND expires_at>now() AND (revoked_at IS NULL OR revoked_at<$3)`, lead, sender, at, permanent)
+		_, e = tx.Exec(ctx, `UPDATE bia_go.voice_requests SET state='ready',permission_at=$3,permission_expires_at=CASE WHEN $4 THEN NULL ELSE $3+interval '7 days' END,permanent=$4,due_at=now(),updated_at=now() WHERE lead_id=$1 AND sender=$2 AND mode='live' AND state='awaiting_permission' AND date_trunc('second',created_at)<=$3 AND expires_at>now() AND (revoked_at IS NULL OR revoked_at<$3)`, lead, sender, at, permanent)
 	}
 	if e != nil {
 		return e
 	}
 	return tx.Commit(ctx)
+}
+
+// MarkPermanentPermission handles Twilio 37010: WhatsApp confirms the consumer
+// already granted permanent calling permission, so another button is invalid.
+func (s Repository) MarkPermanentPermission(ctx context.Context, r Request, at time.Time) error {
+	ct, err := s.DB.Pool.Exec(ctx, `UPDATE bia_go.voice_requests SET state='ready',permission_at=$3,permission_expires_at=NULL,permanent=true,due_at=now(),error_code=NULL,lease_token=NULL,lease_until=NULL,updated_at=now() WHERE id=$1 AND lease_token=$2 AND lease_until>now() AND state='requesting'`, r.ID, r.Token, at)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() != 1 {
+		return store.ErrLease
+	}
+	return nil
 }
 func (s Repository) Status(ctx context.Context, id, sid, status string, seq int64) error {
 	switch status {
@@ -215,7 +239,7 @@ func (s Repository) Active(ctx context.Context, r Request) (domain.State, error)
 	return st, nil
 }
 func (s Repository) BeginStream(ctx context.Context, r Request, sid string) error {
-	ct, e := s.DB.Pool.Exec(ctx, `UPDATE bia_go.voice_requests SET stream_started=true,call_sid=$2 WHERE id=$1 AND mode='live' AND NOT stream_started AND revoked_at IS NULL AND permission_expires_at>now() AND state IN ('dialing','queued','initiated','ringing','in-progress') AND (call_sid=$2 OR call_sid IS NULL)`, r.ID, sid)
+	ct, e := s.DB.Pool.Exec(ctx, `UPDATE bia_go.voice_requests SET stream_started=true,call_sid=$2 WHERE id=$1 AND mode='live' AND NOT stream_started AND revoked_at IS NULL AND (permanent OR permission_expires_at>now()) AND state IN ('dialing','queued','initiated','ringing','in-progress') AND (call_sid=$2 OR call_sid IS NULL)`, r.ID, sid)
 	if e != nil {
 		return e
 	}

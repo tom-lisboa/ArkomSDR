@@ -125,7 +125,7 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 		}
 		return finish("awaiting_permission", id, "")
 	}
-	if r.PermissionAt == nil || r.PermissionExpires == nil || !now.Before(*r.PermissionExpires) || r.Revoked != nil {
+	if r.PermissionAt == nil || (!r.Permanent && (r.PermissionExpires == nil || !now.Before(*r.PermissionExpires))) || r.Revoked != nil {
 		return finish("skipped", "", "call_permission_missing_or_expired")
 	}
 	id, e := w.Provider.Dial(ctx, r, st.Profile.Phone)
@@ -144,6 +144,9 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 }
 func (w *Worker) failed(ctx context.Context, r Request, e error) (bool, error) {
 	f := providers.Classify(e)
+	if r.State == "requesting" && f.Code == "twilio_37010" {
+		return true, w.Repo.MarkPermanentPermission(ctx, r, time.Now().UTC())
+	}
 	state := "failed"
 	if f.Ambiguous {
 		state = "uncertain"

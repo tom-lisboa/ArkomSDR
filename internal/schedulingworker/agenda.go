@@ -33,7 +33,8 @@ func (w *Worker) answerAgenda(ctx context.Context) (bool, error) {
 		var lead, bid, purpose, mode, state string
 		var start *time.Time
 		var revoked, permissionExpires *time.Time
-		e = tx.QueryRow(ctx, `SELECT lead_id,COALESCE(booking_id,''),booking_start,purpose,mode,state,revoked_at,permission_expires_at FROM bia_go.voice_requests WHERE id=$1`, request).Scan(&lead, &bid, &start, &purpose, &mode, &state, &revoked, &permissionExpires)
+		var permanent bool
+		e = tx.QueryRow(ctx, `SELECT lead_id,COALESCE(booking_id,''),booking_start,purpose,mode,state,revoked_at,permission_expires_at,permanent FROM bia_go.voice_requests WHERE id=$1`, request).Scan(&lead, &bid, &start, &purpose, &mode, &state, &revoked, &permissionExpires, &permanent)
 		if e != nil {
 			return true, e
 		}
@@ -74,7 +75,7 @@ func (w *Worker) answerAgenda(ctx context.Context) (bool, error) {
 					out.Booking = &b
 					out.Customer = domain.CustomerContext(s, &b, w.runtime.Policy)
 					if kind == "note" {
-						if mode != "live" || permissionExpires == nil || !out.Now.Before(*permissionExpires) || (state != "dialing" && state != "queued" && state != "initiated" && state != "ringing" && state != "in-progress") || len(body) == 0 || len(body) > 2000 {
+						if mode != "live" || (!permanent && (permissionExpires == nil || !out.Now.Before(*permissionExpires))) || (state != "dialing" && state != "queued" && state != "initiated" && state != "ringing" && state != "in-progress") || len(body) == 0 || len(body) > 2000 {
 							out.Status = "blocked"
 						} else {
 							_, e = tx.Exec(ctx, `INSERT INTO bia_go.crm_notes(operation_id,lead_id,purpose,body) VALUES($1,$2,'voice_reminder',$3) ON CONFLICT DO NOTHING`, "agenda/"+id, lead, body)
