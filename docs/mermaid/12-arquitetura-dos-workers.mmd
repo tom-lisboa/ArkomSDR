@@ -6,7 +6,7 @@ flowchart LR
     WEB --> CTX["Worker de contexto"]
     CTX <--> PG
     CTX <--> REDIS[("Redis<br/>Buffer e prazo rápido de agrupamento")]
-    CTX --> MEDIA["Worker de mídia<br/>Transcrição, visão e envio de gravação"]
+    CTX --> MEDIA["Worker de mídia<br/>Transcrição, visão, gravação e case em vídeo"]
     MEDIA --> CTX
     MEDIA <--> PG
     CTX --> EXEC["Worker de execução<br/>Roteador e motor de decisões"]

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"arkom/bia/internal/casemedia"
 	"arkom/bia/internal/domain"
 	"arkom/bia/internal/providers"
 	"arkom/bia/internal/remindermedia"
@@ -13,6 +14,9 @@ import (
 )
 
 type Config struct {
+	IntroVideoEnabled                   bool
+	IntroVideoContentSID                string
+	IntroVideo                          casemedia.Asset
 	PreparationContentSID               string
 	SMSFrom                             string
 	Availability                        providers.DailyAvailability
@@ -134,6 +138,15 @@ func Load() (Config, error) {
 		}
 	}
 	c.ReminderAudio = remindermedia.Asset{Directory: env("BIA_REMINDER_AUDIO_DIR", ".local/media/reminders"), SHA256: os.Getenv("BIA_REMINDER_AUDIO_SHA256"), PublicURL: os.Getenv("BIA_VOICE_PUBLIC_URL")}
+	c.IntroVideoEnabled = os.Getenv("BIA_INTRO_VIDEO_ENABLED") == "true"
+	c.IntroVideoContentSID = os.Getenv("TWILIO_INTRO_VIDEO_CONTENT_SID")
+	c.IntroVideo = casemedia.Asset{Directory: env("BIA_INTRO_VIDEO_DIR", ".local/media/cases"), SHA256: os.Getenv("BIA_INTRO_VIDEO_SHA256"), PublicURL: os.Getenv("BIA_VOICE_PUBLIC_URL")}
+	if c.IntroVideo.SHA256 != "" && !remindermedia.ValidHash(c.IntroVideo.SHA256) {
+		return c, errors.New("invalid BIA_INTRO_VIDEO_SHA256")
+	}
+	if c.IntroVideoContentSID != "" && (len(c.IntroVideoContentSID) != 34 || !strings.HasPrefix(c.IntroVideoContentSID, "HX")) {
+		return c, errors.New("invalid TWILIO_INTRO_VIDEO_CONTENT_SID")
+	}
 	if c.ReminderAudio.SHA256 != "" && !remindermedia.ValidHash(c.ReminderAudio.SHA256) {
 		return c, errors.New("invalid BIA_REMINDER_AUDIO_SHA256")
 	}
@@ -179,6 +192,9 @@ func Load() (Config, error) {
 		return c, e
 	}
 	c.Voice = v
+	if c.IntroVideoEnabled && (c.MessagingProvider != "twilio" || c.IntroVideoContentSID == "" || !c.IntroVideo.Ready()) {
+		return c, errors.New("intro video requires Twilio, a verified MP4 and its approved template")
+	}
 	c.Policy.WhatsAppPhone = v.Sender
 	if c.Policy.MeetingPreparation && (c.MessagingProvider != "twilio" || c.PreparationContentSID == "" || c.TestPhone != "") {
 		return c, errors.New("meeting preparation requires Twilio, an approved preparation template and unrestricted recipient configuration")

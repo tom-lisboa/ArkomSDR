@@ -6,6 +6,7 @@ release_dir=$(pwd -P)
 case "$release_dir" in /opt/arkom-bia/releases/r-*) ;; *) echo 'Invalid release directory' >&2; exit 1 ;; esac
 release=$(basename "$release_dir")
 install -d -m 0755 /var/lib/arkom-bia/media/reminders
+install -d -m 0755 /var/lib/arkom-bia/media/cases
 docker compose config --quiet
 chmod 0555 bia
 docker build -f Dockerfile.runtime -t "arkom-bia:$release" .

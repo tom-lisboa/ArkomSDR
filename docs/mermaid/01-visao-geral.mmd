@@ -8,8 +8,9 @@ flowchart TD
     FB -->|Sim| AB["Abertura confirma a reunião e aproveita o objetivo"]
     FB -->|Não| AS["Abertura convida ao agendamento"]
     W --> CT["Contexto agrupa texto, áudios e imagens"]
-    AB --> R{"Cliente responde?"}
-    AS --> R
+    AB --> VID["Após entrega da abertura: enviar case Camozzi uma vez por contato"]
+    AS --> VID
+    VID --> R{"Cliente responde?"}
     R -->|Sim| CT
     R -->|Não| ESP["Aguardar; não há retomada específica da abertura hoje"]
     CT --> EX["Execução escolhe agente e valida a decisão em Go"]

@@ -1,0 +1,12 @@
+{
+  "friendly_name": "arkom_case_camozzi_v1",
+  "language": "pt_BR",
+  "types": {
+    "twilio/media": {
+      "body": "Enquanto isso, conheça o case Camozzi neste vídeo.",
+      "media": [
+        "https://24.199.100.186/media/cases/4b20f519bca440bca910b89289783612b3e56bf37ffef9954f7d33ed1e7cc009.mp4"
+      ]
+    }
+  }
+}

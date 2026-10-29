@@ -22,6 +22,6 @@ flowchart TD
     EUNC --> EREV["Revisão da tentativa e do provedor"]
     EDEAD --> EREV
     EREV --> ECHAN{"Qual operação falhou?"}
-    ECHAN -->|SMS opcional| ESMS["Registrar revisão sem tomar o atendimento do WhatsApp"]
+    ECHAN -->|SMS ou vídeo opcional| ESMS["Registrar revisão sem tomar o atendimento do WhatsApp"]
     ECHAN -->|Envio de texto, áudio ou outra ação crítica| EHUM["Pode ativar revisão humana e bloquear automação"]
     ECHAN -->|Voz| EVO["Estado próprio de voz; uncertain pode segurar outros envios"]

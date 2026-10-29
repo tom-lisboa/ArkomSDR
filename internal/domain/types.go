@@ -120,6 +120,7 @@ type Decision struct {
 }
 
 type Effect struct {
+	AfterMessageID      string    `json:"after_message_id,omitempty"`
 	ManualReminder      bool      `json:"manual_reminder,omitempty"`
 	MediaURL            string    `json:"media_url,omitempty"`
 	ReplyRoot           string    `json:"reply_root,omitempty"`

@@ -33,3 +33,13 @@ flowchart TD
     FAP -->|Sim| FTXT
     FTXT --> FOK["Registrar envio e horário da abertura"]
     FOK --> FPREP["Se houver reunião, avaliar preparação em mais 15 minutos"]
+    FOK --> FV["Criar job de vídeo único por contato, elegível em 2 segundos"]
+    FV --> FVD{"Abertura entregue ou lida?"}
+    FVD -->|Ainda não| FVW["Adiar; vídeo expira após 15 minutos"]
+    FVW --> FVD
+    FVD -->|Falhou| FVF["Registrar falha opcional; manter conversa"]
+    FVD -->|Sim| FVWIN{"Sessão recente de WhatsApp?"}
+    FVWIN -->|Sim| FVS["Worker de mídia envia MP4"]
+    FVWIN -->|Não| FVT{"Template de vídeo aprovado?"}
+    FVT -->|Não| FVW
+    FVT -->|Sim| FVS

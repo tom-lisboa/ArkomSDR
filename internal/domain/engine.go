@@ -539,6 +539,9 @@ func Deliverable(s State, fx Effect, now time.Time) (bool, string) {
 	if s.Human {
 		return false, "human_takeover"
 	}
+	if fx.Purpose == "intro_video" && (s.Paused || !s.Profile.Consent) {
+		return false, "intro_video_contact_blocked"
+	}
 	if fx.BookingID != "" && (s.Booking == nil || s.Booking.ID != fx.BookingID) {
 		return false, "stale_booking"
 	}

@@ -8,6 +8,7 @@ x-runtime: &runtime
   read_only: true
   volumes:
     - /var/lib/arkom-bia/media/reminders:/media/reminders:ro
+    - /var/lib/arkom-bia/media/cases:/media/cases:ro
   cap_drop: [ALL]
   security_opt: [no-new-privileges:true]
   pids_limit: 64

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"arkom/bia/internal/casemedia"
 	"arkom/bia/internal/domain"
 	"arkom/bia/internal/providers"
 	"arkom/bia/internal/remindermedia"
@@ -18,6 +19,7 @@ import (
 )
 
 type Server struct {
+	IntroVideo      casemedia.Asset
 	SMSEnabled      bool
 	FormAutoContact bool
 	ReminderAudio   remindermedia.Asset
@@ -33,6 +35,7 @@ type Server struct {
 func (s *Server) Handler() http.Handler {
 	m := http.NewServeMux()
 	m.Handle("/media/reminders/", s.ReminderAudio)
+	m.Handle(casemedia.Prefix, s.IntroVideo)
 	m.Handle("GET /v1/followups", s.auth(http.HandlerFunc(s.followupStatus)))
 	m.HandleFunc("POST /webhooks/test-form/{key}/sms-consent", s.testSMSConsent)
 	m.HandleFunc("OPTIONS /webhooks/test-form/{key}/sms-consent", s.testSMSConsent)

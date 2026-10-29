@@ -30,6 +30,10 @@ type SkipEffect struct{ Reason string }
 func (s *SkipEffect) Error() string { return s.Reason }
 
 type Worker struct {
+	IntroVideoURL string
+	VideoSender   interface {
+		SendVideo(context.Context, string, domain.State, string, string, time.Time) (providers.Receipt, error)
+	}
 	SMSSender interface {
 		SendSMS(context.Context, string, domain.State, string, time.Time, time.Time) (providers.Receipt, error)
 	}
@@ -186,7 +190,7 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 	}
 	if fx.Kind != "crm" {
 		conv, version := fx.ConversationID, fx.ConversationVersion
-		if domain.IsMeetingReminder(fx) {
+		if domain.IsMeetingReminder(fx) || fx.Purpose == "intro_video" {
 			conv, version = "", 0
 		}
 		pending, e := w.DB.HasNewInput(ctx, s.ID, conv, version)
@@ -194,7 +198,7 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 			return true, e
 		}
 		if pending {
-			if domain.IsMeetingReminder(fx) {
+			if domain.IsMeetingReminder(fx) || fx.Purpose == "intro_video" {
 				return true, w.DB.DeferJob(ctx, j, now.Add(5*time.Second), "new_input_pending")
 			}
 			return true, w.DB.Finish(ctx, j, s, nil, "skipped", map[string]string{"reason": "new_input_superseded_run"})
@@ -228,7 +232,7 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 	var result any
 	var follow []domain.Effect
 	switch fx.Kind {
-	case "send", "send_audio", "send_sms":
+	case "send", "send_audio", "send_sms", "send_video":
 		lead, global, e := w.DB.Counts(ctx, s.ID)
 		if e != nil {
 			return true, e
@@ -259,6 +263,13 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 				err = &providers.Failure{Code: "sms_not_enabled"}
 			} else {
 				receipt, err = w.SMSSender.SendSMS(opCtx, j.ID, s, text, now, fx.Expires)
+			}
+		} else if fx.Kind == "send_video" {
+			text = "[Vídeo case Camozzi enviado]"
+			if w.VideoSender == nil {
+				err = &providers.Failure{Code: "video_sender_not_configured"}
+			} else {
+				receipt, err = w.VideoSender.SendVideo(opCtx, j.ID, s, fx.MediaURL, fx.AfterMessageID, now)
 			}
 		} else if fx.Kind == "send_audio" {
 			text = "[Áudio de lembrete da reunião enviado]"
@@ -317,6 +328,9 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 					follow = append(follow, domain.PreparationSequence(s, now)...)
 				}
 			}
+			if fx.Purpose == "form_contact" || fx.Purpose == "welcome" {
+				follow = append(follow, domain.IntroVideoSequence(s, j.ID, w.IntroVideoURL, now)...)
+			}
 		}
 	case "crm":
 		err = w.CRM.Record(opCtx, j.ID, s, fx)
@@ -346,8 +360,8 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 		}
 		// Never fabricate a success message after a timeout or unknown response.
 		if fx.Kind != "crm" {
-			// A failed optional SMS must not take over the WhatsApp conversation.
-			if fx.Kind != "send_sms" {
+			// Optional SMS/video failures must not take over the WhatsApp conversation.
+			if fx.Kind != "send_sms" && fx.Kind != "send_video" {
 				s.Human = true
 			}
 			s.Reasons = append(s.Reasons, f.Code)

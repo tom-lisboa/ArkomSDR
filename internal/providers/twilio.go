@@ -19,6 +19,7 @@ import (
 // TwilioMessaging records an attempt before making a non-idempotent POST.
 // An interrupted attempt without a SID requires review; it is never resent.
 type TwilioMessaging struct {
+	IntroVideoContentSID                              string
 	PreparationContentSID                             string
 	FormContentSID, ContentBaseURL                    string
 	BookedContentSID, BookedQuestionSID, TimeZone     string

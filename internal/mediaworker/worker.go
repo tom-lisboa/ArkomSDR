@@ -1,6 +1,7 @@
 package mediaworker
 
 import (
+	"arkom/bia/internal/casemedia"
 	"arkom/bia/internal/conversation"
 	"arkom/bia/internal/domain"
 	"arkom/bia/internal/followupworker"
@@ -24,15 +25,26 @@ type Worker struct {
 	Processor Processor
 }
 
-// Outbound audio uses the same per-lead leases, opt-out checks and delivery
+// Outbound audio/video use the same per-lead leases, opt-out checks and delivery
 // receipts as text, while incoming transcription keeps its independent loop.
-func Outbound(base worker.Worker, a remindermedia.Asset) *worker.Worker {
+func Outbound(base worker.Worker, a remindermedia.Asset, videos ...casemedia.Asset) *worker.Worker {
 	base.Queue = "media"
 	base.Planner = nil
 	base.Calendar = nil
 	base.HandleEffect = nil
 	base.AfterSend = nil
 	base.Schedule = func(s domain.State, fx domain.Effect, now time.Time) (time.Time, string) {
+		if fx.Kind == "send_video" && fx.Purpose == "intro_video" {
+			if base.IntroVideoURL == "" {
+				return time.Time{}, "intro_video_disabled"
+			}
+			if len(videos) != 1 || !videos[0].Ready() || fx.MediaURL != videos[0].URL() {
+				return time.Time{}, "intro_video_not_ready"
+			}
+			// This follows an explicitly requested opening, including at night.
+			// Outside the service window the provider must use an approved template.
+			return now, ""
+		}
 		due, why := followupworker.NextContact(base.Policy, s, fx, now)
 		if why != "" || due.After(now) {
 			return due, why

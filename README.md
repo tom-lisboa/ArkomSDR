@@ -8,6 +8,8 @@ Serviço novo e independente para captar leads, conversar, organizar agendamento
 
 **Mapa da jornada:** [fluxo completo em Mermaid para Obsidian](docs/fluxo-cliente-mermaid.md), com caminhos do cliente, follow-ups, exceções, workers e proposta de evolução dos agentes. Os diagramas individuais estão em [docs/mermaid](docs/mermaid).
 
+**Case no início do contato:** o [vídeo Camozzi](docs/intro-video.md) é enviado pelo worker de mídia após a entrega da abertura, uma vez por contato. Fora da janela de atendimento, usa um template de vídeo aprovado próprio.
+
 ## Mudanças comerciais implementadas
 
 - O formulário gera trabalho imediatamente; não depende de uma primeira mensagem do lead.

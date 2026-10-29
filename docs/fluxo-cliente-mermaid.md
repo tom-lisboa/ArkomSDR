@@ -13,7 +13,7 @@ tags:
 
 Documento para importar ou colar no Obsidian. Cada bloco `mermaid` funciona de forma independente; o primeiro dá a visão de cima e os demais abrem os caminhos.
 
-Base: código do commit `2466bb7` e configuração consultada no servidor em **29/10/2026**. O mapa descreve os caminhos implementados; isso não significa que todos foram homologados em atendimento real. Não houve alteração na operação para produzir este documento.
+Base: implementação e configuração consultadas no servidor em **29/10/2026**, incluindo o case Camozzi após a abertura. O mapa descreve os caminhos implementados; isso não significa que todos foram homologados em atendimento real.
 
 **Como ler:** decisões aparecem em losangos. Estados finais de uma etapa podem voltar à conversa quando houver uma nova mensagem. Trechos explicitamente marcados como desligados, dependentes de evento ou propostos não devem ser tratados como automações ativas.
 
@@ -30,8 +30,9 @@ flowchart TD
     FB -->|Sim| AB["Abertura confirma a reunião e aproveita o objetivo"]
     FB -->|Não| AS["Abertura convida ao agendamento"]
     W --> CT["Contexto agrupa texto, áudios e imagens"]
-    AB --> R{"Cliente responde?"}
-    AS --> R
+    AB --> VID["Após entrega da abertura: enviar case Camozzi uma vez por contato"]
+    AS --> VID
+    VID --> R{"Cliente responde?"}
     R -->|Sim| CT
     R -->|Não| ESP["Aguardar; não há retomada específica da abertura hoje"]
     CT --> EX["Execução escolhe agente e valida a decisão em Go"]
@@ -67,6 +68,7 @@ O bloco de cadência é independente de o cliente responder à primeira mensagem
 | Caminho | Situação observada no servidor |
 |---|---|
 | Contato automático após formulário | Ativo; abertura tem espera de 10 segundos para incorporar a reserva |
+| Case Camozzi logo após a abertura | Ativo no worker de mídia; uma vez por contato; template aprovado; aguarda entrega da abertura |
 | Agendar no formulário e enxergar no WhatsApp | Ativo; há reserva no mesmo pedido ou em chamada posterior |
 | Texto, áudio, imagem e agrupamento de mensagens | Ativos |
 | Preparação 15 minutos após a abertura | Ativa, com horário permitido e validade curta |
@@ -122,6 +124,16 @@ flowchart TD
     FAP -->|Sim| FTXT
     FTXT --> FOK["Registrar envio e horário da abertura"]
     FOK --> FPREP["Se houver reunião, avaliar preparação em mais 15 minutos"]
+    FOK --> FV["Criar job de vídeo único por contato, elegível em 2 segundos"]
+    FV --> FVD{"Abertura entregue ou lida?"}
+    FVD -->|Ainda não| FVW["Adiar; vídeo expira após 15 minutos"]
+    FVW --> FVD
+    FVD -->|Falhou| FVF["Registrar falha opcional; manter conversa"]
+    FVD -->|Sim| FVWIN{"Sessão recente de WhatsApp?"}
+    FVWIN -->|Sim| FVS["Worker de mídia envia MP4"]
+    FVWIN -->|Não| FVT{"Template de vídeo aprovado?"}
+    FVT -->|Não| FVW
+    FVT -->|Sim| FVS
 ```
 
 **Detalhes que mudam a jornada:**
@@ -131,6 +143,7 @@ flowchart TD
 - A espera de 10 segundos acomoda o formulário que agenda em uma segunda chamada. A reserva enviada no mesmo pedido é a opção transacional; uma segunda chamada que demore mais pode chegar depois da abertura.
 - Quando a abertura já confirmou a reserva atual, a confirmação separada da agenda é descartada para não duplicar a mensagem.
 - Novo formulário não remove opt-out, pausa nem atendimento humano. Repetição com nova chave também passa pelo intervalo mínimo entre aberturas.
+- O vídeo não exige reserva; exige contato liberado. Não é reenviado a cada formulário, resposta ou retomada. Falhas no vídeo não colocam o WhatsApp em atendimento humano. Consulte [o contrato do vídeo](intro-video.md).
 - Há um caminho legado de pareamento por link/código e uma API interna de cadastro. No servidor atual, o formulário público está em contato automático.
 
 ## 4. WhatsApp, mensagens picadas, mídia e memória
@@ -276,6 +289,7 @@ Há proteções adicionais para contextos de reuniões em grupo e troca de respo
 ```mermaid
 flowchart TD
     P0["Cadastro e conversa"] --> P1{"Existe reunião futura?"}
+    P0 --> PCASE["Entrega da abertura mais 2 segundos<br/>Case Camozzi único; expira em 15 minutos"]
     P1 -->|Não| PNO["Atendimento busca agendamento"]
     PNO --> PO{"Horários já foram oferecidos?"}
     PO -->|Não e cliente em silêncio| PSIL["Aguardar; sem sequência própria de retomada da abertura"]
@@ -307,6 +321,7 @@ flowchart TD
 | Etapa | Quando fica elegível | Janela e condições principais | Conteúdo e responsável |
 |---|---|---|---|
 | Abertura | Cerca de 10s após ativar formulário público | Cadastro elegível; template aprovado fora da sessão; validade de 24h; intervalo mínimo entre aberturas de 15min | Execução envia texto/template montado com perfil e reserva |
+| Vídeo Camozzi | Elegível 2s após o envio da abertura | Aguarda entrega da abertura; vence em 15min; contato liberado; template de vídeo fora da sessão | Mídia envia o MP4 instalado, uma vez por contato |
 | Confirmação de reserva | Após sucesso da agenda | Antes do início da reunião; aguarda janela de WhatsApp se não foi coberta pela abertura | Worker de agenda; não é uma nova geração livre de horários |
 | Preparação | T0 + 15min | Só se há reunião; vence após 5min ou em T−30, o que ocorrer primeiro; respeita horário permitido | Follow-up envia texto/template de preparação, sem depoimento |
 | Áudio | T−30min | Vence em T−25; sessão recente de WhatsApp, consentimento e arquivo pronto; horário permitido | Follow-up encaminha; mídia envia a gravação existente |
@@ -465,7 +480,7 @@ flowchart TD
     EUNC --> EREV["Revisão da tentativa e do provedor"]
     EDEAD --> EREV
     EREV --> ECHAN{"Qual operação falhou?"}
-    ECHAN -->|SMS opcional| ESMS["Registrar revisão sem tomar o atendimento do WhatsApp"]
+    ECHAN -->|SMS ou vídeo opcional| ESMS["Registrar revisão sem tomar o atendimento do WhatsApp"]
     ECHAN -->|Envio de texto, áudio ou outra ação crítica| EHUM["Pode ativar revisão humana e bloquear automação"]
     ECHAN -->|Voz| EVO["Estado próprio de voz; uncertain pode segurar outros envios"]
 ```
@@ -528,7 +543,7 @@ flowchart LR
     WEB --> CTX["Worker de contexto"]
     CTX <--> PG
     CTX <--> REDIS[("Redis<br/>Buffer e prazo rápido de agrupamento")]
-    CTX --> MEDIA["Worker de mídia<br/>Transcrição, visão e envio de gravação"]
+    CTX --> MEDIA["Worker de mídia<br/>Transcrição, visão, gravação e case em vídeo"]
     MEDIA --> CTX
     MEDIA <--> PG
     CTX --> EXEC["Worker de execução<br/>Roteador e motor de decisões"]
@@ -644,6 +659,7 @@ flowchart LR
 | Entrada WhatsApp e permissão | `internal/voiceworker/messages.go`, `internal/voiceworker/http.go` |
 | Contexto, agrupamento e memória | `internal/store/context.go`, `internal/contextworker/worker.go`, `internal/contextworker/buffer.go` |
 | Extração de mídia | `internal/providers/media.go`, `internal/providers/audio.go`, `internal/mediaworker/worker.go` |
+| Vídeo após a abertura | `internal/domain/intro_video.go`, `internal/providers/video.go`, `internal/casemedia/asset.go` |
 | Roteador e prompt de texto | `internal/agent/router.go`, `internal/agent/whatsapp_prompt.txt`, `internal/agent/openai.go` |
 | Decisões, controle e validações | `internal/domain/engine.go`, `internal/worker/worker.go` |
 | Operações e consulta da agenda | `internal/schedulingworker/worker.go`, `internal/schedulingworker/agenda.go`, `internal/providers/local.go` |
@@ -654,4 +670,4 @@ flowchart LR
 | Resposta em partes | `internal/domain/reply_parts.go`, `internal/worker/reply_typing.go` |
 | Parâmetros | `internal/config/config.go`, `internal/config/voice.go`; valores não secretos conferidos no servidor |
 
-Valores observados: `live`, contato automático ligado, retomadas gerais desligadas, preparação/reunião/SMS/voz ligados, sem restrição a um único telefone de teste, sem URL de sala, sem URL de agendamento e sem pedido de permissão de voz fora da sessão. Os limites atuais de homologação são 100 envios por contato/dia e 300 globais/hora; não são uma recomendação de cadência comercial.
+Valores observados: `live`, contato automático e vídeo de abertura ligados, retomadas gerais desligadas, preparação/reunião/SMS/voz ligados, sem restrição a um único telefone de teste, sem URL de sala, sem URL de agendamento e sem pedido de permissão de voz fora da sessão. Os limites atuais de homologação são 100 envios por contato/dia e 300 globais/hora; não são uma recomendação de cadência comercial.

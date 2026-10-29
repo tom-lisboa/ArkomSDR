@@ -73,6 +73,7 @@ func run() error {
 		twilioMessages = &providers.TwilioMessaging{Pool: db.Pool, Account: c.Voice.Account, AuthToken: c.Voice.AuthToken, Sender: c.Voice.Sender, AllowedPhone: c.TestPhone, Client: providers.NewHTTP()}
 		twilioMessages.FormContentSID = c.FormContentSID
 		twilioMessages.PreparationContentSID = c.PreparationContentSID
+		twilioMessages.IntroVideoContentSID = c.IntroVideoContentSID
 		twilioMessages.BookedContentSID = c.BookedContentSID
 		twilioMessages.BookedQuestionSID = c.BookedQuestionSID
 		twilioMessages.TimeZone = c.Policy.TimeZone
@@ -82,6 +83,10 @@ func run() error {
 	w := &worker.Worker{VoiceAutoRequest: c.Voice.AutoRequest, VoiceSender: c.Voice.Sender, Queue: "execution", DB: db, Planner: planner, Messenger: messenger, Calendar: calendar, CRM: providers.LocalCRM{Pool: db.Pool}, Policy: c.Policy, Live: c.Mode == "live", PerLeadDaily: c.PerLeadDaily, GlobalHourly: c.GlobalHourly}
 	if twilioMessages != nil {
 		w.AudioSender = twilioMessages
+		w.VideoSender = twilioMessages
+	}
+	if c.IntroVideoEnabled {
+		w.IntroVideoURL = c.IntroVideo.URL()
 	}
 	if c.SMSFrom != "" {
 		transport := &providers.TwilioMessaging{Pool: db.Pool, Account: c.Voice.Account, AuthToken: c.Voice.AuthToken, Client: providers.NewHTTP(), AllowedPhone: c.TestPhone}
@@ -126,7 +131,7 @@ func run() error {
 		cw.Typing = twilioMessages
 		cw.TestPhone = c.TestPhone
 	}
-	mw := &mediaworker.Worker{DB: db, Outbound: mediaworker.Outbound(*w, c.ReminderAudio)}
+	mw := &mediaworker.Worker{DB: db, Outbound: mediaworker.Outbound(*w, c.ReminderAudio, c.IntroVideo)}
 	if processor != nil {
 		mw.Processor = processor
 	}
@@ -180,7 +185,7 @@ func run() error {
 		wg.Wait()
 		return nil
 	}
-	api := &httpapi.Server{ReminderAudio: c.ReminderAudio, TestFormToken: c.TestFormToken, DB: db, Calendar: calendar, Token: c.Token, Mode: c.Mode, Policy: c.Policy, VoiceSender: c.Voice.Sender, VoiceEnabled: c.Voice.Enabled}
+	api := &httpapi.Server{IntroVideo: c.IntroVideo, ReminderAudio: c.ReminderAudio, TestFormToken: c.TestFormToken, DB: db, Calendar: calendar, Token: c.Token, Mode: c.Mode, Policy: c.Policy, VoiceSender: c.Voice.Sender, VoiceEnabled: c.Voice.Enabled}
 	api.FormAutoContact = c.FormAutoContact
 	api.SMSEnabled = c.SMSFrom != ""
 	srv := &http.Server{Addr: c.Address, Handler: api.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}

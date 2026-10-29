@@ -1,5 +1,6 @@
 flowchart TD
     P0["Cadastro e conversa"] --> P1{"Existe reunião futura?"}
+    P0 --> PCASE["Entrega da abertura mais 2 segundos<br/>Case Camozzi único; expira em 15 minutos"]
     P1 -->|Não| PNO["Atendimento busca agendamento"]
     PNO --> PO{"Horários já foram oferecidos?"}
     PO -->|Não e cliente em silêncio| PSIL["Aguardar; sem sequência própria de retomada da abertura"]
