@@ -9,7 +9,7 @@ import (
 	"arkom/bia/internal/domain"
 )
 
-const SpecialistPromptVersion = "bia-specialists-v2"
+const SpecialistPromptVersion = "bia-specialists-v3"
 
 func normalizeAssessment(s domain.State, e domain.Event, a domain.DialogueAssessment) domain.DialogueAssessment {
 	set := func(field string, target *string, value string) {
@@ -19,9 +19,25 @@ func normalizeAssessment(s domain.State, e domain.Event, a domain.DialogueAssess
 			delete(a.Confidence, field)
 		}
 	}
-	if a.Intent == "objection" && a.Objection == "none" && a.Cause == "none" && a.Readiness == "ready" {
+	if s.Dialogue != nil && s.Dialogue.BookingCondition != "" && domain.WithdrawsCondition(e.Text) && choiceCommit.MatchString(e.Text) && !domain.ConditionalAcceptance(e.Text) {
+		if _, ok := domain.ResolveOfferedSelection(e.Text, s.Offered, (domain.Policy{TimeZone: "America/Cuiaba"}).Zone(s), time.Now().UTC()); ok && (a.Intent == "select" || a.Intent == "schedule" || a.Intent == "clarify") {
+			set("intent", &a.Intent, "select")
+			set("objection", &a.Objection, "none")
+			set("progress", &a.Progress, "resolved")
+			set("readiness", &a.Readiness, "ready")
+		}
+	}
+	if domain.ConditionalAcceptance(e.Text) && (a.Intent == "select" || a.Intent == "schedule" || a.Intent == "clarify" || a.Intent == "objection") {
+		set("intent", &a.Intent, "clarify")
+		if a.Objection == "none" || a.Objection == "" {
+			set("objection", &a.Objection, "unknown")
+		}
+		set("readiness", &a.Readiness, "considering")
+		set("progress", &a.Progress, "open")
+	}
+	if a.Intent == "objection" && a.Objection == "none" && a.Cause == "none" {
 		set("intent", &a.Intent, "value")
-		if s.Dialogue != nil && s.Dialogue.Objection != nil {
+		if a.Readiness == "ready" && s.Dialogue != nil && s.Dialogue.Objection != nil {
 			set("progress", &a.Progress, "resolved")
 		}
 	}
@@ -139,6 +155,27 @@ func specialistActions(id string, a domain.DialogueAssessment) []string {
 // Defence in depth after typed output: acknowledgments and commercial hesitation
 // are not authority to mutate an existing booking or pause every reminder.
 func constrainSpecialist(s domain.State, e domain.Event, d domain.Decision, a domain.DialogueAssessment, now time.Time) domain.Decision {
+	if a.Intent == "human" {
+		return domain.Decision{Action: "handoff", Evidence: e.Text, Reason: "customer_requested_human"}
+	}
+	if a.Intent == "pause_contact" {
+		return domain.Decision{Action: "pause", Evidence: e.Text, Reason: "customer_requested_pause"}
+	}
+	if a.Intent == "select" && !domain.ConditionalAcceptance(e.Text) && (s.Dialogue == nil || s.Dialogue.BookingCondition == "" || domain.WithdrawsCondition(e.Text)) {
+		if id, ok := domain.ResolveOfferedSelection(e.Text, s.Offered, (domain.Policy{TimeZone: "America/Cuiaba"}).Zone(s), now); ok {
+			action := "book"
+			if s.Booking != nil {
+				action = "reschedule"
+			}
+			return domain.Decision{Action: action, SlotID: id, Evidence: e.Text, Reason: "explicit_offered_selection"}
+		}
+	}
+	if a.Intent == "reschedule" && !domain.ConditionalAcceptance(e.Text) && (s.Dialogue == nil || s.Dialogue.BookingCondition == "" || domain.WithdrawsCondition(e.Text)) {
+		if id, ok := domain.ResolveOfferedSelection(e.Text, s.Offered, (domain.Policy{TimeZone: "America/Cuiaba"}).Zone(s), now); ok {
+			return domain.Decision{Action: "reschedule", SlotID: id, Evidence: e.Text, Reason: "explicit_replacement_selection"}
+		}
+		return domain.Decision{Action: "offer_slots", OfferSlotIDs: d.OfferSlotIDs, Reason: "reschedule_requires_available_options"}
+	}
 	if domain.MeetingStatus(s, now) == "in_progress" && delayNotice.MatchString(e.Text) && !domain.RescheduleRequested(e.Text) {
 		p := domain.Policy{TimeZone: "America/Cuiaba"}
 		z := p.Zone(s)
@@ -187,3 +224,4 @@ func constrainSpecialist(s domain.State, e domain.Event, d domain.Decision, a do
 
 var offerDetails = regexp.MustCompile(`(?i)(\b[0-9]{1,2}(:[0-9]{2}|h([0-9]{2})?| horas?)\b|[0-9]{1,2}/[0-9]{1,2}|https?://)`)
 var delayNotice = regexp.MustCompile(`(?i)(atras|vou entrar depois|vou chegar depois)`)
+var choiceCommit = regexp.MustCompile(`(?i)(pode (ser|marcar|agendar|reservar)|quero (o|a)|escolho|fico com|confirma)`)

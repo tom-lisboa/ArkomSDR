@@ -82,7 +82,7 @@ func AdvanceDialogue(s State, e Event, a DialogueAssessment, id, version string,
 	if e.Context != nil {
 		n.ConversationVersion = e.Context.Version
 	}
-	if (a.Objection == "price" || a.Objection == "time") && (a.Intent == "clarify" || a.Intent == "objection") && ConditionalAcceptance(e.Text) {
+	if (a.Intent == "clarify" || a.Intent == "objection") && ConditionalAcceptance(e.Text) {
 		n.BookingCondition = dialogueText(e.Text, 1000)
 	}
 	if WithdrawsCondition(e.Text) {
@@ -124,8 +124,12 @@ func AdvanceDialogue(s State, e Event, a DialogueAssessment, id, version string,
 var conditionalAcceptanceRE = regexp.MustCompile(`(?i)\b(se (for|fosse|tiver|custar|durar)|desde que|com a condição|com a condicao)\b`)
 var withdrawConditionRE = regexp.MustCompile(`(?i)(independentemente|mesmo assim|n[ãa]o precisa ser|sem essa condi[çc][ãa]o|sem essa exig[êe]ncia|pode ser pag[oa])`)
 
-func ConditionalAcceptance(text string) bool { return conditionalAcceptanceRE.MatchString(text) }
-func WithdrawsCondition(text string) bool    { return withdrawConditionRE.MatchString(text) }
+var courtesyConditionRE = regexp.MustCompile(`(?i)\bse for poss[ií]vel\b`)
+
+func ConditionalAcceptance(text string) bool {
+	return conditionalAcceptanceRE.MatchString(courtesyConditionRE.ReplaceAllString(text, ""))
+}
+func WithdrawsCondition(text string) bool { return withdrawConditionRE.MatchString(text) }
 
 func RecordDialogueDelivery(s *State, fx Effect, text string, at time.Time) {
 	if s.Dialogue == nil || fx.Dialogue == nil {

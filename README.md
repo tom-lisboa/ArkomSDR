@@ -149,6 +149,8 @@ com autorização própria no formulário e botão opcional `/reminders/sms` par
 
 O [aviso por WhatsApp no início da reunião](docs/followups.md) pede uma resposta direta (`CONFIRMO` ou `REMARCAR`) e tem template próprio fora da janela. A Bia mantém o contexto da reunião durante o intervalo reservado; confirmação é intenção de presença, sem inferir comparecimento real.
 
+Avaliação repetível da conversa, com cenários fictícios e API real, sem disparar WhatsApp: [matriz e execução](evals/README.md) e [relatório da rodada](docs/conversation-qa-2026-10-29.md).
+
 Disponibilidade e reserva pelo formulário: [contrato dos endpoints](docs/form-calendar.md).
 
 Abertura com confirmação da reserva, preparação após 15 minutos e correção dos erros do formulário: [contrato e diagnóstico](docs/test-form-troubleshooting.md).

@@ -1,6 +1,6 @@
 # Especialistas de texto e Decisions em Go
 
-O prompt atual é `bia-specialists-v2`, de 29/10/2026. Inclui orientação de direct response e reconhecimento da reunião em andamento pelo intervalo real da reserva. A versão anterior foi validada com 12 turnos sintéticos na API real; mais quatro turnos desta atualização verificaram consulta da reserva, atraso e remarcação. Os testes locais cobrem as guardas finais contra promessas de espera e ofertas duplicadas. A conversa no aparelho ainda precisa validar a experiência completa desta versão.
+O prompt atual é `bia-specialists-v3`, de 29/10/2026. A [avaliação das conversas](conversation-qa-2026-10-29.md) registra a matriz sintética, falhas encontradas, correções e limites da homologação. Inclui direct response, contexto durante o intervalo da reunião, condições pendentes, preferência explícita de horários, pedido de humano e desistência da remarcação. A experiência no aparelho continua sendo uma validação complementar.
 
 O atendimento pode classificar cada lote de mensagens com Decisions e escolher um especialista de texto no worker de execução. A Bia mantém a identidade, o número e o histórico compartilhado. Voz conserva o roteiro de lembrete separado.
 
@@ -89,6 +89,8 @@ Antes de confirmar uma Run interpretada, o banco verifica a versão da conversa 
 Decisions tem prazo de oito segundos e uma tentativa por Run. Falha, recusa, categoria inválida ou resposta incompleta ativa interpretação conservadora com `source=decisions_unavailable`; isso sozinho não coloca o contato em atendimento humano. O fallback usa contexto e alguns sinais explícitos, sem fingir que houve classificação bem-sucedida.
 
 As ações permitidas aparecem tanto no contexto como no JSON Schema por especialidade. Há guardas adicionais para aceite condicionado, adiamento sem pausa global, reserva existente, horários duplicados na introdução e “sim” diante de duas opções.
+
+Na versão v3, um pedido de humano ou pausa não depende de o redator concordar com a classificação. Escolha literal validada pode seguir à agenda após retirada explícita de condição; novas condições continuam bloqueadas, incluindo as de formato. Um pedido de remarcação oferece opções reais antes de exigir escolha. Manter explicitamente o horário original invalida as opções anteriores de remarcação. Restrições literais de disponibilidade são aplicadas às vagas antes da oferta; subconjunto validado com uma única vaga não é completado com outra fora do período pedido. Diagnósticos internos longos são truncados em limites UTF-8 sem descartar uma resposta operacional válida.
 
 A revisão de qualidade detecta repetição da pergunta sobre motivo já explicado, certas promessas de confirmação indisponíveis, afirmações de reserva/links que o domínio rejeitaria, termos internos e caracteres cirílicos inesperados na resposta. Permite **uma regeneração**, com instrução de correção. Se persistir, usa uma resposta conservadora e descarta o head do rascunho inadequado. Essas verificações não são uma avaliação semântica completa de persuasão ou de todas as alegações possíveis.
 

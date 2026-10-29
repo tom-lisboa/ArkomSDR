@@ -14,6 +14,12 @@ var stopRE = regexp.MustCompile(`(?im)(pare de (me )?(ligar|mandar|enviar)|n[ãa
 func IsOptOut(text string) bool { return stopRE.MatchString(strings.TrimSpace(text)) }
 
 var cancelRE = regexp.MustCompile(`(?i)^(por favor[, ]*)?(quero |pode |preciso )?(cancelar|cancele|cancela)( minha| a| essa| esta)? (reunião|reuniao|call|reserva|vaga)[.! ]*$`)
+var naturalCancelRE = regexp.MustCompile(`^(?:(?:nao vou conseguir participar|nao poderei participar|tive um imprevisto)[,;.! ]+)?(?:por favor[, ]*)?(?:(?:eu )?(?:quero|preciso|gostaria de|pode|poderia) )?(?:cancelar|cancele|cancela|desmarcar|desmarque|desmarca)(?: (?:a |o |minha |meu |essa |esse |esta |este )?(?:reuniao|call|reserva|vaga|horario)(?: de (?:amanha|hoje))?)?(?:[, ]+por favor)?[.!? ]*$`)
+
+func CancellationRequested(text string) bool {
+	return cancelRE.MatchString(strings.TrimSpace(text)) || naturalCancelRE.MatchString(normalizedChoice(text))
+}
+
 var confirmRE = regexp.MustCompile(`(?i)^(sim[,! ]*)?(confirmo( minha presença| minha presenca)?|estarei (lá|la|presente)|vou participar|presença confirmada|presenca confirmada)[.! ]*$`)
 var bareYesRE = regexp.MustCompile(`(?i)^(sim|s)[.! ]*$`)
 
@@ -252,7 +258,13 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 		if confirmRE.MatchString(strings.TrimSpace(e.Text)) {
 			d.Action = "confirm"
 		}
-		if cancelRE.MatchString(strings.TrimSpace(e.Text)) {
+		if HasActiveMeeting(s, now) && KeepBookingRequested(e.Text) {
+			s.Offered = nil
+			s.OfferVersion = ""
+			s.Stage = "booked"
+			d = Decision{Action: "reply", Message: bookingText(*s.Booking, p, s), Reason: "reschedule_withdrawn"}
+		}
+		if CancellationRequested(e.Text) {
 			d.Action = "cancel"
 		}
 		if e.SelectedSlotID != "" {
@@ -303,7 +315,7 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 			message("reply", "Presença confirmada! "+bookingText(b, p, s))
 			add("crm", "presence_confirmed", "Lead confirmou presença.", now, now.Add(24*time.Hour))
 		case "cancel":
-			if !cancelRE.MatchString(strings.TrimSpace(e.Text)) {
+			if !CancellationRequested(e.Text) {
 				message("reply", "Você quer cancelar a reunião ou prefere encontrar outro horário?")
 				break
 			}
@@ -319,6 +331,10 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 			fx.Booking = s.Booking
 			fx.BookingID = s.Booking.ID
 		case "book", "reschedule":
+			if e.SelectedSlotID == "" && (ConditionalAcceptance(e.Text) || (s.Dialogue != nil && s.Dialogue.BookingCondition != "" && !WithdrawsCondition(e.Text))) {
+				message("reply", "Essa condição ainda não está confirmada. Você prefere aguardar essa informação ou seguir sem essa exigência?")
+				break
+			}
 			var chosen *Slot
 			for _, slot := range s.Offered {
 				if slot.ID == d.SlotID {
@@ -392,7 +408,7 @@ func offer(s *State, r *Result, e Event, slots []Slot, p Policy, now time.Time) 
 		r.Effects = append(r.Effects, Effect{ID: e.ID + ":existing-booking", LeadID: s.ID, Kind: "send", Purpose: "reply", Text: bookingText(*s.Booking, p, *s), Due: now, Expires: now.Add(30 * time.Minute), BookingID: s.Booking.ID, BookingStart: s.Booking.Start})
 		return
 	}
-	available := append([]Slot(nil), slots...)
+	available := append([]Slot(nil), constrainedAvailability(e.Text, slots, p.Zone(*s), now)...)
 	sort.SliceStable(available, func(i, j int) bool { return available[i].Start.Before(available[j].Start) })
 	// Prefer the model's requested IDs only if every ID is in the fresh calendar.
 	preferred := []Slot{}
@@ -413,7 +429,9 @@ func offer(s *State, r *Result, e Event, slots []Slot, p Policy, now time.Time) 
 		}
 	}
 	if validPreference {
-		available = append(preferred, available...)
+		// A validated subset can express a hard time constraint. Do not fill a
+		// one-slot preference with an unrelated hour merely to offer two choices.
+		available = preferred
 	}
 	s.Offered = nil
 	seen := map[string]bool{}
@@ -432,6 +450,9 @@ func offer(s *State, r *Result, e Event, slots []Slot, p Policy, now time.Time) 
 	}
 	s.OfferVersion = e.ID
 	text := "Não encontrei horários disponíveis na agenda agora. O agendamento ainda não foi feito."
+	if len(slots) > 0 && len(available) == 0 {
+		text = "Não encontrei horários disponíveis para o período que você pediu. O agendamento ainda não foi feito."
+	}
 	if e.CalendarUnavailable {
 		text = "Não consegui consultar a agenda agora. O agendamento ainda não foi feito."
 	}
@@ -658,5 +679,5 @@ func AutomaticReply(text string) bool {
 }
 
 func NeedsPlan(s State, e Event, now time.Time) bool {
-	return e.Kind == "message.received" && !s.OptedOut && !s.Human && !AutomaticReply(e.Text) && !stopRE.MatchString(e.Text) && !cancelRE.MatchString(e.Text) && !confirmRE.MatchString(e.Text) && e.SelectedSlotID == "" && !e.At.Before(s.LastInbound) && now.Sub(e.At) <= 24*time.Hour
+	return e.Kind == "message.received" && !s.OptedOut && !s.Human && !AutomaticReply(e.Text) && !stopRE.MatchString(e.Text) && !CancellationRequested(e.Text) && !(HasActiveMeeting(s, now) && KeepBookingRequested(e.Text)) && !confirmRE.MatchString(e.Text) && e.SelectedSlotID == "" && !e.At.Before(s.LastInbound) && now.Sub(e.At) <= 24*time.Hour
 }

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"arkom/bia/internal/conversation"
 	"arkom/bia/internal/domain"
@@ -130,7 +131,11 @@ func (a *OpenAI) Run(ctx context.Context, s domain.State, e domain.Event, slots 
 			res.ID = ""
 		}
 	}
-	if len([]rune(d.Message)) > 1000 || len(d.Reason) > 500 || len(d.Evidence) > 2000 || len(d.OfferSlotIDs) > 2 {
+	// Diagnostic prose is not an operational field. Bound it without dropping a
+	// valid customer response or stopping the conversation for an oversized reason.
+	d.Reason = boundedMetadata(d.Reason, 500)
+	d.Evidence = boundedMetadata(d.Evidence, 2000)
+	if len([]rune(d.Message)) > 1000 || len(d.OfferSlotIDs) > 2 {
 		return out, errors.New("openai_invalid_decision")
 	}
 	switch d.Action {
@@ -151,11 +156,25 @@ func (a *OpenAI) Run(ctx context.Context, s domain.State, e domain.Event, slots 
 	*d = normalizeTextDecision(s, e, *d)
 	if a.Specialists {
 		*d = constrainSpecialist(s, e, *d, assessment, time.Now().UTC())
+		if len(slots) == 0 && (assessment.Intent == "schedule" || assessment.Intent == "reschedule") {
+			*d = domain.Decision{Action: "offer_slots", Reason: "calendar_has_no_available_slots"}
+		}
 	}
 	out.ResponseID = res.ID
 	out.InputTokens = res.Usage.InputTokens
 	out.UsedPrevious = params.PreviousResponseID.Value != ""
 	return out, nil
+}
+
+func boundedMetadata(text string, limit int) string {
+	if len(text) <= limit {
+		return text
+	}
+	for len(text) > limit {
+		_, size := utf8.DecodeLastRuneInString(text)
+		text = text[:len(text)-size]
+	}
+	return text
 }
 
 func DecisionSchema() map[string]any {

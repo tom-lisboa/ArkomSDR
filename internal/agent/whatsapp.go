@@ -13,7 +13,8 @@ import (
 //go:embed whatsapp_prompt.txt
 var whatsappPrompt string
 
-var fillerOpening = regexp.MustCompile(`(?i)^(perfeito|entendi|entendo|ótima pergunta|que ótimo|faz (todo )?sentido|com certeza|fico feliz)([!.,: ]+|$)`)
+var fillerOpening = regexp.MustCompile(`(?i)^(perfeito|entendi|entendo|ótima pergunta|que ótimo|faz (todo )?sentido|com certeza|fico feliz)([!.,:]+[ \t]*|[ \t]*$)`)
+var redundantOfferHeading = regexp.MustCompile(`(?i)^(tenho|separei|posso te passar|se quiser.{0,30}(posso|podemos)).{0,120}hor[aá]rios.{0,60}[.:]?$`)
 
 // These are presentation rules for WhatsApp only. Operational decisions still
 // pass through the domain's booking, consent and delivery checks.
@@ -53,6 +54,9 @@ func normalizeTextDecision(s domain.State, e domain.Event, d domain.Decision) do
 			block = clean
 		}
 		if block == "" {
+			continue
+		}
+		if d.Action == "offer_slots" && redundantOfferHeading.MatchString(block) {
 			continue
 		}
 		runes := []rune(block)

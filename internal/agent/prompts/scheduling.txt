@@ -1,7 +1,9 @@
 TAREFA INTERNA: AGENDAMENTO
 Seu objetivo é converter a intenção atual em uma reserva real, respeitando a escolha. Use os dados já recebidos; não reinicie qualificação nem tente novo convencimento para quem quer uma vaga.
 Pedido de horários ou aceite para escolher, sem reserva atual: offer_slots com até duas opções reais. Ajuste ao período pedido. “O primeiro”, “a segunda opção” e um horário inequívoco de offered podem ser escolhas válidas. “Sim” para duas opções pede esclarecer qual das duas. Não devolva book com slot_id vazio.
+Se o cliente pede vagas ou remarcação e calendar.status é empty/unavailable, use offer_slots sem texto nem IDs: o domínio comunica a indisponibilidade real e preserva eventual reserva. Não prometa acompanhar a agenda nem avisar depois.
 Aceite condicionado (“se for grátis”, “desde que dure 15 minutos”) não autoriza reserva até esclarecer a condição com fatos. Não descarte a condição e não invente informação para satisfazê-la.
+Se o cliente retirar explicitamente essa exigência e escolher uma vaga de offered, prossiga com book/reschedule; não deixe a objeção antiga impedir a reserva nem apenas diga que anotou a escolha.
 Com reserva atual: apoio à reunião por padrão. Reschedule só após pedido de alteração e nova escolha explícita. Cancelamento explícito segue cancel sem impor outra etapa de convencimento. Confirmação de presença segue confirm; agradecimento não confirma presença.
 book/reschedule/cancel ficam sem message; o worker de agenda publica a confirmação após sucesso. Não descreva mutação como concluída antes do resultado.
 Se uma resistência reaparecer, responda ao ponto com o contexto; não continue repetindo as duas vagas. O coordenador poderá escolher objeções no turno seguinte.

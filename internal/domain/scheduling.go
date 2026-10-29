@@ -24,6 +24,71 @@ var choiceDate = regexp.MustCompile(`\b([0-3]?\d)/([01]?\d)(?:/(20\d\d))?\b`)
 var negativeChoice = regexp.MustCompile(`\b(nao|talvez|ainda|depois eu|vou ver|vou olhar|qual|quais)\b`)
 var ordinalFirst = regexp.MustCompile(`\b(primeir[oa]|opcao 1|1a opcao|1ª opcao|1º horario)\b`)
 var ordinalSecond = regexp.MustCompile(`\b(segundo|segunda opcao|segunda alternativa|opcao 2|2a opcao|2ª opcao|2º horario)\b|^a segunda[.! ]*$`)
+var withdrawnPriceCondition = regexp.MustCompile(`\bnao precisa ser (gratuit[oa]|gratis|de graca|pag[oa])\b`)
+var keepBookingRE = regexp.MustCompile(`(?:^|[.!;,\n]\s*)(?:por favor[, ]*)?(?:mantenha|pode manter|vamos manter|deixe|pode deixar) (?:o |a |meu |minha )?(?:horario|reserva|reuniao) (?:original|atual|como esta)\b`)
+var hardAvailabilityRE = regexp.MustCompile(`\b(so (consigo|posso|tenho)|somente|apenas)\b`)
+
+func KeepBookingRequested(text string) bool { return keepBookingRE.MatchString(normalizedChoice(text)) }
+
+// Explicit availability limits filter real slots before offers are rendered.
+// This does not infer a constraint from a vague preference or a model label.
+func constrainedAvailability(text string, slots []Slot, zone *time.Location, now time.Time) []Slot {
+	t := normalizedChoice(text)
+	constraint := hardAvailabilityRE.FindStringIndex(t)
+	if constraint == nil {
+		return slots
+	}
+	t = t[constraint[0]:]
+	clocks := choiceClock.FindAllStringSubmatch(t, -1)
+	morning, afternoon, night := strings.Contains(t, "manha") && !strings.Contains(t, "amanha"), strings.Contains(t, "tarde"), strings.Contains(t, "noite")
+	// "amanhã de manhã" also contains the literal period.
+	morning = morning || strings.Contains(t, "de manha") || strings.Contains(t, "pela manha")
+	periods := 0
+	for _, v := range []bool{morning, afternoon, night} {
+		if v {
+			periods++
+		}
+	}
+	result := []Slot{}
+	for _, slot := range slots {
+		local := slot.Start.In(zone)
+		end := slot.End.In(zone)
+		minute := local.Hour()*60 + local.Minute()
+		if strings.Contains(t, "amanha") && local.Format("2006-01-02") != now.In(zone).AddDate(0, 0, 1).Format("2006-01-02") {
+			continue
+		}
+		if strings.Contains(t, "hoje") && local.Format("2006-01-02") != now.In(zone).Format("2006-01-02") {
+			continue
+		}
+		if periods == 1 && ((morning && minute >= 12*60) || (afternoon && (minute < 12*60 || minute >= 18*60)) || (night && minute < 18*60)) {
+			continue
+		}
+		if len(clocks) == 1 {
+			h, _ := strconv.Atoi(clocks[0][1])
+			m, _ := strconv.Atoi(clocks[0][2])
+			bound := h*60 + m
+			if strings.Contains(t, "depois") || strings.Contains(t, "a partir") {
+				if minute < bound {
+					continue
+				}
+			} else if strings.Contains(t, "antes") || strings.Contains(t, "ate") {
+				if minute >= bound || (slot.End.After(slot.Start) && (end.YearDay() != local.YearDay() || end.Hour()*60+end.Minute() > bound)) {
+					continue
+				}
+			} else if minute != bound {
+				continue
+			}
+		}
+		result = append(result, slot)
+	}
+	return result
+}
+
+// ResolveOfferedSelection shares the independent, literal choice check with the
+// planner. It is never authority to skip pending conditions or booking guards.
+func ResolveOfferedSelection(text string, offered []Slot, zone *time.Location, now time.Time) (string, bool) {
+	return selectedOffer(text, offered, zone, now)
+}
 
 func normalizedChoice(text string) string {
 	return strings.NewReplacer("á", "a", "à", "a", "ã", "a", "â", "a", "é", "e", "ê", "e", "í", "i", "ó", "o", "õ", "o", "ô", "o", "ú", "u", "ç", "c").Replace(strings.ToLower(strings.TrimSpace(text)))
@@ -33,6 +98,9 @@ func normalizedChoice(text string) string {
 // The model's chosen ID alone is never authorization to reserve a meeting.
 func selectedOffer(text string, offered []Slot, zone *time.Location, now time.Time) (string, bool) {
 	t := normalizedChoice(text)
+	// Removing a price condition is not a negation of the following choice.
+	// Keep all other negations, including "não quero o primeiro", intact.
+	t = withdrawnPriceCondition.ReplaceAllString(t, "")
 	if negativeChoice.MatchString(t) {
 		return "", false
 	}
