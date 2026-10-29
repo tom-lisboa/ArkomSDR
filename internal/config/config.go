@@ -14,6 +14,8 @@ import (
 )
 
 type Config struct {
+	Specialists                         bool
+	DecisionsModel                      string
 	IntroVideoEnabled                   bool
 	IntroVideoContentSID                string
 	IntroVideo                          casemedia.Asset
@@ -46,6 +48,11 @@ func env(k, d string) string {
 }
 func Load() (Config, error) {
 	c := Config{RedisURL: env("BIA_REDIS_URL", "redis://127.0.0.1:6389/0"), MediaModel: os.Getenv("OPENAI_MEDIA_MODEL"), Address: env("BIA_ADDR", "127.0.0.1:8080"), DSN: os.Getenv("BIA_DATABASE_URL"), Token: os.Getenv("BIA_API_TOKEN"), Mode: env("BIA_MODE", "shadow"), OpenAIKey: os.Getenv("OPENAI_API_KEY"), OpenAIModel: os.Getenv("OPENAI_MODEL"), AudioModel: os.Getenv("OPENAI_AUDIO_MODEL"), GatewayURL: os.Getenv("BIA_GATEWAY_URL"), GatewayToken: os.Getenv("BIA_GATEWAY_TOKEN"), Workers: 4}
+	c.Specialists = os.Getenv("BIA_SPECIALISTS_ENABLED") == "true"
+	c.DecisionsModel = env("OPENAI_DECISIONS_MODEL", "gpt-6-luna")
+	if c.Specialists && (c.OpenAIKey == "" || c.DecisionsModel != "gpt-6-luna") {
+		return c, errors.New("specialists require OPENAI_API_KEY and OPENAI_DECISIONS_MODEL=gpt-6-luna")
+	}
 	c.PerLeadDaily = 15
 	c.GlobalHourly = 60
 	for key, target := range map[string]*int{"BIA_PER_LEAD_DAILY": &c.PerLeadDaily, "BIA_GLOBAL_HOURLY": &c.GlobalHourly} {

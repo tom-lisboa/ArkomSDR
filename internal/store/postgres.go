@@ -64,20 +64,21 @@ var ErrLease = errors.New("lease lost; stale worker cannot commit")
 type DB struct{ Pool *pgxpool.Pool }
 type VoiceInvite struct{ Sender string }
 type Job struct {
-	VoiceInvite *VoiceInvite            `json:"-"`
-	Run         *conversation.RunResult `json:"-"`
-	Delivery    *conversation.Delivery  `json:"-"`
-	Queue       string                  `json:"queue"`
-	ID          string                  `json:"id"`
-	LeadID      string                  `json:"lead_id"`
-	Kind        string                  `json:"kind"`
-	Mode        string                  `json:"mode"`
-	Payload     json.RawMessage         `json:"payload"`
-	Token       string                  `json:"-"`
-	Attempts    int                     `json:"attempts"`
-	Status      string                  `json:"status"`
-	Result      json.RawMessage         `json:"result,omitempty"`
-	ErrorCode   *string                 `json:"error_code,omitempty"`
+	GuardContext bool                    `json:"-"`
+	VoiceInvite  *VoiceInvite            `json:"-"`
+	Run          *conversation.RunResult `json:"-"`
+	Delivery     *conversation.Delivery  `json:"-"`
+	Queue        string                  `json:"queue"`
+	ID           string                  `json:"id"`
+	LeadID       string                  `json:"lead_id"`
+	Kind         string                  `json:"kind"`
+	Mode         string                  `json:"mode"`
+	Payload      json.RawMessage         `json:"payload"`
+	Token        string                  `json:"-"`
+	Attempts     int                     `json:"attempts"`
+	Status       string                  `json:"status"`
+	Result       json.RawMessage         `json:"result,omitempty"`
+	ErrorCode    *string                 `json:"error_code,omitempty"`
 }
 
 func Open(ctx context.Context, dsn string) (*DB, error) {
@@ -298,6 +299,34 @@ func (d *DB) Finish(ctx context.Context, j Job, s domain.State, effects []domain
 		return e
 	}
 	defer tx.Rollback(ctx)
+	if j.GuardContext && j.Run != nil && j.Kind == "event" {
+		// Serialize the final assessment against the context writer. A newer
+		// inbound invalidates the draft, including its commercial memory.
+		var version int64
+		if e = tx.QueryRow(ctx, `SELECT version FROM bia_go.conversations WHERE id=$1 FOR UPDATE`, j.Run.ConversationID).Scan(&version); e != nil {
+			return e
+		}
+		var pending bool
+		if e = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM bia_go.worker_tasks WHERE lead_id=$1 AND kind='inbound' AND status IN('pending','running')) OR EXISTS(SELECT 1 FROM bia_go.conversation_messages WHERE conversation_id=$2 AND role='user' AND run_id IS NULL)`, j.LeadID, j.Run.ConversationID).Scan(&pending); e != nil {
+			return e
+		}
+		if pending || version > j.Run.Version {
+			var original []byte
+			if e = tx.QueryRow(ctx, `SELECT state FROM bia_go.leads WHERE id=$1 AND lease_token=$2`, j.LeadID, j.Token).Scan(&original); e != nil {
+				return e
+			}
+			s = domain.State{}
+			if e = json.Unmarshal(original, &s); e != nil {
+				return e
+			}
+			effects = nil
+			status = "skipped"
+			result = map[string]string{"reason": "new_input_superseded_assessment"}
+			j.Run.Agent = ""
+			j.Run.ResponseID = ""
+			j.Run.PromptVersion = ""
+		}
+	}
 	raw, e := json.Marshal(s)
 	if e != nil {
 		return e

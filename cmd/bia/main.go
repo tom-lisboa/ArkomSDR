@@ -62,7 +62,12 @@ func run() error {
 	}
 	var planner agent.Planner = agent.Offline{}
 	if c.OpenAIKey != "" {
-		planner = agent.New(c.OpenAIKey, c.OpenAIModel, c.Policy.Brand, c.Policy.SchedulingURL)
+		ai := agent.New(c.OpenAIKey, c.OpenAIModel, c.Policy.Brand, c.Policy.SchedulingURL)
+		ai.Specialists = c.Specialists
+		if c.Specialists {
+			ai.Classifier = agent.DecisionsClassifier{Client: ai.Client, Model: c.DecisionsModel}
+		}
+		planner = ai
 	}
 	var messenger providers.Messenger = providers.Disabled{}
 	var twilioMessages *providers.TwilioMessaging

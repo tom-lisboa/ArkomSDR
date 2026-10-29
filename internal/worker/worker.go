@@ -125,6 +125,7 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 			j.Run = &conversation.RunResult{ConversationID: e.Context.ConversationID, RunID: e.Context.RunID, Version: e.Context.Version}
 		}
 		var d domain.Decision
+		var routedAgent string
 		var slots []domain.Slot
 		if e.Kind == "message.received" && !s.OptedOut && !s.Human && !domain.AutomaticReply(e.Text) && (e.Context == nil || !e.Context.MediaFailed) {
 			var calendarErr error
@@ -135,8 +136,17 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 				var out agent.Outcome
 				out, err = agent.Execute(opCtx, w.Planner, s, e, slots, id)
 				d = out.Decision
+				routedAgent = out.Agent
+				if routedAgent == "" {
+					routedAgent = id
+				}
+				if out.Dialogue != nil {
+					s.Dialogue = out.Dialogue
+					j.GuardContext = true
+				}
 				if j.Run != nil {
-					j.Run.Agent = id
+					j.Run.Agent = routedAgent
+					j.Run.PromptVersion = out.PromptVersion
 					j.Run.ResponseID = out.ResponseID
 					j.Run.InputTokens = out.InputTokens
 					j.Run.UsedPrevious = out.UsedPrevious
@@ -151,7 +161,18 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 			}
 		}
 		r := domain.Reduce(s, e, d, slots, w.Policy, now)
-		return true, w.DB.Finish(ctx, j, r.State, r.Effects, "done", map[string]any{"decision": r.Decision, "effects": len(r.Effects)})
+		if s.Dialogue != nil && j.GuardContext {
+			for i := range r.Effects {
+				fx := &r.Effects[i]
+				if fx.Kind == "send" && fx.Purpose == "reply" {
+					fx.Dialogue = &domain.DialogueDelivery{Agent: routedAgent, TurnID: e.ID}
+					if s.Dialogue.Objection != nil {
+						fx.Dialogue.ObjectionID = s.Dialogue.Objection.ID
+					}
+				}
+			}
+		}
+		return true, w.DB.Finish(ctx, j, r.State, r.Effects, "done", map[string]any{"decision": r.Decision, "effects": len(r.Effects), "agent": routedAgent, "dialogue": r.State.Dialogue})
 	}
 	var fx domain.Effect
 	if err = json.Unmarshal(j.Payload, &fx); err != nil {
@@ -306,6 +327,7 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 			}
 			j.Delivery = &conversation.Delivery{ConversationID: fx.ConversationID, ProviderConversationID: s.Profile.ConversationID, ID: "outbound/" + j.ID, Text: text, At: now}
 			domain.AppendTurn(&s, "assistant", text, now)
+			domain.RecordDialogueDelivery(&s, fx, text, now)
 			if s.FirstContactAt == nil {
 				s.FirstContactAt = &now
 			}

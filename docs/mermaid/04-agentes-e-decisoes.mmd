@@ -3,15 +3,23 @@ flowchart TD
     ARULE -->|Saída, humano, entrada velha ou resposta automática| ANO["Aplicar bloqueio ou ignorar execução"]
     ARULE -->|Ação explícita reconhecida pelo código| ADET["Tratar cancelamento, presença ou seleção sem depender do modelo"]
     ARULE -->|Precisa interpretar| ACAL["Consultar agenda atual"]
-    ACAL --> AR{"Roteador em Go"}
-    AR -->|Estado no_show| AREC["Especialidade recovery"]
-    AR -->|Reserva, oferta, pendência ou intenção de agenda| ASCH["Especialidade scheduling"]
-    AR -->|Demais casos| ASDR["Especialidade sdr"]
-    AREC --> AP["Prompt de WhatsApp comum mais instrução da especialidade"]
+    ACAL --> DEC["Decisions classifica intenção, objeção, disposição, progresso e motivo"]
+    DEC --> AR{"Coordenador Go aplica prioridades"}
+    DEC -->|Indisponível ou inválido| FALL["Fallback conservador, sem bloquear WhatsApp por isso"]
+    FALL --> AR
+    AR -->|Objeção ou condição pendente| AOBJ["Especialista de objeções"]
+    AR -->|Pedido operacional de agenda| ASCH["Especialista de agendamento"]
+    AR -->|Reserva futura e dúvida sobre a conversa| AATT["Especialista de comparecimento"]
+    AR -->|Nova conversa após no-show| AREC["Especialista de recuperação"]
+    AR -->|Valor e interesse inicial| APER["Especialista de persuasão"]
+    AOBJ --> AP["Prompt próprio mais identidade comum da Bia e memória compartilhada"]
     ASCH --> AP
-    ASDR --> AP
-    AP --> AM["OpenAI Responses propõe decisão estruturada"]
-    AM --> AV["Motor Go valida estado, evidência e ação"]
+    AATT --> AP
+    AREC --> AP
+    APER --> AP
+    AP --> AM["Responses propõe decisão com ações limitadas à especialidade"]
+    AM --> AQ["Revisão de qualidade: no máximo uma regeneração"]
+    AQ --> AV["Motor Go valida estado, evidência e ação"]
     ADET --> AV
     AV --> AA{"Ação validada"}
     AA -->|reply| AT["Responder dúvida ou acolher; sem perguntas repetidas"]
@@ -24,8 +32,11 @@ flowchart TD
     AA -->|pause| APA["Pausar lembretes"]
     AA -->|opt_out| AST["Bloquear novos contatos"]
     AA -->|handoff| AH["Ativar atendimento humano e registrar motivo"]
-    AT --> AOUT["Fila de efeitos, envio e retorno ao contexto"]
+    AT --> AOUT["Preparar efeitos e retorno ao contexto"]
     AO --> AOUT
     AYES --> AOUT
     ASAFE --> AOUT
-    AOUT --> A0
+    AOUT --> FRESH{"Nova entrada durante a Run interpretada?"}
+    FRESH -->|Sim| DROP["Descartar avaliação e efeitos antigos; liberar próxima Run"]
+    FRESH -->|Não| PUBLISH["Enviar como Bia; registrar argumentos efetivamente enviados"]
+    PUBLISH --> A0

@@ -176,7 +176,7 @@ func (d *DB) ApplyContext(ctx context.Context, t Task, p WindowPolicy, now time.
 				if r.UsedPrevious {
 					depth = heads[r.Agent].Depth + 1
 				}
-				heads[r.Agent] = conversation.Head{ResponseID: r.ResponseID, At: now, Depth: depth, InputTokens: r.InputTokens}
+				heads[r.Agent] = conversation.Head{PromptVersion: r.PromptVersion, ResponseID: r.ResponseID, At: now, Depth: depth, InputTokens: r.InputTokens}
 			} else {
 				delete(heads, r.Agent)
 			}

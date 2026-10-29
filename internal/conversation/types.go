@@ -10,10 +10,11 @@ type Message struct {
 	At   time.Time `json:"at"`
 }
 type Head struct {
-	ResponseID  string    `json:"response_id"`
-	At          time.Time `json:"at"`
-	Depth       int       `json:"depth"`
-	InputTokens int64     `json:"input_tokens"`
+	PromptVersion string    `json:"prompt_version,omitempty"`
+	ResponseID    string    `json:"response_id"`
+	At            time.Time `json:"at"`
+	Depth         int       `json:"depth"`
+	InputTokens   int64     `json:"input_tokens"`
 }
 type Window struct {
 	ConversationID string          `json:"conversation_id"`
@@ -25,6 +26,7 @@ type Window struct {
 	MediaFailed    bool            `json:"media_failed"`
 }
 type RunResult struct {
+	PromptVersion  string `json:"prompt_version,omitempty"`
 	ConversationID string `json:"conversation_id"`
 	RunID          string `json:"run_id"`
 	Version        int64  `json:"version"`

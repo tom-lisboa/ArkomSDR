@@ -20,6 +20,8 @@ type Planner interface {
 }
 
 type OpenAI struct {
+	Specialists   bool
+	Classifier    Classifier
 	Client        openai.Client
 	Model         string
 	Brand         string
@@ -38,9 +40,33 @@ func (a *OpenAI) Plan(ctx context.Context, s domain.State, e domain.Event, slots
 func (a *OpenAI) Run(ctx context.Context, s domain.State, e domain.Event, slots []domain.Slot, agentID string) (Outcome, error) {
 	var out Outcome
 	d := &out.Decision
+	if !a.Specialists {
+		s.Dialogue = nil
+	}
+	assessment := domain.DialogueAssessment{}
+	if a.Specialists {
+		assessment = domain.DialogueAssessment{Intent: "other", Objection: "unknown", Readiness: "unknown", Progress: "none", Source: "decisions_unavailable"}
+		if a.Classifier != nil {
+			if v, err := a.Classifier.Assess(ctx, s, e); err == nil {
+				assessment = v
+			}
+		}
+		assessment = normalizeAssessment(s, e, assessment)
+		agentID = SelectAssessment(s, e, assessment, time.Now().UTC())
+		if assessment.Source != "decisions" && agentID == "objections" {
+			assessment.Intent = "objection"
+		}
+		out.Dialogue = domain.AdvanceDialogue(s, e, assessment, agentID, SpecialistPromptVersion, time.Now().UTC())
+		s.Dialogue = out.Dialogue
+		out.PromptVersion = SpecialistPromptVersion
+	}
+	out.Agent = agentID
 	var head conversation.Head
 	if e.Context != nil {
 		head = e.Context.Heads[agentID]
+	}
+	if (a.Specialists && head.PromptVersion != SpecialistPromptVersion) || (!a.Specialists && head.PromptVersion != "") {
+		head = conversation.Head{}
 	}
 	// Do not give the model credentials, arbitrary workflow code or database access.
 	input, err := json.Marshal(textContext(s, e, slots, a.SchedulingURL, time.Now().UTC()))
@@ -48,10 +74,15 @@ func (a *OpenAI) Run(ctx context.Context, s domain.State, e domain.Event, slots 
 		return out, err
 	}
 	prompt := textInstructions(a.Brand, agentID)
+	schema := DecisionSchema()
+	if a.Specialists {
+		prompt = specialistInstructions(a.Brand, agentID)
+		schema = decisionSchema(specialistActions(agentID, assessment))
+	}
 	params := responses.ResponseNewParams{
 		Model: a.Model, Instructions: openai.String(prompt), Store: openai.Bool(e.Context != nil), MaxOutputTokens: openai.Int(1500),
 		Input: responses.ResponseNewParamsInputUnion{OfString: openai.String(string(input))},
-		Text:  responses.ResponseTextConfigParam{Format: responses.ResponseFormatTextConfigUnionParam{OfJSONSchema: &responses.ResponseFormatTextJSONSchemaConfigParam{Name: "sdr_decision", Strict: openai.Bool(true), Schema: DecisionSchema()}}},
+		Text:  responses.ResponseTextConfigParam{Format: responses.ResponseFormatTextConfigUnionParam{OfJSONSchema: &responses.ResponseFormatTextJSONSchemaConfigParam{Name: "sdr_decision", Strict: openai.Bool(true), Schema: schema}}},
 	}
 	if head.ResponseID != "" {
 		params.PreviousResponseID = openai.String(head.ResponseID)
@@ -73,6 +104,32 @@ func (a *OpenAI) Run(ctx context.Context, s domain.State, e domain.Event, slots 
 	if err = json.Unmarshal([]byte(res.OutputText()), d); err != nil {
 		return out, errors.New("openai_invalid_json")
 	}
+	if a.Specialists {
+		*d = normalizeTextDecision(s, e, *d)
+		if feedback := specialistQuality(s, *d); feedback != "" {
+			params.Instructions = openai.String(prompt + "\n\nREVISÃO OBRIGATÓRIA DESTA RESPOSTA: " + feedback)
+			fixed, repairErr := a.Client.Responses.New(ctx, params, option.WithMaxRetries(0))
+			if repairErr == nil && fixed.Status == "completed" && strings.TrimSpace(fixed.OutputText()) != "" {
+				candidate := domain.Decision{}
+				if json.Unmarshal([]byte(fixed.OutputText()), &candidate) == nil {
+					candidate = normalizeTextDecision(s, e, candidate)
+					if specialistQuality(s, candidate) == "" {
+						*d = candidate
+						res = fixed
+					} else {
+						*d = specialistQualityFallback(s)
+					}
+				} else {
+					*d = specialistQualityFallback(s)
+				}
+			} else {
+				*d = specialistQualityFallback(s)
+			}
+		}
+		if d.Reason == "specialist_quality_fallback" {
+			res.ID = ""
+		}
+	}
 	if len([]rune(d.Message)) > 1000 || len(d.Reason) > 500 || len(d.Evidence) > 2000 || len(d.OfferSlotIDs) > 2 {
 		return out, errors.New("openai_invalid_decision")
 	}
@@ -92,6 +149,9 @@ func (a *OpenAI) Run(ctx context.Context, s domain.State, e domain.Event, slots 
 		}
 	}
 	*d = normalizeTextDecision(s, e, *d)
+	if a.Specialists {
+		*d = constrainSpecialist(s, e, *d, assessment, time.Now().UTC())
+	}
 	out.ResponseID = res.ID
 	out.InputTokens = res.Usage.InputTokens
 	out.UsedPrevious = params.PreviousResponseID.Value != ""
@@ -99,12 +159,15 @@ func (a *OpenAI) Run(ctx context.Context, s domain.State, e domain.Event, slots 
 }
 
 func DecisionSchema() map[string]any {
+	return decisionSchema([]string{"reply", "offer_slots", "book", "reschedule", "cancel", "confirm", "pause", "opt_out", "handoff"})
+}
+func decisionSchema(actions []string) map[string]any {
 	props := map[string]any{}
 	for _, k := range []string{"action", "message", "slot_id", "evidence", "reason"} {
 		props[k] = map[string]any{"type": "string"}
 	}
 	props["offer_slot_ids"] = map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "maxItems": 2}
-	props["action"] = map[string]any{"type": "string", "enum": []string{"reply", "offer_slots", "book", "reschedule", "cancel", "confirm", "pause", "opt_out", "handoff"}}
+	props["action"] = map[string]any{"type": "string", "enum": actions}
 	return map[string]any{"type": "object", "properties": props, "required": []string{"action", "message", "slot_id", "offer_slot_ids", "evidence", "reason"}, "additionalProperties": false}
 }
 

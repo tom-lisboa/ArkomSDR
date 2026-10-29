@@ -11,8 +11,11 @@ flowchart LR
   C -->|media.request| M[Worker de mídia]
   M -->|media.completed| C
   C -->|janela pronta / Run| E[Worker de execução]
-  E --> A{Agente escolhido}
-  A --> SDR[SDR]
+  E --> D[Decisions: leitura do turno]
+  D --> A{Coordenador Go}
+  A --> SDR[Conexão e persuasão]
+  A --> OBJ[Objeções]
+  A --> ATT[Comparecimento]
   A --> AG[Agendamento]
   A --> REC[Recuperação de ausência]
   E -->|book / cancel| S[Worker de agendamento]
@@ -25,7 +28,7 @@ flowchart LR
   API -->|intenção de chamada| V[Worker de voz]
   V <--> WA[WhatsApp Calling / Twilio]
   V <--> RT[OpenAI Realtime]
-  V -->|ordem de reserva| S
+  V -->|consulta e nota de reunião| S
   V -->|voice.transcript| C
 ```
 
@@ -40,9 +43,9 @@ flowchart LR
 | Follow-up | Consome contatos programados, revalida horário e estado, envia retomadas, lembretes e recuperação | `internal/followupworker` |
 | Voz | Gerencia autorização nativa, ligação WhatsApp, áudio Realtime e ferramentas | `internal/voiceworker` |
 
-Voz tem fila própria em Postgres, sessão Realtime separada das Runs de texto e ferramentas que encaminham a reserva ao agendamento. Consulte [autorização, configuração e limites](voice.md). O áudio usa WebSocket e o histórico confirmado é publicado para contexto.
+Voz tem fila própria em Postgres, sessão Realtime separada das Runs de texto e ferramentas que consultam a reunião e registram notas por meio do worker de agenda. A ligação atual não altera reservas. Consulte [autorização, configuração e limites](voice.md). O áudio usa WebSocket e o histórico confirmado é publicado para contexto.
 
-A API é a porta de entrada HTTP. O mesmo binário tem modos separados de execução; `all` inicia os seis workers e a API para desenvolvimento. Cada agente usa o modelo configurado e instruções da sua especialidade. O roteamento inicial usa estado da reserva, ausência e intenção de agendamento; é uma regra explícita no código, não uma classificação aprendida.
+A API é a porta de entrada HTTP. O mesmo binário tem modos separados de execução; `all` inicia os seis workers e a API para desenvolvimento. Cada agente usa o modelo configurado e instruções da sua especialidade. Com `BIA_SPECIALISTS_ENABLED=true`, Decisions classifica o turno e o Go escolhe entre cinco especialistas com prompts próprios. O histórico e a memória comercial são compartilhados; consulte [especialistas e limites](specialists.md). O roteamento legado continua disponível quando a opção está desligada.
 
 Execução, agendamento e follow-up atualizam o estado comercial (`leads.state`) sob uma trava compartilhada por lead. Cada um consome apenas sua fila. Seu histórico curto é uma projeção legada. O histórico canônico das mensagens, referências de mídia e `previous_response_id` pertencem ao contexto. Essa separação é aplicada pelo código; os processos ainda compartilham a credencial de banco. Roles SQL com permissões por serviço não foram implementadas.
 
@@ -50,10 +53,10 @@ Execução, agendamento e follow-up atualizam o estado comercial (`leads.state`)
 
 1. A API valida o evento, rejeita o campo interno `context` e grava a entrada no Postgres. O HTTP 202 confirma persistência, não entrega de resposta.
 2. Contexto registra a mensagem original e atualiza no Redis os IDs dos fragmentos, a versão e o prazo de agrupamento. O texto permanece durável no Postgres.
-3. A janela fecha após **1,5 segundo de silêncio**, com limite de **8 segundos** para tráfego contínuo. Esses valores estão em `DefaultWindowPolicy`.
-4. Havendo anexos, contexto publica trabalho para mídia. A janela aguarda os resultados por até **90 segundos**. Erro ou timeout vira revisão humana explícita.
+3. A janela fecha após **5 segundos de silêncio**, com limite de **30 segundos** para tráfego contínuo. Esses valores estão em `DefaultWindowPolicy`.
+4. Havendo anexos, contexto publica trabalho para mídia. A janela aguarda os resultados por até **120 segundos**. Erro ou timeout vira revisão humana explícita.
 5. Contexto publica uma Run imutável: IDs das mensagens, texto agrupado, histórico recente, versão e heads. Há no máximo uma Run ativa por conversa. Entradas novas ficam para a próxima.
-6. Execução escolhe o agente `sdr`, `scheduling` ou `recovery`, recebe a decisão e aplica as regras comerciais. O agente `scheduling` conversa sobre agenda; o **worker** `scheduling` executa as mutações. Conclusão e efeitos são persistidos na mesma transação, com destino calculado pelo banco.
+6. Execução usa Decisions e escolhe `persuasion`, `objections`, `scheduling`, `attendance` ou `recovery`, recebe a decisão e aplica as regras comerciais. A ativação é explícita; sem ela, usa as três rotas legadas. O agente `scheduling` conversa sobre agenda; o **worker** `scheduling` executa as mutações. Conclusão e efeitos são persistidos na mesma transação, com destino calculado pelo banco.
 7. Contexto consome a conclusão e atualiza o head daquele agente. Mensagens de saída só entram no histórico canônico após o adaptador confirmar o envio. A simulação não cria mensagens ficticiamente entregues.
 
 Os contratos estão em `internal/conversation/types.go`. `worker_tasks` transporta entradas/resultados de contexto e mídia; `jobs` transporta Runs e ações comerciais. São filas Postgres com leases, tentativas limitadas e confirmação transacional. Redis acelera o agrupamento, mas não é a única cópia das mensagens: sua indisponibilidade ativa a leitura dos prazos no Postgres. Não há um broker externo obrigatório nesta versão.

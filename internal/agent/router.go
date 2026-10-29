@@ -7,10 +7,13 @@ import (
 )
 
 type Outcome struct {
-	Decision     domain.Decision
-	ResponseID   string
-	InputTokens  int64
-	UsedPrevious bool
+	PromptVersion string
+	Agent         string
+	Dialogue      *domain.DialogueState
+	Decision      domain.Decision
+	ResponseID    string
+	InputTokens   int64
+	UsedPrevious  bool
 }
 type Runner interface {
 	Run(context.Context, domain.State, domain.Event, []domain.Slot, string) (Outcome, error)

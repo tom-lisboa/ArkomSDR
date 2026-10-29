@@ -23,3 +23,22 @@ func TestPreparationFlagSurvivesPolicyInitialization(t *testing.T) {
 		t.Fatal("preparation enabled without template")
 	}
 }
+
+func TestSpecialistsAreExplicitAndRequireSupportedDecisionsModel(t *testing.T) {
+	for k, v := range map[string]string{"BIA_MODE": "shadow", "BIA_DATABASE_URL": "postgres://unused", "BIA_API_TOKEN": strings.Repeat("x", 32), "BIA_MESSAGING_PROVIDER": "gateway", "OPENAI_API_KEY": "test", "OPENAI_MODEL": "test-model", "BIA_SPECIALISTS_ENABLED": "true", "OPENAI_DECISIONS_MODEL": "gpt-6-luna"} {
+		t.Setenv(k, v)
+	}
+	c, err := Load()
+	if err != nil || !c.Specialists || c.DecisionsModel != "gpt-6-luna" {
+		t.Fatal(c.Specialists, c.DecisionsModel, err)
+	}
+	t.Setenv("OPENAI_DECISIONS_MODEL", "unsupported")
+	if _, err = Load(); err == nil {
+		t.Fatal("enabled unsupported classifier")
+	}
+	t.Setenv("BIA_SPECIALISTS_ENABLED", "false")
+	t.Setenv("OPENAI_API_KEY", "")
+	if c, err = Load(); err != nil || c.Specialists {
+		t.Fatal("legacy configuration requires Decisions", err)
+	}
+}

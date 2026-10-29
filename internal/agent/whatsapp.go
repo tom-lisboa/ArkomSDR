@@ -13,7 +13,7 @@ import (
 //go:embed whatsapp_prompt.txt
 var whatsappPrompt string
 
-var fillerOpening = regexp.MustCompile(`(?i)^(perfeito|entendi|ótima pergunta|que ótimo|faz todo sentido|com certeza|fico feliz)([!.,: ]+|$)`)
+var fillerOpening = regexp.MustCompile(`(?i)^(perfeito|entendi|entendo|ótima pergunta|que ótimo|faz (todo )?sentido|com certeza|fico feliz)([!.,: ]+|$)`)
 
 // These are presentation rules for WhatsApp only. Operational decisions still
 // pass through the domain's booking, consent and delivery checks.
@@ -116,12 +116,39 @@ func textContext(s domain.State, e domain.Event, slots []domain.Slot, scheduling
 		meetingStatus = "upcoming"
 	}
 	return map[string]any{
-		"meeting_status": meetingStatus,
-		"customer":       domain.CustomerContext(s, s.Booking, p),
-		"profile":        map[string]any{"company": s.Profile.Company, "name": s.Profile.Name, "goal": s.Profile.Goal, "revenue": s.Profile.Revenue, "timezone": zone.String()},
-		"history":        history, "booking": s.Booking, "offered": labels(s.Offered), "available_slots": labels(slots),
+		"dialogue":        s.Dialogue,
+		"allowed_actions": dialogueAllowedActions(s),
+		"response_goal":   dialogueResponseGoal(s),
+		"meeting_status":  meetingStatus,
+		"customer":        domain.CustomerContext(s, s.Booking, p),
+		"profile":         map[string]any{"company": s.Profile.Company, "name": s.Profile.Name, "goal": s.Profile.Goal, "revenue": s.Profile.Revenue, "timezone": zone.String()},
+		"history":         history, "booking": s.Booking, "offered": labels(s.Offered), "available_slots": labels(slots),
 		"calendar":              map[string]any{"status": status, "timezone": zone.String()},
 		"conversation_progress": map[string]any{"previous_user_turns": turns, "goal_already_in_form": strings.TrimSpace(s.Profile.Goal) != "", "stage": s.Stage},
 		"current_message":       e.Text, "scheduling_url": schedulingURL, "now": now.In(zone),
 	}
+}
+
+func dialogueResponseGoal(s domain.State) string {
+	if s.Dialogue == nil || s.Dialogue.Agent != "objections" {
+		return "Responder à fala atual e executar apenas o próximo passo autorizado."
+	}
+	if s.Dialogue.BookingCondition != "" {
+		return "Condição de reserva ainda NÃO confirmada: esclareça-a; não sugira seguir com o horário enquanto depender dessa condição. Não invente gratuidade ou outra condição comercial."
+	}
+	o := s.Dialogue.Objection
+	if o == nil || o.Clarification == "" {
+		return "Identificar o motivo ainda desconhecido da objeção com uma pergunta curta, aproveitando o histórico."
+	}
+	if len(o.Attempts) >= 2 {
+		return "Já houve duas tentativas. Responda apenas a uma dúvida nova concreta ou respeite o retorno/recusa; não repita pressão ou convite."
+	}
+	return "O motivo JÁ foi explicado em dialogue.objection.clarification. Responda diretamente a esse motivo e, se houver abertura, faça uma pergunta curta para verificar se quer avaliar isso na reunião. Não pergunte novamente o que fez sentir que não se encaixa, nem repita pergunta equivalente."
+}
+
+func dialogueAllowedActions(s domain.State) []string {
+	if s.Dialogue == nil {
+		return []string{"reply", "offer_slots", "book", "reschedule", "cancel", "confirm", "pause", "opt_out", "handoff"}
+	}
+	return specialistActions(s.Dialogue.Agent, s.Dialogue.Assessment)
 }

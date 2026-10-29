@@ -13,7 +13,7 @@ tags:
 
 Documento para importar ou colar no Obsidian. Cada bloco `mermaid` funciona de forma independente; o primeiro dá a visão de cima e os demais abrem os caminhos.
 
-Base: implementação e configuração consultadas no servidor em **29/10/2026**, incluindo o case Camozzi após a abertura. O mapa descreve os caminhos implementados; isso não significa que todos foram homologados em atendimento real.
+Base: implementação e configuração consultadas no servidor em **29/10/2026**, incluindo o case Camozzi após a abertura e especialistas de texto com Decisions. O mapa descreve os caminhos implementados; isso não significa que todos foram homologados em atendimento real.
 
 **Como ler:** decisões aparecem em losangos. Estados finais de uma etapa podem voltar à conversa quando houver uma nova mensagem. Trechos explicitamente marcados como desligados, dependentes de evento ou propostos não devem ser tratados como automações ativas.
 
@@ -71,6 +71,7 @@ O bloco de cadência é independente de o cliente responder à primeira mensagem
 | Case Camozzi logo após a abertura | Ativo no worker de mídia; uma vez por contato; template aprovado; aguarda entrega da abertura |
 | Agendar no formulário e enxergar no WhatsApp | Ativo; há reserva no mesmo pedido ou em chamada posterior |
 | Texto, áudio, imagem e agrupamento de mensagens | Ativos |
+| Especialistas de texto com Decisions | Persuasão, objeções, agenda, comparecimento e recuperação; memória compartilhada e prompts próprios |
 | Preparação 15 minutos após a abertura | Ativa, com horário permitido e validade curta |
 | Áudio 30 minutos antes | Ativo, usando a gravação instalada |
 | Texto e solicitação de ligação 15 minutos antes | Ativos, condicionados à janela e à permissão |
@@ -201,15 +202,23 @@ flowchart TD
     ARULE -->|Saída, humano, entrada velha ou resposta automática| ANO["Aplicar bloqueio ou ignorar execução"]
     ARULE -->|Ação explícita reconhecida pelo código| ADET["Tratar cancelamento, presença ou seleção sem depender do modelo"]
     ARULE -->|Precisa interpretar| ACAL["Consultar agenda atual"]
-    ACAL --> AR{"Roteador em Go"}
-    AR -->|Estado no_show| AREC["Especialidade recovery"]
-    AR -->|Reserva, oferta, pendência ou intenção de agenda| ASCH["Especialidade scheduling"]
-    AR -->|Demais casos| ASDR["Especialidade sdr"]
-    AREC --> AP["Prompt de WhatsApp comum mais instrução da especialidade"]
+    ACAL --> DEC["Decisions classifica intenção, objeção, disposição, progresso e motivo"]
+    DEC --> AR{"Coordenador Go aplica prioridades"}
+    DEC -->|Indisponível ou inválido| FALL["Fallback conservador, sem bloquear WhatsApp por isso"]
+    FALL --> AR
+    AR -->|Objeção ou condição pendente| AOBJ["Especialista de objeções"]
+    AR -->|Pedido operacional de agenda| ASCH["Especialista de agendamento"]
+    AR -->|Reserva futura e dúvida sobre a conversa| AATT["Especialista de comparecimento"]
+    AR -->|Nova conversa após no-show| AREC["Especialista de recuperação"]
+    AR -->|Valor e interesse inicial| APER["Especialista de persuasão"]
+    AOBJ --> AP["Prompt próprio mais identidade comum da Bia e memória compartilhada"]
     ASCH --> AP
-    ASDR --> AP
-    AP --> AM["OpenAI Responses propõe decisão estruturada"]
-    AM --> AV["Motor Go valida estado, evidência e ação"]
+    AATT --> AP
+    AREC --> AP
+    APER --> AP
+    AP --> AM["Responses propõe decisão com ações limitadas à especialidade"]
+    AM --> AQ["Revisão de qualidade: no máximo uma regeneração"]
+    AQ --> AV["Motor Go valida estado, evidência e ação"]
     ADET --> AV
     AV --> AA{"Ação validada"}
     AA -->|reply| AT["Responder dúvida ou acolher; sem perguntas repetidas"]
@@ -222,22 +231,27 @@ flowchart TD
     AA -->|pause| APA["Pausar lembretes"]
     AA -->|opt_out| AST["Bloquear novos contatos"]
     AA -->|handoff| AH["Ativar atendimento humano e registrar motivo"]
-    AT --> AOUT["Fila de efeitos, envio e retorno ao contexto"]
+    AT --> AOUT["Preparar efeitos e retorno ao contexto"]
     AO --> AOUT
     AYES --> AOUT
     ASAFE --> AOUT
-    AOUT --> A0
+    AOUT --> FRESH{"Nova entrada durante a Run interpretada?"}
+    FRESH -->|Sim| DROP["Descartar avaliação e efeitos antigos; liberar próxima Run"]
+    FRESH -->|Não| PUBLISH["Enviar como Bia; registrar argumentos efetivamente enviados"]
+    PUBLISH --> A0
 ```
 
 | Especialidade atual | Quando entra | Objetivo |
 |---|---|---|
-| `sdr` | Sem contexto de agenda dominante | Aproveitar objetivo já informado e conduzir à oferta de horários |
-| `scheduling` | Existe reserva, oferta, pendência ou mensagem sobre agenda | Agendar, reforçar reunião, esclarecer dúvidas ou encaminhar remarcação |
+| `persuasion` | Interesse inicial ou dúvida de valor sem barreira concreta | Relacionar o objetivo à reunião e facilitar o próximo passo |
+| `objections` | Barreira de adequação, tempo, investimento, confiança, sócio ou formato | Esclarecer o motivo e tratar a barreira sem repetir argumentos |
+| `scheduling` | Intenção de consultar vagas, escolher ou alterar reserva | Transformar escolha clara em ordem de agenda validada |
+| `attendance` | Reserva futura, preparação e dúvidas sobre a reunião | Sustentar comparecimento e preservar a reserva atual |
 | `recovery` | Estado `no_show` informado | Acolher a ausência e facilitar nova escolha, se houver conversa |
 | Voz de lembrete | Chamada autorizada vinculada a reunião existente | Lembrar, consultar dados e registrar nota; prompt próprio |
 | Extração de mídia | Anexo recebido | Produzir conteúdo de referência; não toma ações comerciais |
 
-Os três agentes de texto são **especializações de um mesmo planejador**, com uma especialidade escolhida por Run. Eles não conversam livremente entre si e não se autoacionam em cadeia. Uma nova entrada pode selecionar outra especialidade, com memória própria e histórico compartilhado. Ter o envio de recuperação desligado não impede selecionar `recovery` quando o cliente de um no-show manda uma nova mensagem.
+Os cinco especialistas têm **prompts próprios**, com uma especialidade escolhida por Run e identidade comum da Bia. Decisions faz a leitura, o Go escolhe a rota e Responses escreve a resposta. Histórico e memória comercial são compartilhados; os response IDs são separados e versionados por especialista. Ter o envio de recuperação desligado não impede selecionar `recovery` numa nova conversa de quem tem no-show informado. Consulte [contratos e limites](specialists.md).
 
 Se já há reunião futura, o atendimento prioriza comparecimento e dúvidas. Sem reunião, objetivo conhecido e aceite bastam para oferecer horários. Se o objetivo estiver ausente, o prompt permite uma pergunta curta; não exige site, equipe ou nova rodada de faturamento. Pedido explícito de remarcação abre novamente a consulta de vagas.
 
@@ -579,7 +593,7 @@ Todo o controle comercial e a orquestração estão no nosso código Go. Twilio 
 | Reserva | Sem reserva, agendada, remarcada, cancelada, resultado desconhecido, compareceu ou faltou |
 | Oferta | Sem oferta, duas opções atuais, escolha pendente, agenda vazia ou consulta indisponível |
 | Contexto | Fragmentos chegando, mídia pendente, Run congelada, resposta em partes ou entrada nova |
-| Memória | `previous_response_id` por agente/conversa e histórico recente compartilhado |
+| Memória | Histórico compartilhado, objeção/motivo, argumentos enviados, condição pendente e `previous_response_id` por especialista/versão |
 | Canal | Sessão de WhatsApp, consentimento e telefone SMS, permissão de chamada temporária/permanente |
 | Operação | Pendente, executando, adiada, concluída, pulada, falhou ou incerta |
 
@@ -613,11 +627,11 @@ flowchart LR
 
 ### Fronteiras sugeridas para discutir novos agentes
 
-| Responsabilidade | Como está hoje | Evolução possível, ainda não implantada |
+| Responsabilidade | Como está hoje | Próxima evolução para avaliar |
 |---|---|---|
-| Agendamento inicial | `sdr` e `scheduling`, sob o mesmo prompt-base | Separar critérios de objetivo, oferta e fechamento de horário, se as avaliações mostrarem ganho |
-| Comparecimento | `scheduling` atende quem já agendou; cadência é determinística | Especialidade de preparação e compromisso, sem voltar à qualificação |
-| Objeções | Regras dentro do prompt de WhatsApp | Biblioteca de casos e passagem opcional, sem criar um interrogatório |
+| Agendamento inicial | `persuasion` e `scheduling`, com prompts próprios e Decisions | Avaliar conversas e comparar agendamento real |
+| Comparecimento | Especialista `attendance`; cadência determinística | Medir presença e qualidade das respostas de preparação |
+| Objeções | Especialista próprio, memória de motivos e argumentos enviados | Ampliar biblioteca com casos reais e medir resolução reconhecida pelo cliente |
 | Retomada sem resposta | Uma retomada de oferta existe, mas está desligada; não cobre toda abertura | Projetar uma cadência finita, com saída explícita, intervalo e critérios por estágio |
 | Reagendamento pedido na voz | Apenas nota para consulta | Passagem durável para texto/agenda e confirmação do cliente antes de alterar a reserva |
 | Falta à reunião | Evento externo e especialidade `recovery` | Integrar presença real e definir uma sequência curta de recuperação |
@@ -660,7 +674,8 @@ flowchart LR
 | Contexto, agrupamento e memória | `internal/store/context.go`, `internal/contextworker/worker.go`, `internal/contextworker/buffer.go` |
 | Extração de mídia | `internal/providers/media.go`, `internal/providers/audio.go`, `internal/mediaworker/worker.go` |
 | Vídeo após a abertura | `internal/domain/intro_video.go`, `internal/providers/video.go`, `internal/casemedia/asset.go` |
-| Roteador e prompt de texto | `internal/agent/router.go`, `internal/agent/whatsapp_prompt.txt`, `internal/agent/openai.go` |
+| Decisions, especialistas e prompts de texto | `internal/agent/decisions.go`, `internal/agent/specialists.go`, `internal/agent/prompts/`, `internal/agent/openai.go` |
+| Memória comercial e revisão | `internal/domain/dialogue.go`, `internal/agent/quality.go` |
 | Decisões, controle e validações | `internal/domain/engine.go`, `internal/worker/worker.go` |
 | Operações e consulta da agenda | `internal/schedulingworker/worker.go`, `internal/schedulingworker/agenda.go`, `internal/providers/local.go` |
 | Cadência e reconciliação | `internal/domain/reminders.go`, `internal/domain/sms.go`, `internal/store/reminders.go`, `internal/followupworker/worker.go` |

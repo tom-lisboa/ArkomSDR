@@ -8,6 +8,8 @@ Serviço novo e independente para captar leads, conversar, organizar agendamento
 
 **Mapa da jornada:** [fluxo completo em Mermaid para Obsidian](docs/fluxo-cliente-mermaid.md), com caminhos do cliente, follow-ups, exceções, workers e proposta de evolução dos agentes. Os diagramas individuais estão em [docs/mermaid](docs/mermaid).
 
+**Especialistas na mesma conversa:** [Decisions, roteamento Go e memória comercial](docs/specialists.md). Cada turno escolhe entre persuasão, objeções, agenda, comparecimento e recuperação, com prompts próprios e uma única identidade da Bia. A ativação é explícita por `BIA_SPECIALISTS_ENABLED`.
+
 **Case no início do contato:** o [vídeo Camozzi](docs/intro-video.md) é enviado pelo worker de mídia após a entrega da abertura, uma vez por contato. Fora da janela de atendimento, usa um template de vídeo aprovado próprio.
 
 ## Mudanças comerciais implementadas
