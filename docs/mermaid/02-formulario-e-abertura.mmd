@@ -20,7 +20,7 @@ flowchart TD
     F11 -->|Abertura enviada há menos de 15 minutos| FCOOL["Descartar duplicação pelo intervalo mínimo"]
     F11 -->|Sim| F12{"Há reunião futura no estado atual?"}
     F12 -->|Não| FUN["Abertura sem reserva: convidar a escolher horário"]
-    F12 -->|Sim, com objetivo| FGO["Confirmação curta: data, hora, fuso e duração"]
+    F12 -->|Sim, com objetivo| FGO["Confirmação curta: data, hora local e duração"]
     F12 -->|Sim, sem objetivo| FQ["Mesma confirmação curta da reunião"]
     FUN --> FSEND["Enviar pelo WhatsApp"]
     FGO --> FSEND

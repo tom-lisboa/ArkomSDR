@@ -6,13 +6,13 @@ Publicado em 29/10/2026, release `r-34b0b1c935d6`. Os quatro templates foram con
 
 Exemplo com objetivo conhecido:
 
-> Oi, Ana! Sou a Bia, IA da Arkom. Sua reunião está confirmada para 30/10 às 14:00 (America/Cuiaba), por 45 minutos.
+> Oi, Ana! Sou a Bia, IA da Arkom. Sua reunião está confirmada para 30/10 às 14:00. Separe 45 minutos para essa conversa.
 
 > Na reunião, vamos avaliar onde a IA pode ajudar. Seu foco: melhorar o atendimento.
 >
-> Alguma dúvida antes da conversa?
+> Você confirma sua presença?
 
-Sem objetivo informado, a segunda mensagem pergunta apenas o que mais toma tempo hoje: atendimento, vendas ou operação. Quem ainda não tem reunião recebe somente a abertura curta com o convite para escolher horário.
+Sem objetivo informado, a segunda mensagem pergunta qual rotina priorizar: atendimento, vendas ou operação. Quem ainda não tem reunião recebe somente a abertura curta com a ação de responder AGENDAR para ver horários. [Direct response e apresentação do horário local](direct-response.md).
 
 O objetivo completo fica no perfil do banco e no contexto dos especialistas. Apenas o trecho mostrado na abertura é limitado a 90 caracteres. O primeiro nome exibido fica limitado a 20 caracteres. Essas medidas reduzem o texto; o aplicativo WhatsApp controla a exibição de “Ler mais/More”, que pode variar por aparelho e tamanho de fonte.
 
@@ -32,7 +32,7 @@ Não se aplica o divisor de respostas livres ao template: cada mensagem deve cor
 
 ## Ordem e interrupções
 
-- A confirmação é gerada da reserva atual no momento do envio, incluindo horário, fuso e duração reais.
+- A confirmação é gerada da reserva atual no momento do envio, incluindo horário local e duração reais; o fuso é usado internamente na conversão.
 - A segunda parte usa `form_context` na fila de execução, com ID derivado da primeira; a criação é atômica com a conclusão da primeira parte.
 - Cada parte tem recibo e idempotência próprios. Reiniciar os serviços não reinicia a abertura.
 - Nova mensagem do cliente, cancelamento, remarcação, saída, pausa, controle humano ou retirada de consentimento impedem a continuação antiga. O atendimento segue pelo contexto normal.

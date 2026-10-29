@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +25,7 @@ type turn struct {
 	Agent       string   `json:"agent,omitempty"`
 	ContainsAny []string `json:"contains_any,omitempty"`
 	Forbidden   []string `json:"forbidden,omitempty"`
+	RequireCTA  bool     `json:"require_cta,omitempty"`
 }
 type scenario struct {
 	ID       string  `json:"id"`
@@ -356,6 +358,15 @@ func run(a *agent.OpenAI, c scenario, repeat int) []result {
 			fail("expected specialist " + tr.Agent)
 		}
 		text := strings.ToLower(strings.Join(r.Replies, "\n\n"))
+		if tr.RequireCTA && !directCustomerAction.MatchString(text) {
+			fail("missing concrete call to action")
+		}
+		if tr.RequireCTA && strings.Contains(text, "se quiser") {
+			fail("vague conditional invitation instead of direct response")
+		}
+		if strings.Contains(text, "america/") || strings.Contains(text, "europe/") || strings.Contains(text, "etc/") {
+			fail("technical timezone exposed")
+		}
 		if len(tr.ContainsAny) > 0 {
 			found := false
 			for _, v := range tr.ContainsAny {
@@ -411,3 +422,5 @@ func run(a *agent.OpenAI, c scenario, repeat int) []result {
 	}
 	return rows
 }
+
+var directCustomerAction = regexp.MustCompile(`(?i)(\?|\b(responda|responde|escolha|escolhe|confirme|confirma|separe|separa|traga|traz|leve|leva|envie|envia|me mande|me manda|me conte|me conta|me diga|me diz|vamos (usar|avaliar|olhar))\b)`)

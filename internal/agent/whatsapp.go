@@ -19,6 +19,7 @@ var redundantOfferHeading = regexp.MustCompile(`(?i)^(tenho|separei|posso te pas
 // These are presentation rules for WhatsApp only. Operational decisions still
 // pass through the domain's booking, consent and delivery checks.
 func normalizeTextDecision(s domain.State, e domain.Event, d domain.Decision) domain.Decision {
+	d.Message = domain.CustomerMessage(d.Message)
 	if s.Booking != nil && shortAcknowledgment(e.Text) {
 		last := ""
 		for _, h := range s.History {

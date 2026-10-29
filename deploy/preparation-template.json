@@ -1,12 +1,12 @@
 {
-  "friendly_name": "arkom_preparacao_reuniao_v1",
+  "friendly_name": "arkom_preparacao_direta_v2",
   "language": "pt_BR",
   "variables": {
     "1": "Ana"
   },
   "types": {
     "twilio/text": {
-      "body": "Oi, {{1}}! Uma dica para aproveitar melhor sua reunião com o time da Arkom: separe um exemplo de tarefa que toma tempo no dia a dia do negócio.\n\nPode ser uma conversa de atendimento, uma etapa de vendas ou uma rotina da operação. Não precisa montar apresentação; esse exemplo ajuda a deixar a conversa mais prática."
+      "body": "Oi, {{1}}! Para aproveitar a reunião, escolha uma tarefa que toma seu tempo no atendimento, nas vendas ou na operação.\n\nMe envie um exemplo para começarmos por ele."
     }
   }
 }

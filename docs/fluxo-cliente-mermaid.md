@@ -86,7 +86,7 @@ O bloco de cadência é independente de o cliente responder à primeira mensagem
 | Marcar, remarcar ou cancelar pela ligação | Não permitido; a ligação apenas consulta e registra notas |
 | Nova tentativa automática depois de `busy` ou `no-answer` | Não há uma sequência de rediscagem implementada |
 
-A agenda está configurada para reuniões de **45 minutos**, todos os dias, nas janelas **08:00–12:00 e 14:00–20:00**, com geração de 14 dias. A grade é gerada em `America/Cuiaba`; a apresentação ao cliente usa o fuso informado no cadastro. Há antecedência mínima de 30 minutos.
+A agenda está configurada para reuniões de **45 minutos**, todos os dias, nas janelas **08:00–12:00 e 14:00–20:00**, com geração de 14 dias. A grade é gerada em `America/Cuiaba`; a apresentação ao cliente converte pelo fuso do cadastro e mostra apenas dia/hora, sem o código técnico. Há antecedência mínima de 30 minutos.
 
 ## 3. Formulário, identidade e primeira mensagem
 
@@ -113,7 +113,7 @@ flowchart TD
     F11 -->|Abertura enviada há menos de 15 minutos| FCOOL["Descartar duplicação pelo intervalo mínimo"]
     F11 -->|Sim| F12{"Há reunião futura no estado atual?"}
     F12 -->|Não| FUN["Abertura sem reserva: convidar a escolher horário"]
-    F12 -->|Sim, com objetivo| FGO["Confirmação curta: data, hora, fuso e duração"]
+    F12 -->|Sim, com objetivo| FGO["Confirmação curta: data, hora local e duração"]
     F12 -->|Sim, sem objetivo| FQ["Mesma confirmação curta da reunião"]
     FUN --> FSEND["Enviar pelo WhatsApp"]
     FGO --> FSEND

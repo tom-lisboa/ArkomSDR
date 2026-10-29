@@ -11,6 +11,7 @@ import (
 var repeatedCause = regexp.MustCompile(`(?i)(o que (te |você |voce )?(fez|levou)|me di[zgs]a? o que|por que (acha|achou|voc[eê] acha)|qual (é |e )?o motivo)`)
 var conditionalInvite = regexp.MustCompile(`(?i)((seguimos|seguir|avan[çc]ar|reservar|marcar) com esse hor[aá]rio|posso reservar|vamos reservar|seguimos com (o |esse )?primeiro)`)
 var unsupportedConfirmation = regexp.MustCompile(`(?i)(posso|vou|quer que eu|te ajudo|te ajudar|ajudo voc[eê]).{0,45}(confirmar|esclarecer|verificar).{0,45}(condi[çc][ãa]o|custo|gratuidade)`)
+var customerAction = regexp.MustCompile(`(?i)(\?|\b(responda|responde|escolha|escolhe|confirme|confirma|separe|separa|traga|traz|leve|leva|envie|envia|me mande|me manda|me conte|me conta|me diga|me diz)\b)`)
 
 func specialistQuality(s domain.State, d domain.Decision) string {
 	if d.Action != "reply" {
@@ -29,6 +30,11 @@ func specialistQuality(s domain.State, d domain.Decision) string {
 	}
 	if s.Dialogue != nil && s.Dialogue.BookingCondition != "" && unsupportedConfirmation.MatchString(d.Message) {
 		return "Não existe ferramenta para confirmar essa condição com alguém. Informe que a condição não está confirmada e deixe o cliente decidir aguardar ou prosseguir sem essa exigência. Não prometa verificar nem encaminhar sem ação disponível."
+	}
+	if s.Dialogue != nil && s.Dialogue.Agent == "objections" && s.Dialogue.Assessment.Intent == "objection" && s.Dialogue.BookingCondition == "" && s.Dialogue.Objection != nil && len(s.Dialogue.Objection.Attempts) < 2 && s.Dialogue.Assessment.Readiness != "declined" && s.Dialogue.Assessment.Readiness != "deferred" {
+		if strings.Contains(strings.ToLower(d.Message), "se quiser") || !customerAction.MatchString(d.Message) {
+			return "Esta objeção ainda tem abertura e não atingiu duas tentativas. Depois de responder ao motivo, termine com UMA pergunta de decisão concreta, sem 'se quiser' nem convite vago. Com causa desconhecida, pergunte apenas a causa; com causa já explicada, convide a avaliar esse processo na reunião. Preserve reserva atual e condições desconhecidas."
+		}
 	}
 	if !domain.SafeReply(d.Message, s, domain.Policy{}) {
 		return "Não declare ações concluídas nem use 'reunião confirmada', 'reservei', 'agendei' ou links não autorizados. Sobre custo desconhecido, diga 'não tenho esse custo confirmado', sem formular uma confirmação de reunião."

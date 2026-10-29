@@ -62,7 +62,7 @@ func TestMeetingStartUsesTemplateOrSessionAndNeverRepeatsAfterRestart(t *testing
 					}
 					var variables map[string]string
 					_ = json.Unmarshal([]byte(r.Form.Get("ContentVariables")), &variables)
-					if variables["4"] != "45" || variables["1"] != "Teste" {
+					if variables["3"] != "45" || variables["1"] != "Teste" {
 						t.Error("wrong booking facts", variables)
 					}
 				}

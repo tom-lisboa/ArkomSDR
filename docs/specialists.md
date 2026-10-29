@@ -1,6 +1,6 @@
 # Especialistas de texto e Decisions em Go
 
-O prompt atual é `bia-specialists-v3`, de 29/10/2026. A [avaliação das conversas](conversation-qa-2026-10-29.md) registra a matriz sintética, falhas encontradas, correções e limites da homologação. Inclui direct response, contexto durante o intervalo da reunião, condições pendentes, preferência explícita de horários, pedido de humano e desistência da remarcação. A experiência no aparelho continua sendo uma validação complementar.
+O prompt atual é `bia-specialists-v4`, de 29/10/2026, com [chamadas para ação por etapa e horário sem rótulo de fuso](direct-response.md). A [avaliação das conversas](conversation-qa-2026-10-29.md) registra a rodada anterior, falhas corrigidas e limites da homologação. Permanecem contexto durante o intervalo da reunião, condições pendentes, preferência explícita de horários, pedido de humano e desistência da remarcação. A experiência no aparelho continua sendo uma validação complementar.
 
 O atendimento pode classificar cada lote de mensagens com Decisions e escolher um especialista de texto no worker de execução. A Bia mantém a identidade, o número e o histórico compartilhado. Voz conserva o roteiro de lembrete separado.
 

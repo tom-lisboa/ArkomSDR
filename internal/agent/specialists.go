@@ -9,7 +9,7 @@ import (
 	"arkom/bia/internal/domain"
 )
 
-const SpecialistPromptVersion = "bia-specialists-v3"
+const SpecialistPromptVersion = "bia-specialists-v4"
 
 func normalizeAssessment(s domain.State, e domain.Event, a domain.DialogueAssessment) domain.DialogueAssessment {
 	set := func(field string, target *string, value string) {
@@ -179,7 +179,7 @@ func constrainSpecialist(s domain.State, e domain.Event, d domain.Decision, a do
 	if domain.MeetingStatus(s, now) == "in_progress" && delayNotice.MatchString(e.Text) && !domain.RescheduleRequested(e.Text) {
 		p := domain.Policy{TimeZone: "America/Cuiaba"}
 		z := p.Zone(s)
-		return domain.Decision{Action: "reply", Message: "Seu horário reservado é de " + s.Booking.Start.In(z).Format("15:04") + " a " + s.Booking.End.In(z).Format("15:04") + " (" + z.String() + "). Você consegue participar nesse intervalo ou prefere remarcar?", Reason: "delay_does_not_authorize_host_availability"}
+		return domain.Decision{Action: "reply", Message: "Seu horário reservado é de " + s.Booking.Start.In(z).Format("15:04") + " a " + s.Booking.End.In(z).Format("15:04") + ". Você consegue participar nesse intervalo ou prefere remarcar?", Reason: "delay_does_not_authorize_host_availability"}
 	}
 	if d.Action == "confirm" && a.Intent != "confirm" {
 		d.Action = "reply"
@@ -212,7 +212,7 @@ func constrainSpecialist(s domain.State, e domain.Event, d domain.Decision, a do
 	rescheduling := a.Intent == "reschedule" || (a.Intent == "select" && s.Stage == "choosing_slot" && len(s.Offered) > 0)
 	if activeMeeting(s, now) && !rescheduling && (d.Action == "offer_slots" || d.Action == "book" || d.Action == "reschedule") {
 		p := domain.Policy{TimeZone: "America/Cuiaba"}
-		return domain.Decision{Action: "reply", Message: "Sua reunião está marcada para " + s.Booking.Start.In(p.Zone(s)).Format("02/01 às 15:04") + " (" + p.Zone(s).String() + "). Pode me dizer sua dúvida sobre essa conversa?", Reason: "keep_current_booking"}
+		return domain.Decision{Action: "reply", Message: "Sua reunião está marcada para " + s.Booking.Start.In(p.Zone(s)).Format("02/01 às 15:04") + ". Traga um exemplo do processo que você quer melhorar para avaliarmos na conversa.", Reason: "keep_current_booking"}
 	}
 	for _, v := range []string{"vou te transferir", "vou transferir você", "sou o agente", "agente de objeções", "worker", "previous_response_id", "decisions api"} {
 		if strings.Contains(strings.ToLower(d.Message), v) {

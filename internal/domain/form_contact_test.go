@@ -38,7 +38,7 @@ func TestOpeningUsesCurrentBookingWithoutRepeatingKnownGoal(t *testing.T) {
 	}
 	s.Profile.Goal = ""
 	o = ContactOpening(s, Policy{}, now)
-	if o.Kind != "booked_question" || strings.Contains(o.Text, "?") || !strings.Contains(ContactContextOpening(s, Policy{}, now).Text, "O que mais toma") {
+	if o.Kind != "booked_question" || strings.Contains(o.Text, "?") || !strings.Contains(ContactContextOpening(s, Policy{}, now).Text, "Qual rotina") {
 		t.Fatal(o)
 	}
 	s.Booking = nil

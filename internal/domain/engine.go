@@ -468,7 +468,12 @@ func offer(s *State, r *Result, e Event, slots []Slot, p Policy, now time.Time) 
 		for _, slot := range s.Offered {
 			parts = append(parts, SlotLabel(slot, p.Zone(*s)))
 		}
-		text = "Tenho estes horários para o diagnóstico: " + strings.Join(parts, " ou ") + ". Horário de " + p.Zone(*s).String() + ". Qual você escolhe?"
+		text = "Tenho estes horários para o diagnóstico: " + strings.Join(parts, " ou ") + "."
+		if len(parts) == 1 {
+			text += " Responda PRIMEIRO para escolher esse horário."
+		} else {
+			text += " Qual você escolhe: o primeiro ou o segundo?"
+		}
 	}
 	if intro := strings.TrimSpace(r.Decision.Message); r.Decision.Action == "offer_slots" && intro != "" && !strings.Contains(intro, "?") && len([]rune(intro)) <= 350 && SafeReply(intro, *s, p) {
 		text = intro + "\n\n" + text
@@ -514,11 +519,11 @@ func minTime(a, b time.Time) time.Time {
 }
 
 func bookingText(b Booking, p Policy, s State) string {
-	text := "Seu diagnóstico está marcado para " + b.Start.In(p.Zone(s)).Format("02/01/2006 às 15:04") + " (" + p.Zone(s).String() + ")."
+	text := "Seu diagnóstico está marcado para " + b.Start.In(p.Zone(s)).Format("02/01 às 15:04") + "."
 	if b.MeetingURL != "" {
 		text += " Link da reunião: " + b.MeetingURL
 	}
-	return text + " Se surgir um imprevisto, me avise para encontrarmos outro horário."
+	return text + " Para mudar o horário, responda REMARCAR."
 }
 
 var urlRE = regexp.MustCompile(`https?://[^\s<>]+`)
@@ -639,6 +644,10 @@ func Deliverable(s State, fx Effect, now time.Time) (bool, string) {
 }
 
 func Render(s State, fx Effect, p Policy, now time.Time) string {
+	return CustomerMessage(render(s, fx, p, now))
+}
+
+func render(s State, fx Effect, p Policy, now time.Time) string {
 	if fx.Purpose == "form_context" {
 		return ContactContextOpening(s, p, now).Text
 	}
@@ -654,8 +663,11 @@ func Render(s State, fx Effect, p Policy, now time.Time) string {
 	if fx.Purpose == "meeting_sms" {
 		return SMSReminderText(s, p)
 	}
+	if fx.Purpose == "booking_confirmation" && s.Booking != nil {
+		return bookingText(*s.Booking, p, s)
+	}
 	if fx.Purpose == "meeting_call" && s.Booking != nil {
-		text := firstName(s.Profile.Name) + ", sua reunião com o time da " + p.Brand + " é " + s.Booking.Start.In(p.Zone(s)).Format("02/01 às 15:04") + " (" + p.Zone(s).String() + ")."
+		text := firstName(s.Profile.Name) + ", sua reunião com o time da " + p.Brand + " é " + s.Booking.Start.In(p.Zone(s)).Format("02/01 às 15:04") + "."
 		if s.Booking.End.After(s.Booking.Start) {
 			text += fmt.Sprintf(" Separe %d minutos para avaliar onde a IA pode ajudar no seu negócio.", int(s.Booking.End.Sub(s.Booking.Start).Minutes()))
 		}

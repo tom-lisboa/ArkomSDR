@@ -267,7 +267,8 @@
           "o que te fez",
           "qual é o motivo",
           "quantas pessoas"
-        ]
+        ],
+        "require_cta": true
       },
       {
         "text": "Tá, vamos avaliar. Quais horários vocês têm?",
@@ -292,7 +293,8 @@
           "qual é o motivo",
           "serve sim",
           "não serve"
-        ]
+        ],
+        "require_cta": true
       }
     ]
   },
@@ -308,7 +310,8 @@
           "é inferior",
           "garanto",
           "dobrar"
-        ]
+        ],
+        "require_cta": true
       }
     ]
   },
@@ -340,7 +343,8 @@
         "forbidden": [
           "15 minutos",
           "10 minutos"
-        ]
+        ],
+        "require_cta": true
       }
     ]
   },
@@ -433,7 +437,8 @@
       },
       {
         "text": "O que preciso preparar?",
-        "expect": "keep_booking"
+        "expect": "keep_booking",
+        "require_cta": true
       },
       {
         "text": "Obrigado",
@@ -495,7 +500,8 @@
         "agent": "objections",
         "forbidden": [
           "o que te fez"
-        ]
+        ],
+        "require_cta": true
       },
       {
         "text": "Pode deixar marcado. O que devo preparar?",
@@ -807,6 +813,9 @@
           "14",
           "São Paulo",
           "Sao_Paulo"
+        ],
+        "forbidden": [
+          "America/"
         ]
       }
     ]
@@ -944,6 +953,20 @@
           "às 14h",
           "às 23h está confirmado"
         ]
+      }
+    ]
+  },
+  {
+    "id": "opening_agendar",
+    "category": "direct response",
+    "turns": [
+      {
+        "text": "AGENDAR",
+        "expect": "offer"
+      },
+      {
+        "text": "O primeiro",
+        "expect": "book"
       }
     ]
   }

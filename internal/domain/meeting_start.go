@@ -8,7 +8,7 @@ import (
 )
 
 const MeetingStartGrace = 5 * time.Minute
-const MeetingStartText = "Oi, {{1}}! Chegou o horário da sua reunião com o time da Arkom: {{2}} ({{3}}).\n\nSão {{4}} minutos para avaliar onde a IA pode ajudar no seu negócio. Você consegue participar agora?\n\nResponda CONFIRMO para confirmar presença ou REMARCAR para escolher outro horário."
+const MeetingStartText = "Oi, {{1}}! Sua reunião com a Arkom é agora: {{2}}. Separe {{3}} minutos para avaliar a IA no seu negócio.\n\nVocê participa agora? Responda CONFIRMO ou REMARCAR."
 
 // A meeting stays relevant throughout its real interval. It is not a no-show
 // merely because the scheduled start passed.
@@ -46,7 +46,7 @@ func MeetingStartOpening(s State, p Policy) Opening {
 	if s.Booking == nil || !s.Booking.End.After(s.Booking.Start) {
 		return Opening{Kind: "meeting_start"}
 	}
-	name := firstName(s.Profile.Name)
+	name := CustomerMessage(firstName(s.Profile.Name))
 	if name == "" {
 		name = "tudo bem"
 	}
@@ -55,7 +55,7 @@ func MeetingStartOpening(s State, p Policy) Opening {
 	if len(r) > 60 {
 		name = string(r[:60])
 	}
-	vars := map[string]string{"1": name, "2": s.Booking.Start.In(p.Zone(s)).Format("02/01 às 15:04"), "3": p.Zone(s).String(), "4": fmt.Sprint(int(s.Booking.End.Sub(s.Booking.Start).Minutes()))}
+	vars := map[string]string{"1": name, "2": s.Booking.Start.In(p.Zone(s)).Format("02/01 às 15:04"), "3": fmt.Sprint(int(s.Booking.End.Sub(s.Booking.Start).Minutes()))}
 	pairs := []string{}
 	for k, v := range vars {
 		pairs = append(pairs, "{{"+k+"}}", v)

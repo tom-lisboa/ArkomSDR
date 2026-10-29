@@ -20,7 +20,7 @@ func reminderInstructions(m domain.MeetingContext, history []map[string]string) 
 	when := ""
 	format := m.Briefing.Format
 	if m.Booking != nil {
-		when = m.Booking.Start.In(zone).Format("02/01/2006 às 15:04") + " (" + zone.String() + ")"
+		when = m.Booking.Start.In(zone).Format("02/01/2006 às 15:04")
 		if format == "" && m.Booking.MeetingURL != "" {
 			format = "Reunião online. Link de acesso registrado: " + m.Booking.MeetingURL
 		}
@@ -35,9 +35,9 @@ func reminderInstructions(m domain.MeetingContext, history []map[string]string) 
 		"reuniao_pauta": m.Briefing.Agenda, "contexto": m.Briefing.Context, "objetivo_formulario": m.Goal,
 		"consultor": m.Briefing.Consultant, "consultor_genero": m.Briefing.ConsultantGender, "ambiente": env,
 	}, "agenda": m, "historico": history})
-	return reminderPrompt + "\n\nLeia datas e horas em português por extenso preservando exatamente o dia, a hora e o fuso fornecidos.\nDADOS DA LIGAÇÃO (JSON):\n" + string(raw)
+	return reminderPrompt + "\n\nLeia datas e horas em português por extenso preservando exatamente o dia e a hora local fornecidos. O fuso é um dado interno de conversão: não fale códigos como America/Sao_Paulo, UTC ou GMT ao cliente.\nDADOS DA LIGAÇÃO (JSON):\n" + string(raw)
 }
 func voicemailInstructions(m domain.MeetingContext) string {
 	// No company, revenue, briefing, URL or conversation history in voicemail.
-	return fmt.Sprintf("Diga apenas: Aqui é a Bia, da Arkom. Ligamos para lembrar da reunião em %s. Obrigada. Fale a data e a hora em português por extenso. Não acrescente perguntas, dados pessoais nem outras informações. Não chame ferramentas.", m.Customer.MeetingDate.Format("02/01/2006 às 15:04 -07:00"))
+	return fmt.Sprintf("Diga apenas: Aqui é a Bia, da Arkom. Ligamos para lembrar da reunião em %s. Obrigada. Fale a data e a hora em português por extenso. Não acrescente perguntas, dados pessoais nem outras informações. Não chame ferramentas.", m.Customer.MeetingDate.Format("02/01/2006 às 15:04"))
 }

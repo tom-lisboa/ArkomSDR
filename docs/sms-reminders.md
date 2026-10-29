@@ -49,7 +49,7 @@ processada. `SAIR` no WhatsApp mantém o bloqueio geral de novos contatos.
 
 Exemplo do texto, com data e horário reais no fuso do contato:
 
-> Arkom: sua reuniao esta proxima! 28/10 15:00 (America/Cuiaba). Para parar avisos, envie SAIR no WhatsApp +5511936246321.
+> Arkom: sua reuniao e 28/10 15:00. Confirme presenca pelo WhatsApp +5511936246321. Para parar avisos, envie SAIR por la.
 
 O texto não inclui link de sala, faturamento ou objetivo do formulário. Ele é
 montado por código e não depende de uma geração do modelo.

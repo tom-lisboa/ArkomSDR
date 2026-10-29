@@ -56,7 +56,7 @@ func TestBookedOpeningHasTwoApprovedShortBubblesAndNoReplay(t *testing.T) {
 				var vars map[string]string
 				_ = json.Unmarshal([]byte(r.Form.Get("ContentVariables")), &vars)
 				if len(posts) == 1 {
-					if sid != mainSID || len(vars) != 4 || vars["4"] != "45" {
+					if sid != mainSID || len(vars) != 3 || vars["3"] != "45" {
 						t.Error(r.Form)
 					}
 				} else if goal != "" {

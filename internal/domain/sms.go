@@ -44,5 +44,5 @@ func SMSReminderText(s State, p Policy) string {
 	}
 	start := s.Booking.Start.In(p.Zone(s))
 	// Fixed transactional copy: no model, links, revenue or other form answers.
-	return fmt.Sprintf("Arkom: sua reuniao esta proxima! %s (%s). Para parar avisos, envie SAIR no WhatsApp %s.", start.Format("02/01 15:04"), p.Zone(s).String(), p.WhatsAppPhone)
+	return fmt.Sprintf("Arkom: sua reuniao e %s. Confirme presenca pelo WhatsApp %s. Para parar avisos, envie SAIR por la.", start.Format("02/01 15:04"), p.WhatsAppPhone)
 }

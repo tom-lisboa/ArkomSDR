@@ -1,15 +1,14 @@
 {
-  "friendly_name": "arkom_confirmacao_curta_v1",
+  "friendly_name": "arkom_confirmacao_direta_v2",
   "language": "pt_BR",
   "variables": {
     "1": "Ana",
     "2": "30/10 às 14:00",
-    "3": "America/Cuiaba",
-    "4": "45"
+    "3": "45"
   },
   "types": {
     "twilio/text": {
-      "body": "Oi, {{1}}! Sou a Bia, IA da Arkom. Sua reunião está confirmada para {{2}} ({{3}}), por {{4}} minutos."
+      "body": "Oi, {{1}}! Sou a Bia, IA da Arkom. Sua reunião está confirmada para {{2}}. Separe {{3}} minutos para essa conversa."
     }
   }
 }

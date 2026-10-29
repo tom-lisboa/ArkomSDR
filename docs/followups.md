@@ -10,7 +10,7 @@ uma etapa por clique usando os mesmos workers, mesmo com a cadência desligada.
 |---|---|---|
 | 15 minutos após a abertura | Follow-up | Pede um exemplo prático para preparar a reunião, sem depoimento. |
 | T−30 minutos | Follow-up → mídia | Envia a gravação da equipe como áudio OGG/Opus. |
-| T−15 minutos | Follow-up | Envia texto com horário e fuso; inclui link apenas se existir na reserva. |
+| T−15 minutos | Follow-up | Envia texto com horário local; inclui link apenas se existir na reserva. |
 | Após confirmar o envio do texto | Follow-up → voz | Solicita permissão pelo botão nativo do WhatsApp. |
 | Após o cliente permitir | Voz → agenda | Confere a reserva e inicia uma única ligação de lembrete. |
 | T−5 minutos | Follow-up → SMS | Envia lembrete por SMS aos contatos que autorizaram esse canal. |
@@ -23,11 +23,9 @@ O WhatsApp no início tem ativação independente por `BIA_MEETING_START_ENABLED
 
 Exemplo de texto, com valores gerados a partir do cadastro e da reserva:
 
-> Oi, Ana! Chegou o horário da sua reunião com o time da Arkom: 30/10 às 14:00 (America/Cuiaba).
+> Oi, Ana! Sua reunião com a Arkom é agora: 30/10 às 14:00. Separe 45 minutos para avaliar a IA no seu negócio.
 >
-> São 45 minutos para avaliar onde a IA pode ajudar no seu negócio. Você consegue participar agora?
->
-> Responda CONFIRMO para confirmar presença ou REMARCAR para escolher outro horário.
+> Você participa agora? Responda CONFIRMO ou REMARCAR.
 
 Não há anúncio de sala aberta nem de consultor esperando. Este aviso não inclui link de reunião. `CONFIRMO` registra intenção de comparecer, inclusive no intervalo da reunião, sem marcar presença real. `REMARCAR` consulta novas vagas e preserva a reserva atual até a troca concluir. Durante esse intervalo o contexto usa `meeting_status=in_progress`, evitando uma nova oferta automática por simples confirmação ou atraso.
 

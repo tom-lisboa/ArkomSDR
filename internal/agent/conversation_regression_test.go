@@ -75,6 +75,25 @@ func TestConditionalChoiceOverridesInconsistentClassifier(t *testing.T) {
 	}
 }
 
+func TestObjectionQualityRequiresDirectResponseOnlyWhileThereIsOpening(t *testing.T) {
+	s := domain.State{Dialogue: &domain.DialogueState{Agent: "objections", Assessment: domain.DialogueAssessment{Intent: "objection", Readiness: "considering"}, Objection: &domain.DialogueObjection{Kind: "fit", Status: "open", Clarification: "já usa ChatGPT"}}}
+	if specialistQuality(s, domain.Decision{Action: "reply", Message: "Podemos avaliar seu atendimento. Se quiser, a gente olha isso na reunião."}) == "" {
+		t.Fatal("vague invitation passed")
+	}
+	if specialistQuality(s, domain.Decision{Action: "reply", Message: "A reunião pode avaliar seu atendimento. Vamos olhar esse processo com o time?"}) != "" {
+		t.Fatal("concrete next step rejected")
+	}
+	s.Dialogue.Objection.Attempts = []domain.DialogueAttempt{{ID: "1"}, {ID: "2"}}
+	if specialistQuality(s, domain.Decision{Action: "reply", Message: "Tudo bem. Você pode pensar e me avisar."}) != "" {
+		t.Fatal("forced third persuasion attempt")
+	}
+	s.Dialogue.Objection.Attempts = nil
+	s.Dialogue.Assessment.Intent = "defer"
+	if specialistQuality(s, domain.Decision{Action: "reply", Message: "Combinado."}) != "" {
+		t.Fatal("forced invitation after defer")
+	}
+}
+
 func TestLongDiagnosticMetadataDoesNotStopValidConversation(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		d, _ := json.Marshal(domain.Decision{Action: "reply", Message: "A conversa pode avaliar esse atendimento.", Reason: strings.Repeat("ação ", 200), Evidence: strings.Repeat("evidência ", 400)})

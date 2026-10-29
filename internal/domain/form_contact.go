@@ -8,11 +8,11 @@ import (
 
 // These patterns are mirrored in approved WhatsApp content assets. Values are
 // generated only from the current profile and confirmed booking, never the LLM.
-const FormContactText = "Oi, {{1}}! Sou a Bia, IA da Arkom. Recebi seu cadastro.\n\nVamos escolher um horário para conversar?"
-const BookedContactText = "Oi, {{1}}! Sou a Bia, IA da Arkom. Sua reunião está confirmada para {{2}} ({{3}}), por {{4}} minutos."
+const FormContactText = "Oi, {{1}}! Sou a Bia, IA da Arkom. Recebi seu cadastro.\n\nResponda AGENDAR para eu te mostrar os horários da sua conversa com o time."
+const BookedContactText = "Oi, {{1}}! Sou a Bia, IA da Arkom. Sua reunião está confirmada para {{2}}. Separe {{3}} minutos para essa conversa."
 const BookedQuestionText = BookedContactText
-const BookedContextText = "Na reunião, vamos avaliar onde a IA pode ajudar. Seu foco: {{1}}.\n\nAlguma dúvida antes da conversa?"
-const BookedContextQuestionText = "Na reunião, vamos avaliar onde a IA pode ajudar na sua empresa.\n\nO que mais toma seu tempo hoje: atendimento, vendas ou operação?"
+const BookedContextText = "Na reunião, vamos avaliar onde a IA pode ajudar. Seu foco: {{1}}.\n\nVocê confirma sua presença?"
+const BookedContextQuestionText = "Vamos avaliar onde a IA pode ajudar na sua empresa.\n\nQual rotina vamos priorizar nessa reunião: atendimento, vendas ou operação?"
 
 type Opening struct {
 	Kind, Text string
@@ -21,6 +21,7 @@ type Opening struct {
 
 func ContactOpening(s State, p Policy, now time.Time) Opening {
 	clean := func(v string, limit int) string {
+		v = CustomerMessage(v)
 		v = strings.Join(strings.Fields(v), " ")
 		r := []rune(v)
 		if len(r) > limit {
@@ -39,8 +40,7 @@ func ContactOpening(s State, p Policy, now time.Time) Opening {
 		out.Kind = "booked_question"
 		pattern = BookedQuestionText
 		out.Variables["2"] = b.Start.In(p.Zone(s)).Format("02/01 às 15:04")
-		out.Variables["3"] = p.Zone(s).String()
-		out.Variables["4"] = fmt.Sprint(int(b.End.Sub(b.Start).Minutes()))
+		out.Variables["3"] = fmt.Sprint(int(b.End.Sub(b.Start).Minutes()))
 		if goal := strings.TrimRight(clean(s.Profile.Goal, 90), ".!?"); goal != "" {
 			out.Kind = "booked"
 			pattern = BookedContactText
@@ -62,7 +62,7 @@ func ContactContextOpening(s State, p Policy, now time.Time) Opening {
 		return Opening{}
 	}
 	o := Opening{Kind: "booked_context_question", Text: BookedContextQuestionText, Variables: map[string]string{}}
-	goal := strings.TrimRight(strings.Join(strings.Fields(s.Profile.Goal), " "), ".!?")
+	goal := strings.TrimRight(strings.Join(strings.Fields(CustomerMessage(s.Profile.Goal)), " "), ".!?")
 	if goal != "" {
 		r := []rune(goal)
 		if len(r) > 90 {
@@ -83,10 +83,10 @@ func ContactContextSequence(s State, openingID string, p Policy, now time.Time) 
 	return []Effect{{ID: openingID + ":context", LeadID: s.ID, Kind: "send", Purpose: "form_context", Text: o.Text, AfterMessageID: openingID, Due: now.Add(2 * time.Second), Expires: minTime(now.Add(15*time.Minute), s.Booking.Start), BookingID: s.Booking.ID, BookingStart: s.Booking.Start, TriggerAt: now}}
 }
 
-const PreparationText = "Oi, {{1}}! Uma dica para aproveitar melhor sua reunião com o time da Arkom: separe um exemplo de tarefa que toma tempo no dia a dia do negócio.\n\nPode ser uma conversa de atendimento, uma etapa de vendas ou uma rotina da operação. Não precisa montar apresentação; esse exemplo ajuda a deixar a conversa mais prática."
+const PreparationText = "Oi, {{1}}! Para aproveitar a reunião, escolha uma tarefa que toma seu tempo no atendimento, nas vendas ou na operação.\n\nMe envie um exemplo para começarmos por ele."
 
 func PreparationOpening(s State) Opening {
-	name := firstName(s.Profile.Name)
+	name := CustomerMessage(firstName(s.Profile.Name))
 	if name == "" {
 		name = "tudo bem"
 	}

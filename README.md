@@ -156,3 +156,5 @@ Disponibilidade e reserva pelo formulário: [contrato dos endpoints](docs/form-c
 Abertura com confirmação da reserva, preparação após 15 minutos e correção dos erros do formulário: [contrato e diagnóstico](docs/test-form-troubleshooting.md).
 
 A [abertura em mensagens curtas](docs/short-opening.md) divide confirmação e contexto em duas mensagens, com templates próprios para o primeiro contato automático.
+
+[Direct response por etapa](docs/direct-response.md): chamadas para ação específicas e datas/horas locais sem códigos técnicos de fuso nas mensagens.
