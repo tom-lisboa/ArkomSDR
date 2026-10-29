@@ -284,6 +284,8 @@ func (d *DB) FlushWindow(ctx context.Context, candidate string, p WindowPolicy, 
 	if e != nil {
 		return h, e
 	}
+	var buttonCount int
+	var buttonPayload string
 	var ev domain.Event
 	var ids []string
 	var body strings.Builder
@@ -301,9 +303,14 @@ func (d *DB) FlushWindow(ctx context.Context, candidate string, p WindowPolicy, 
 		if len(ids) > 0 && body.Len()+len(part) > 16000 {
 			break
 		}
+		ev = domain.Event{}
 		if e = json.Unmarshal(raw, &ev); e != nil {
 			rows.Close()
 			return h, e
+		}
+		if ev.ButtonPayload != "" {
+			buttonCount++
+			buttonPayload = ev.ButtonPayload
 		}
 		if len(part) > 16000 {
 			part = "[conteúdo acima do limite; revisão necessária]"
@@ -360,6 +367,12 @@ func (d *DB) FlushWindow(ctx context.Context, candidate string, p WindowPolicy, 
 	}
 	for i, j := 0, len(window.History)-1; i < j; i, j = i+1, j-1 {
 		window.History[i], window.History[j] = window.History[j], window.History[i]
+	}
+	// Multiple messages must not execute a positional/confirmation shortcut.
+	if buttonCount > 0 && len(ids) > 1 {
+		ev.ButtonPayload = "mixed"
+	} else {
+		ev.ButtonPayload = buttonPayload
 	}
 	ev.ID = runID
 	ev.Text = body.String()

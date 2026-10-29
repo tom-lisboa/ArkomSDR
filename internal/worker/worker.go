@@ -12,6 +12,7 @@ import (
 	"arkom/bia/internal/conversation"
 	"arkom/bia/internal/domain"
 	"arkom/bia/internal/providers"
+	"arkom/bia/internal/quickreply"
 	"arkom/bia/internal/store"
 	"github.com/jackc/pgx/v5"
 )
@@ -30,6 +31,7 @@ type SkipEffect struct{ Reason string }
 func (s *SkipEffect) Error() string { return s.Reason }
 
 type Worker struct {
+	Buttons       quickreply.Signer
 	IntroVideoURL string
 	VideoSender   interface {
 		SendVideo(context.Context, string, domain.State, string, string, time.Time) (providers.Receipt, error)
@@ -124,14 +126,14 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 		if e.Context != nil {
 			j.Run = &conversation.RunResult{ConversationID: e.Context.ConversationID, RunID: e.Context.RunID, Version: e.Context.Version}
 		}
-		var d domain.Decision
+		d, buttonHandled := w.Buttons.Resolve(s, &e, w.Policy, now)
 		var routedAgent string
 		var slots []domain.Slot
 		if e.Kind == "message.received" && !s.OptedOut && !s.Human && !domain.AutomaticReply(e.Text) && (e.Context == nil || !e.Context.MediaFailed) {
 			var calendarErr error
 			slots, calendarErr = w.Calendar.Slots(opCtx, s, now)
 			e.CalendarUnavailable = calendarErr != nil
-			if domain.NeedsPlan(s, e, now) {
+			if !buttonHandled && domain.NeedsPlan(s, e, now) {
 				id := agent.Select(s, e)
 				var out agent.Outcome
 				out, err = agent.Execute(opCtx, w.Planner, s, e, slots, id)
@@ -309,7 +311,11 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 				receipt, err = w.AudioSender.SendAudio(opCtx, j.ID, s, fx.MediaURL, now)
 			}
 		} else {
-			receipt, err = w.Messenger.Send(opCtx, j.ID, s, text, fx.Purpose, now)
+			purpose := fx.Purpose
+			if purpose == "reply" && len(fx.RemainingParts) > 0 {
+				purpose = "reply_part"
+			}
+			receipt, err = w.Messenger.Send(opCtx, j.ID, s, text, purpose, now)
 		}
 		if err == nil {
 			result = receipt

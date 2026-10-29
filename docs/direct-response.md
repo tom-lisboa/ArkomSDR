@@ -40,3 +40,7 @@ A matriz de conversa agora tem 60 cenários, incluindo a resposta literal AGENDA
 As evidências ficam em `.local/direct-response-v4-eval/`, `.local/direct-response-v4-final/` e `.local/direct-response-v4-confirm/`. A rodada de 60 cenários cobriu 97 turnos e marcou um falso positivo do avaliador (“Só separa um exemplo…” é uma ação válida). Duas respostas vagas numa repetição focal motivaram a revisão de qualidade. Outra variação válida (“Leva um exemplo…”) ampliou o reconhecimento de imperativos. Na confirmação final, nove cenários e 17 turnos passaram, sem nova falha nos critérios e sem fallback do classificador. A suíte completa com race detector e as verificações adicionais de domínio/agente/voz passaram. Nenhuma dessas conversas enviou WhatsApp ou alterou reservas de clientes. O relatório da rodada anterior continua histórico em [avaliação de 29/10](conversation-qa-2026-10-29.md).
 
 Método de instruções e exemplos consultado: [OpenAI Docs — Prompt engineering](https://developers.openai.com/api/docs/guides/prompt-engineering).
+
+## Botões nativos
+
+As chamadas para ação também usam botões reais no WhatsApp, com roteamento e validação no Go. Consulte o [mapa dos botões e suas regras](quick-replies.md). A disponibilidade dos botões não muda a cadência de follow-ups nem cria um link de sala.

@@ -704,3 +704,37 @@ flowchart LR
 | Parâmetros | `internal/config/config.go`, `internal/config/voice.go`; valores não secretos conferidos no servidor |
 
 Valores observados: `live`, contato automático e vídeo de abertura ligados, retomadas gerais desligadas, preparação/reunião/SMS/voz ligados, sem restrição a um único telefone de teste, sem URL de sala, sem URL de agendamento e sem pedido de permissão de voz fora da sessão. Os limites atuais de homologação são 100 envios por contato/dia e 300 globais/hora; não são uma recomendação de cadência comercial.
+
+## 17. Respostas rápidas nativas
+
+```mermaid
+flowchart TD
+    B0["Go envia a mensagem com até 3 botões"] --> B1{"Momento da conversa"}
+    B1 -->|Sem reserva| B2["Ver horários / Tirar dúvida"]
+    B1 -->|Reserva e objetivo conhecidos| B3["Confirmar presença / Remarcar / Tirar dúvida"]
+    B1 -->|Definir rotina| B4["Atendimento / Vendas / Operação"]
+    B1 -->|Vagas apresentadas| B5["Primeiro horário / Segundo horário / Outros horários"]
+    B2 --> BC["Clique chega com assinatura Twilio e Message SID"]
+    B3 --> BC
+    B4 --> BC
+    B5 --> BC
+    BC --> BD["Mesmo contato, conversa e agrupamento de mensagens"]
+    BD --> BE{"Pedido explícito de saída?"}
+    BE -->|Sim| BO["Preservar saída; interromper contato"]
+    BE -->|Não| BF{"Payload válido, atual e único no lote?"}
+    BF -->|Não| BG["Pedir escolha atualizada; manter reserva"]
+    BF -->|Sim| BH{"Ação do botão"}
+    BH -->|Ver ou remarcar| BI["Consultar vagas atuais; manter reserva até troca confirmada"]
+    BH -->|Primeiro ou segundo| BJ["Validar vaga exata e condições; worker de agenda reserva"]
+    BH -->|Confirmar| BK["Registrar intenção de comparecimento da reserva atual"]
+    BH -->|Rotina| BL["Mesmo agente e contexto recebem a intenção da escolha"]
+    BH -->|Dúvida| BM["Pedir a dúvida e continuar a conversa"]
+    BG --> B0
+    BI --> B0
+    BJ --> B0
+    BK --> B0
+    BL --> B0
+    BM --> B0
+```
+
+O botão “Entrar agora” depende de sala e Content de URL próprios, ainda pendentes. Este fluxo não autoriza ligações nem deduz no-show pelo relógio. Os botões não adicionam disparos em novos horários. Consulte [contrato e configuração](quick-replies.md).

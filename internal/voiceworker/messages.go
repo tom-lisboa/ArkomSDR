@@ -72,6 +72,12 @@ func (s *Server) messages(w http.ResponseWriter, r *http.Request) {
 	conv := "twilio:" + s.Sender + ":" + phone
 	profile := domain.Form{Name: name, Phone: phone, Channel: "gateway", ConversationID: conv, Consent: true, ConsentTextVersion: "whatsapp_inbound_service_v1", TimeZone: s.TimeZone, Source: "twilio_whatsapp"}
 	event := domain.Event{ID: "twilio-" + m.SID, LeadID: domain.LeadKey(phone), Kind: "message.received", At: at, Text: text, ConversationID: conv, Attachments: attachments}
+	// ButtonPayload is authenticated by the Twilio signature and revalidated
+	// against the current booking/offer by the execution worker.
+	if payload := f.Get("ButtonPayload"); payload != "" {
+		if len(payload) > 200 { http.Error(w, "invalid button payload", 400); return }
+		event.ButtonPayload = payload
+	}
 	// A form-created lead may store the other Brazilian spelling of this mobile.
 	// The signed provider message continues that same conversation and ownership.
 	existing, lookupErr := s.Repo.DB.WhatsAppContact(ctx, phone)

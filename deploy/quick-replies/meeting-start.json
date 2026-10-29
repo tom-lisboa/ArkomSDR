@@ -1,0 +1,31 @@
+{
+  "friendly_name": "arkom_botoes_meeting_start_v1",
+  "language": "pt_BR",
+  "variables": {
+    "1": "Ana",
+    "2": "30/10 às 14:00",
+    "3": "45",
+    "4": "bia1.sample.sample.sample.sample",
+    "5": "bia1.sample.sample.sample.sample",
+    "6": "bia1.sample.sample.sample.sample"
+  },
+  "types": {
+    "twilio/quick-reply": {
+      "body": "Oi, {{1}}! Sua reunião com a Arkom é agora: {{2}}. Separe {{3}} minutos para avaliar a IA no seu negócio.\n\nVocê participa agora? Responda CONFIRMO ou REMARCAR.",
+      "actions": [
+        {
+          "title": "Confirmar presença",
+          "id": "{{4}}"
+        },
+        {
+          "title": "Remarcar",
+          "id": "{{5}}"
+        },
+        {
+          "title": "Preciso de ajuda",
+          "id": "{{6}}"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "friendly_name": "arkom_botoes_preparation_v1",
+  "language": "pt_BR",
+  "variables": {
+    "1": "Ana",
+    "2": "bia1.sample.sample.sample.sample",
+    "3": "bia1.sample.sample.sample.sample",
+    "4": "bia1.sample.sample.sample.sample"
+  },
+  "types": {
+    "twilio/quick-reply": {
+      "body": "Oi, {{1}}! Para aproveitar a reunião, escolha uma tarefa que toma seu tempo no atendimento, nas vendas ou na operação.\n\nMe envie um exemplo para começarmos por ele.",
+      "actions": [
+        {
+          "title": "Atendimento",
+          "id": "{{2}}"
+        },
+        {
+          "title": "Vendas",
+          "id": "{{3}}"
+        },
+        {
+          "title": "Operação",
+          "id": "{{4}}"
+        }
+      ]
+    }
+  }
+}

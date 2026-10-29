@@ -22,6 +22,7 @@ import (
 	"arkom/bia/internal/httpapi"
 	"arkom/bia/internal/mediaworker"
 	"arkom/bia/internal/providers"
+	"arkom/bia/internal/quickreply"
 	"arkom/bia/internal/schedulingworker"
 	"arkom/bia/internal/store"
 	"arkom/bia/internal/voiceworker"
@@ -76,6 +77,8 @@ func run() error {
 	}
 	if c.MessagingProvider == "twilio" {
 		twilioMessages = &providers.TwilioMessaging{Pool: db.Pool, Account: c.Voice.Account, AuthToken: c.Voice.AuthToken, Sender: c.Voice.Sender, AllowedPhone: c.TestPhone, Client: providers.NewHTTP()}
+		twilioMessages.QuickReplies = c.QuickReplies
+		twilioMessages.Buttons = quickreply.Signer{Key: c.Token}
 		twilioMessages.FormContentSID = c.FormContentSID
 		twilioMessages.FormContextContentSID = c.FormContextContentSID
 		twilioMessages.FormContextQuestionSID = c.FormContextQuestionSID
@@ -88,7 +91,7 @@ func run() error {
 		messenger = twilioMessages
 	}
 	calendar := &providers.LocalCalendar{Pool: db.Pool}
-	w := &worker.Worker{VoiceAutoRequest: c.Voice.AutoRequest, VoiceSender: c.Voice.Sender, Queue: "execution", DB: db, Planner: planner, Messenger: messenger, Calendar: calendar, CRM: providers.LocalCRM{Pool: db.Pool}, Policy: c.Policy, Live: c.Mode == "live", PerLeadDaily: c.PerLeadDaily, GlobalHourly: c.GlobalHourly}
+	w := &worker.Worker{Buttons: quickreply.Signer{Key: c.Token}, VoiceAutoRequest: c.Voice.AutoRequest, VoiceSender: c.Voice.Sender, Queue: "execution", DB: db, Planner: planner, Messenger: messenger, Calendar: calendar, CRM: providers.LocalCRM{Pool: db.Pool}, Policy: c.Policy, Live: c.Mode == "live", PerLeadDaily: c.PerLeadDaily, GlobalHourly: c.GlobalHourly}
 	if twilioMessages != nil {
 		w.AudioSender = twilioMessages
 		w.VideoSender = twilioMessages

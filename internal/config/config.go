@@ -14,6 +14,7 @@ import (
 )
 
 type Config struct {
+	QuickReplies                                  providers.QuickReplyConfig
 	MeetingStartContentSID                        string
 	Specialists                                   bool
 	DecisionsModel                                string
@@ -83,6 +84,28 @@ func Load() (Config, error) {
 	c.TestPhone = os.Getenv("BIA_TEST_PHONE")
 	c.TestFormToken = os.Getenv("BIA_TEST_FORM_TOKEN")
 	c.FormAutoContact = os.Getenv("BIA_FORM_AUTO_CONTACT") == "true"
+	c.QuickReplies.Enabled = os.Getenv("BIA_QUICK_REPLIES_ENABLED") == "true"
+	for key, target := range map[string]*string{
+		"TWILIO_QUICK_REPLY_1_SID":            &c.QuickReplies.Session1,
+		"TWILIO_QUICK_REPLY_2_SID":            &c.QuickReplies.Session2,
+		"TWILIO_QUICK_REPLY_3_SID":            &c.QuickReplies.Session3,
+		"TWILIO_FORM_BUTTONS_SID":             &c.QuickReplies.Form,
+		"TWILIO_CONTEXT_BUTTONS_SID":          &c.QuickReplies.Context,
+		"TWILIO_CONTEXT_QUESTION_BUTTONS_SID": &c.QuickReplies.ContextQuestion,
+		"TWILIO_PREPARATION_BUTTONS_SID":      &c.QuickReplies.Preparation,
+		"TWILIO_MEETING_START_BUTTONS_SID":    &c.QuickReplies.MeetingStart,
+	} {
+		*target = os.Getenv(key)
+		if *target != "" && (len(*target) != 34 || !strings.HasPrefix(*target, "HX")) {
+			return c, errors.New("invalid " + key)
+		}
+		if c.QuickReplies.Enabled && *target == "" {
+			return c, errors.New("quick replies require " + key)
+		}
+	}
+	if c.QuickReplies.Enabled && c.MessagingProvider != "twilio" {
+		return c, errors.New("quick replies require Twilio messaging")
+	}
 	c.FormContentSID = os.Getenv("TWILIO_FORM_CONTACT_CONTENT_SID")
 	c.FormContextContentSID = os.Getenv("TWILIO_FORM_CONTEXT_CONTENT_SID")
 	c.FormContextQuestionSID = os.Getenv("TWILIO_FORM_CONTEXT_QUESTION_CONTENT_SID")

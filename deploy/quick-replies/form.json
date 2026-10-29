@@ -1,0 +1,24 @@
+{
+  "friendly_name": "arkom_botoes_form_v1",
+  "language": "pt_BR",
+  "variables": {
+    "1": "Ana",
+    "2": "bia1.sample.sample.sample.sample",
+    "3": "bia1.sample.sample.sample.sample"
+  },
+  "types": {
+    "twilio/quick-reply": {
+      "body": "Oi, {{1}}! Sou a Bia, IA da Arkom. Recebi seu cadastro.\n\nResponda AGENDAR para eu te mostrar os horários da sua conversa com o time.",
+      "actions": [
+        {
+          "title": "Ver horários",
+          "id": "{{2}}"
+        },
+        {
+          "title": "Tirar dúvida",
+          "id": "{{3}}"
+        }
+      ]
+    }
+  }
+}

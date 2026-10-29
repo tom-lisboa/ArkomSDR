@@ -13,12 +13,15 @@ import (
 	"time"
 
 	"arkom/bia/internal/domain"
+	"arkom/bia/internal/quickreply"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // TwilioMessaging records an attempt before making a non-idempotent POST.
 // An interrupted attempt without a SID requires review; it is never resent.
 type TwilioMessaging struct {
+	QuickReplies                                      QuickReplyConfig
+	Buttons                                           quickreply.Signer
 	MeetingStartContentSID                            string
 	IntroVideoContentSID                              string
 	PreparationContentSID                             string
@@ -99,6 +102,9 @@ func MessageCreated(m TwilioMessage) (time.Time, error) {
 func (t *TwilioMessaging) Send(ctx context.Context, key string, s domain.State, text, purpose string, now time.Time) (Receipt, error) {
 	if len([]rune(text)) > 1000 || strings.TrimSpace(text) == "" {
 		return Receipt{}, &Failure{Code: "twilio_invalid_text"}
+	}
+	if receipt, handled, err := t.sendButtons(ctx, key, s, text, purpose, now); handled {
+		return receipt, err
 	}
 	if purpose == "form_contact" && !messageWindowOpen(s, now) {
 		zone := t.TimeZone

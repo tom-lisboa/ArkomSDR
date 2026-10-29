@@ -34,3 +34,12 @@ func TestReplyPartsPreserveContentAndLinks(t *testing.T) {
 		t.Fatal("unexpected conversational boundaries")
 	}
 }
+
+func TestSlotOfferAndActionStayInFinalBubble(t *testing.T) {
+	offer := SlotOfferPrefix + "quinta-feira, 29/10 às 14:00 ou sexta-feira, 30/10 às 09:30. Qual você escolhe: o primeiro ou o segundo?"
+	text := "Entendi sua dificuldade. Vamos avaliar esse processo com o time e encontrar o próximo passo.\n\n" + offer
+	parts := SplitReply(text)
+	if len(parts) != 2 || parts[1] != offer {
+		t.Fatal("split actual dates from button CTA", parts)
+	}
+}

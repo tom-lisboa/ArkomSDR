@@ -11,8 +11,9 @@ import (
 )
 
 type Event struct {
-	SMSConsent *bool  `json:"sms_consent,omitempty"`
-	SMSPhone   string `json:"sms_phone,omitempty"`
+	ButtonPayload string `json:"button_payload,omitempty"`
+	SMSConsent    *bool  `json:"sms_consent,omitempty"`
+	SMSPhone      string `json:"sms_phone,omitempty"`
 	// CalendarUnavailable is internal execution context, never accepted from webhooks.
 	CalendarUnavailable bool                      `json:"-"`
 	ConversationID      string                    `json:"conversation_id,omitempty"`

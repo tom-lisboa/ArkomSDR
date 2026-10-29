@@ -1,0 +1,32 @@
+{
+  "friendly_name": "arkom_botoes_sessao_3_v1",
+  "language": "pt_BR",
+  "variables": {
+    "1": "Escolha uma opção para continuar.",
+    "2": "Ver horários",
+    "3": "bia1.sample.sample.sample.sample",
+    "4": "Remarcar",
+    "5": "bia1.sample.sample.sample.sample",
+    "6": "Tirar dúvida",
+    "7": "bia1.sample.sample.sample.sample"
+  },
+  "types": {
+    "twilio/quick-reply": {
+      "body": "{{1}}",
+      "actions": [
+        {
+          "title": "{{2}}",
+          "id": "{{3}}"
+        },
+        {
+          "title": "{{4}}",
+          "id": "{{5}}"
+        },
+        {
+          "title": "{{6}}",
+          "id": "{{7}}"
+        }
+      ]
+    }
+  }
+}

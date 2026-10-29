@@ -7,6 +7,8 @@ import (
 	"unicode/utf8"
 )
 
+const SlotOfferPrefix = "Tenho estes horários para o diagnóstico: "
+
 var listLine = regexp.MustCompile(`(?m)^\s*(?:[-*•]|[0-9]+[.)])\s`)
 
 // SplitReply preserves words, links and structured lists. Small replies remain
@@ -15,6 +17,19 @@ func SplitReply(text string) []string {
 	text = strings.TrimSpace(strings.ReplaceAll(text, "\r\n", "\n"))
 	if text == "" {
 		return nil
+	}
+	// Keep the exact slot offer and its CTA together so positional buttons
+	// cannot be separated from the dates they actually select.
+	if index := strings.Index(text, SlotOfferPrefix); index >= 0 {
+		intro := strings.TrimSpace(text[:index])
+		if intro == "" {
+			return []string{text}
+		}
+		parts := SplitReply(intro)
+		if len(parts) > 2 {
+			parts = []string{strings.Join(parts[:len(parts)-1], "\n\n"), parts[len(parts)-1]}
+		}
+		return append(parts, text[index:])
 	}
 	if utf8.RuneCountInString(text) <= 180 || listLine.MatchString(text) {
 		return []string{text}

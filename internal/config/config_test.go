@@ -56,3 +56,24 @@ func TestMeetingStartRequiresItsOwnTemplateButNotVoiceCadence(t *testing.T) {
 		t.Fatal("enabled T0 without template")
 	}
 }
+
+func TestQuickRepliesRequireCompleteTemplateSet(t *testing.T) {
+	for k, v := range map[string]string{"BIA_MODE": "shadow", "BIA_DATABASE_URL": "postgres://unused", "BIA_API_TOKEN": strings.Repeat("x", 32), "BIA_MESSAGING_PROVIDER": "twilio", "BIA_QUICK_REPLIES_ENABLED": "true", "TWILIO_ACCOUNT_SID": "AC" + strings.Repeat("b", 32), "TWILIO_AUTH_TOKEN": "test", "TWILIO_WHATSAPP_FROM": "+5511936246321", "BIA_VOICE_PUBLIC_URL": "https://example.com"} {
+		t.Setenv(k, v)
+	}
+	keys := []string{"TWILIO_QUICK_REPLY_1_SID", "TWILIO_QUICK_REPLY_2_SID", "TWILIO_QUICK_REPLY_3_SID", "TWILIO_FORM_BUTTONS_SID", "TWILIO_CONTEXT_BUTTONS_SID", "TWILIO_CONTEXT_QUESTION_BUTTONS_SID", "TWILIO_PREPARATION_BUTTONS_SID", "TWILIO_MEETING_START_BUTTONS_SID"}
+	for _, key := range keys {
+		t.Setenv(key, "HX"+strings.Repeat("c", 32))
+	}
+	c, err := Load()
+	if err != nil || !c.QuickReplies.Enabled {
+		t.Fatal(c.QuickReplies, err)
+	}
+	for _, key := range keys {
+		t.Setenv(key, "")
+		if _, err = Load(); err == nil {
+			t.Fatal("enabled incomplete templates", key)
+		}
+		t.Setenv(key, "HX"+strings.Repeat("c", 32))
+	}
+}

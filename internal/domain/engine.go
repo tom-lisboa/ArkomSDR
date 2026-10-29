@@ -468,7 +468,7 @@ func offer(s *State, r *Result, e Event, slots []Slot, p Policy, now time.Time) 
 		for _, slot := range s.Offered {
 			parts = append(parts, SlotLabel(slot, p.Zone(*s)))
 		}
-		text = "Tenho estes horários para o diagnóstico: " + strings.Join(parts, " ou ") + "."
+		text = SlotOfferPrefix + strings.Join(parts, " ou ") + "."
 		if len(parts) == 1 {
 			text += " Responda PRIMEIRO para escolher esse horário."
 		} else {

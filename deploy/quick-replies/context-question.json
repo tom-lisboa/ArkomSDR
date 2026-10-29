@@ -1,0 +1,28 @@
+{
+  "friendly_name": "arkom_botoes_context_question_v1",
+  "language": "pt_BR",
+  "variables": {
+    "1": "bia1.sample.sample.sample.sample",
+    "2": "bia1.sample.sample.sample.sample",
+    "3": "bia1.sample.sample.sample.sample"
+  },
+  "types": {
+    "twilio/quick-reply": {
+      "body": "Vamos avaliar onde a IA pode ajudar na sua empresa.\n\nQual rotina vamos priorizar nessa reunião: atendimento, vendas ou operação?",
+      "actions": [
+        {
+          "title": "Atendimento",
+          "id": "{{1}}"
+        },
+        {
+          "title": "Vendas",
+          "id": "{{2}}"
+        },
+        {
+          "title": "Operação",
+          "id": "{{3}}"
+        }
+      ]
+    }
+  }
+}

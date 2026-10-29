@@ -158,3 +158,5 @@ Abertura com confirmação da reserva, preparação após 15 minutos e correçã
 A [abertura em mensagens curtas](docs/short-opening.md) divide confirmação e contexto em duas mensagens, com templates próprios para o primeiro contato automático.
 
 [Direct response por etapa](docs/direct-response.md): chamadas para ação específicas e datas/horas locais sem códigos técnicos de fuso nas mensagens.
+
+Botões nativos de resposta rápida: [etapas, configuração e validação](docs/quick-replies.md).

@@ -1,0 +1,29 @@
+{
+  "friendly_name": "arkom_botoes_context_v1",
+  "language": "pt_BR",
+  "variables": {
+    "1": "melhorar o atendimento",
+    "2": "bia1.sample.sample.sample.sample",
+    "3": "bia1.sample.sample.sample.sample",
+    "4": "bia1.sample.sample.sample.sample"
+  },
+  "types": {
+    "twilio/quick-reply": {
+      "body": "Na reunião, vamos avaliar onde a IA pode ajudar. Seu foco: {{1}}.\n\nVocê confirma sua presença?",
+      "actions": [
+        {
+          "title": "Confirmar presença",
+          "id": "{{2}}"
+        },
+        {
+          "title": "Remarcar",
+          "id": "{{3}}"
+        },
+        {
+          "title": "Tirar dúvida",
+          "id": "{{4}}"
+        }
+      ]
+    }
+  }
+}
