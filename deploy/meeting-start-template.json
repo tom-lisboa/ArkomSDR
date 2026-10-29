@@ -1,0 +1,15 @@
+{
+  "friendly_name": "arkom_reuniao_agora_v1",
+  "language": "pt_BR",
+  "variables": {
+    "1": "Ana",
+    "2": "30/10 às 14:00",
+    "3": "America/Cuiaba",
+    "4": "45"
+  },
+  "types": {
+    "twilio/text": {
+      "body": "Oi, {{1}}! Chegou o horário da sua reunião com o time da Arkom: {{2}} ({{3}}).\n\nSão {{4}} minutos para avaliar onde a IA pode ajudar no seu negócio. Você consegue participar agora?\n\nResponda CONFIRMO para confirmar presença ou REMARCAR para escolher outro horário."
+    }
+  }
+}

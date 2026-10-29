@@ -182,6 +182,9 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 		if p.MeetingReminders {
 			r.Effects = append(r.Effects, MeetingSequence(s, now)...)
 		}
+		if p.MeetingStart {
+			r.Effects = append(r.Effects, MeetingStartSequence(s, now)...)
+		}
 		if p.SMSReminders {
 			r.Effects = append(r.Effects, SMSSequence(s, now)...)
 		}
@@ -276,7 +279,7 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 		case "handoff":
 			handoff(d.Reason)
 		case "confirm":
-			if s.Booking == nil || !s.Booking.Start.After(now) {
+			if !HasActiveMeeting(s, now) {
 				offer(&s, &r, e, slots, p, now)
 				break
 			}
@@ -304,7 +307,7 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 				message("reply", "Você quer cancelar a reunião ou prefere encontrar outro horário?")
 				break
 			}
-			if s.Booking == nil || !s.Booking.Start.After(now) {
+			if !HasActiveMeeting(s, now) {
 				message("reply", "Não encontrei uma reserva futura para cancelar.")
 				break
 			}
@@ -382,7 +385,7 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 }
 
 func offer(s *State, r *Result, e Event, slots []Slot, p Policy, now time.Time) {
-	if s.Booking != nil && s.Booking.Outcome == "" && s.Booking.Start.After(now) && !RescheduleRequested(e.Text) && !(s.Stage == "choosing_slot" && len(s.Offered) > 0) {
+	if HasActiveMeeting(*s, now) && !RescheduleRequested(e.Text) && !(s.Stage == "choosing_slot" && len(s.Offered) > 0) {
 		s.Offered = nil
 		s.OfferVersion = ""
 		s.Stage = "booked"
@@ -558,7 +561,14 @@ func Deliverable(s State, fx Effect, now time.Time) (bool, string) {
 		if s.Paused {
 			return false, "paused"
 		}
-		if s.Booking == nil || s.Booking.Outcome != "" || !s.Booking.Start.After(now) {
+		if fx.Purpose == "meeting_start" {
+			if s.Booking == nil || s.Booking.Outcome != "" || s.Booking.Start.After(now) || !s.Booking.End.After(now) {
+				return false, "meeting_not_in_progress"
+			}
+			if !now.Before(s.Booking.Start.Add(MeetingStartGrace)) {
+				return false, "meeting_start_expired"
+			}
+		} else if s.Booking == nil || s.Booking.Outcome != "" || !s.Booking.Start.After(now) {
 			return false, "meeting_not_upcoming"
 		}
 	}
@@ -605,6 +615,9 @@ func Deliverable(s State, fx Effect, now time.Time) (bool, string) {
 }
 
 func Render(s State, fx Effect, p Policy, now time.Time) string {
+	if fx.Purpose == "meeting_start" {
+		return MeetingStartOpening(s, p).Text
+	}
 	if fx.Purpose == "meeting_preparation" {
 		return PreparationOpening(s).Text
 	}
@@ -615,7 +628,14 @@ func Render(s State, fx Effect, p Policy, now time.Time) string {
 		return SMSReminderText(s, p)
 	}
 	if fx.Purpose == "meeting_call" && s.Booking != nil {
-		return "Olá, " + firstName(s.Profile.Name) + "! Sou a Bia, assistente de IA da " + p.Brand + ". " + bookingText(*s.Booking, p, s) + " Posso te ligar para lembrar da reunião e ajudar com o acesso? Se o WhatsApp mostrar a opção de permitir chamadas, toque em permitir."
+		text := firstName(s.Profile.Name) + ", sua reunião com o time da " + p.Brand + " é " + s.Booking.Start.In(p.Zone(s)).Format("02/01 às 15:04") + " (" + p.Zone(s).String() + ")."
+		if s.Booking.End.After(s.Booking.Start) {
+			text += fmt.Sprintf(" Separe %d minutos para avaliar onde a IA pode ajudar no seu negócio.", int(s.Booking.End.Sub(s.Booking.Start).Minutes()))
+		}
+		if s.Booking.MeetingURL != "" {
+			text += " Link da reunião: " + s.Booking.MeetingURL
+		}
+		return text + "\n\nPosso te ligar para lembrar do horário? Se o WhatsApp mostrar a opção de permitir chamadas, toque em permitir."
 	}
 	if fx.Purpose != "reminder" || s.Booking == nil {
 		return fx.Text

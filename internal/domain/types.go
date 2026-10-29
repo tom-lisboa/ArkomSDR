@@ -154,6 +154,7 @@ type Result struct {
 }
 
 type Policy struct {
+	MeetingStart       bool
 	MeetingPreparation bool
 	SMSReminders       bool
 	WhatsAppPhone      string

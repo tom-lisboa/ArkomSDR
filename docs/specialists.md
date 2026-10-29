@@ -1,6 +1,6 @@
 # Especialistas de texto e Decisions em Go
 
-Publicado e habilitado na homologação em 29/10/2026, release `r-a4028ad7edd3`, prompt `bia-specialists-v1`. A validação automatizada com API real cobriu 12 turnos sintéticos; um deles usou o fallback de indisponibilidade. A conversa no aparelho ainda precisa validar a experiência completa desta versão.
+O prompt atual é `bia-specialists-v2`, de 29/10/2026. Inclui orientação de direct response e reconhecimento da reunião em andamento pelo intervalo real da reserva. A versão anterior foi validada com 12 turnos sintéticos na API real; mais quatro turnos desta atualização verificaram consulta da reserva, atraso e remarcação. Os testes locais cobrem as guardas finais contra promessas de espera e ofertas duplicadas. A conversa no aparelho ainda precisa validar a experiência completa desta versão.
 
 O atendimento pode classificar cada lote de mensagens com Decisions e escolher um especialista de texto no worker de execução. A Bia mantém a identidade, o número e o histórico compartilhado. Voz conserva o roteiro de lembrete separado.
 
@@ -53,10 +53,12 @@ Para rollback de comportamento, definir `BIA_SPECIALISTS_ENABLED=false` e recria
 | `persuasion` | Relacionar o objetivo conhecido ao valor da reunião | Resposta e oferta; não reserva diretamente |
 | `objections` | Esclarecer a barreira ao agendamento ou comparecimento | Enquanto a barreira está aberta, não oferece vagas nem reserva |
 | `scheduling` | Vagas, escolha, remarcação, cancelamento e presença | Mutações continuam validadas e executadas pelo worker de agenda |
-| `attendance` | Preparação e dúvidas sobre uma reserva futura | Não abre outra oferta de reunião |
+| `attendance` | Preparação e dúvidas sobre uma reserva futura ou em andamento | Não abre outra oferta de reunião |
 | `recovery` | Nova conversa após no-show registrado | Pode oferecer vagas; não infere falta pelo silêncio |
 
-Pedidos operacionais claros têm prioridade. Uma oferta anterior não prende a conversa à agenda. Objeções podem ocorrer antes ou depois da reserva. Quem já tem reunião futura permanece no objetivo de comparecimento, exceto quando pede alteração ou apresenta barreira concreta. As especialidades são um registro fechado no Go; nomes ou comandos propostos pelo modelo não criam agentes.
+Pedidos operacionais claros têm prioridade. Uma oferta anterior não prende a conversa à agenda. Objeções podem ocorrer antes ou depois da reserva. Quem já tem reunião futura ou em andamento permanece no objetivo de comparecimento, exceto quando pede alteração ou apresenta barreira concreta. As especialidades são um registro fechado no Go; nomes ou comandos propostos pelo modelo não criam agentes.
+
+Direct response orienta cada resposta comercial a conectar um benefício concreto ao objetivo conhecido e terminar com um próximo passo simples, quando houver abertura. Não adiciona urgência fictícia, resultado garantido ou insistência após saída. No início da reunião, o [worker de follow-up](followups.md) envia uma mensagem determinística com `CONFIRMO` ou `REMARCAR`; a resposta volta ao mesmo contexto. Durante o intervalo reservado, confirmação indica intenção de participar e não comprova presença. Atraso não autoriza prometer que o consultor irá esperar.
 
 ## Termômetro e memória
 

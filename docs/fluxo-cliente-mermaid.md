@@ -13,7 +13,7 @@ tags:
 
 Documento para importar ou colar no Obsidian. Cada bloco `mermaid` funciona de forma independente; o primeiro dá a visão de cima e os demais abrem os caminhos.
 
-Base: implementação e configuração consultadas no servidor em **29/10/2026**, incluindo o case Camozzi após a abertura e especialistas de texto com Decisions. O mapa descreve os caminhos implementados; isso não significa que todos foram homologados em atendimento real.
+Base: implementação e configuração consultadas no servidor em **29/10/2026**, incluindo o case Camozzi, especialistas de texto com Decisions e aviso por WhatsApp no início da reunião. O mapa descreve os caminhos implementados; isso não significa que todos foram homologados em atendimento real.
 
 **Como ler:** decisões aparecem em losangos. Estados finais de uma etapa podem voltar à conversa quando houver uma nova mensagem. Trechos explicitamente marcados como desligados, dependentes de evento ou propostos não devem ser tratados como automações ativas.
 
@@ -76,6 +76,7 @@ O bloco de cadência é independente de o cliente responder à primeira mensagem
 | Áudio 30 minutos antes | Ativo, usando a gravação instalada |
 | Texto e solicitação de ligação 15 minutos antes | Ativos, condicionados à janela e à permissão |
 | SMS 5 minutos antes | Ativo, com `sms_consent: true` |
+| WhatsApp no início | Etapa própria em T, expira em T+5; CONFIRMO ou REMARCAR; template fora da sessão |
 | Botões de áudio, chamada e SMS da demonstração | Ativos; antecipam a execução sem alterar a reunião |
 | Retomada 2 horas após oferta sem resposta | Implementada; desligada por `BIA_DISABLE_FOLLOWUPS=true` |
 | Recuperação após no-show | Implementada; envio desligado pela mesma configuração |
@@ -315,6 +316,15 @@ flowchart TD
     PSCHED --> PT30["T menos 30 minutos<br/>Áudio pronto pelo worker de mídia"]
     PSCHED --> PT15["T menos 15 minutos<br/>Texto e fluxo de autorização da chamada"]
     PSCHED --> PT5["T menos 5 minutos<br/>SMS transacional"]
+    PSCHED --> PTNOW["T: início da reunião<br/>WhatsApp com resposta direta"]
+    PTNOW --> PCNOW{"Contato liberado e dentro de T a T mais 5 minutos?"}
+    PCNOW -->|Não| PSKNOW["Pular aviso expirado ou bloqueado"]
+    PCNOW -->|Sim| PWIN{"Sessão recente de WhatsApp?"}
+    PWIN -->|Sim| PN["Enviar aviso com CONFIRMO ou REMARCAR"]
+    PWIN -->|Não| PAPP{"Template de início aprovado?"}
+    PAPP -->|Sim| PN
+    PAPP -->|Não| PWAIT["Adiar o mesmo job até aprovação ou expiração"]
+    PN --> PREPLY["Resposta entra na mesma conversa; reunião segue relevante até o fim"]
     PT0 --> PC0{"Ainda antes de T menos 30, dentro da validade e do horário permitido?"}
     PC0 -->|Sim| PREP["Pedir exemplo de tarefa para preparar a reunião"]
     PC0 -->|Não| PSK0["Pular preparação; não enviar atrasada"]
@@ -340,6 +350,7 @@ flowchart TD
 | Preparação | T0 + 15min | Só se há reunião; vence após 5min ou em T−30, o que ocorrer primeiro; respeita horário permitido | Follow-up envia texto/template de preparação, sem depoimento |
 | Áudio | T−30min | Vence em T−25; sessão recente de WhatsApp, consentimento e arquivo pronto; horário permitido | Follow-up encaminha; mídia envia a gravação existente |
 | Convite/chamada | T−15min | Texto e início do pedido de permissão até T−10; chamada depende de permissão e reunião ainda futura | Follow-up envia texto; voz trata autorização e chamada |
+| WhatsApp no início | T | Expira em T+5 ou no fim da reserva; contato liberado; template aprovado fora da sessão | Follow-up envia texto determinístico com CONFIRMO ou REMARCAR |
 | SMS | T−5min | Até T; autorização específica, celular válido e canal configurado; não depende de sessão nem do horário comercial | Follow-up envia texto determinístico por Twilio SMS |
 | Retomada de oferta | Oferta + 2h, ajustada ao horário permitido | Desligada hoje; quando ligada, requer a mesma oferta atual, nenhuma reserva e limite de uma retomada em 24h | Follow-up envia texto de retomada; não é uma sequência diária infinita |
 | Lembretes clássicos | T−24h, T−2h, T−15min | Alternativa quando a cadência de reunião está desligada; não roda em paralelo com ela | Follow-up de texto; também afetado pelo bloqueio de retomadas gerais |
@@ -590,7 +601,7 @@ Todo o controle comercial e a orquestração estão no nosso código Go. Twilio 
 |---|---|
 | Identidade e controle | Telefone, responsável `go`, consentimento, `paused`, `opted_out`, `human` |
 | Perfil compartilhado | Pessoa, empresa, receita, objetivo e fuso |
-| Reserva | Sem reserva, agendada, remarcada, cancelada, resultado desconhecido, compareceu ou faltou |
+| Reserva | Sem reserva, agendada, em andamento pelo intervalo, remarcada, cancelada, resultado desconhecido, compareceu ou faltou |
 | Oferta | Sem oferta, duas opções atuais, escolha pendente, agenda vazia ou consulta indisponível |
 | Contexto | Fragmentos chegando, mídia pendente, Run congelada, resposta em partes ou entrada nova |
 | Memória | Histórico compartilhado, objeção/motivo, argumentos enviados, condição pendente e `previous_response_id` por especialista/versão |

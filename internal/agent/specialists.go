@@ -9,7 +9,7 @@ import (
 	"arkom/bia/internal/domain"
 )
 
-const SpecialistPromptVersion = "bia-specialists-v1"
+const SpecialistPromptVersion = "bia-specialists-v2"
 
 func normalizeAssessment(s domain.State, e domain.Event, a domain.DialogueAssessment) domain.DialogueAssessment {
 	set := func(field string, target *string, value string) {
@@ -71,8 +71,8 @@ func specialistInstructions(brand, id string) string {
 	return strings.ReplaceAll(string(common), "{{brand}}", brand) + "\n\n" + string(job)
 }
 
-func upcoming(s domain.State, now time.Time) bool {
-	return s.Booking != nil && s.Booking.Outcome == "" && s.Booking.Start.After(now)
+func activeMeeting(s domain.State, now time.Time) bool {
+	return domain.HasActiveMeeting(s, now)
 }
 
 // The registry is closed; Decisions recommends conversational labels, not agent
@@ -91,12 +91,12 @@ func SelectAssessment(s domain.State, e domain.Event, a domain.DialogueAssessmen
 			return "scheduling"
 		}
 	case "schedule":
-		if upcoming(s, now) {
+		if activeMeeting(s, now) {
 			return "attendance"
 		}
 		return "scheduling"
 	}
-	if upcoming(s, now) {
+	if activeMeeting(s, now) {
 		return "attendance"
 	}
 	if s.Stage == "no_show" {
@@ -139,6 +139,11 @@ func specialistActions(id string, a domain.DialogueAssessment) []string {
 // Defence in depth after typed output: acknowledgments and commercial hesitation
 // are not authority to mutate an existing booking or pause every reminder.
 func constrainSpecialist(s domain.State, e domain.Event, d domain.Decision, a domain.DialogueAssessment, now time.Time) domain.Decision {
+	if domain.MeetingStatus(s, now) == "in_progress" && delayNotice.MatchString(e.Text) && !domain.RescheduleRequested(e.Text) {
+		p := domain.Policy{TimeZone: "America/Cuiaba"}
+		z := p.Zone(s)
+		return domain.Decision{Action: "reply", Message: "Seu horário reservado é de " + s.Booking.Start.In(z).Format("15:04") + " a " + s.Booking.End.In(z).Format("15:04") + " (" + z.String() + "). Você consegue participar nesse intervalo ou prefere remarcar?", Reason: "delay_does_not_authorize_host_availability"}
+	}
 	if d.Action == "confirm" && a.Intent != "confirm" {
 		d.Action = "reply"
 		if d.Message == "" {
@@ -167,7 +172,8 @@ func constrainSpecialist(s domain.State, e domain.Event, d domain.Decision, a do
 			d.Message = "O que mais pesa nessa decisão para você?"
 		}
 	}
-	if upcoming(s, now) && a.Intent != "reschedule" && (d.Action == "offer_slots" || d.Action == "book" || d.Action == "reschedule") {
+	rescheduling := a.Intent == "reschedule" || (a.Intent == "select" && s.Stage == "choosing_slot" && len(s.Offered) > 0)
+	if activeMeeting(s, now) && !rescheduling && (d.Action == "offer_slots" || d.Action == "book" || d.Action == "reschedule") {
 		p := domain.Policy{TimeZone: "America/Cuiaba"}
 		return domain.Decision{Action: "reply", Message: "Sua reunião está marcada para " + s.Booking.Start.In(p.Zone(s)).Format("02/01 às 15:04") + " (" + p.Zone(s).String() + "). Pode me dizer sua dúvida sobre essa conversa?", Reason: "keep_current_booking"}
 	}
@@ -180,3 +186,4 @@ func constrainSpecialist(s domain.State, e domain.Event, d domain.Decision, a do
 }
 
 var offerDetails = regexp.MustCompile(`(?i)(\b[0-9]{1,2}(:[0-9]{2}|h([0-9]{2})?| horas?)\b|[0-9]{1,2}/[0-9]{1,2}|https?://)`)
+var delayNotice = regexp.MustCompile(`(?i)(atras|vou entrar depois|vou chegar depois)`)

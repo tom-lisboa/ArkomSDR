@@ -88,3 +88,32 @@ func TestCurrentBookingOverridesOldConversationInContext(t *testing.T) {
 		t.Fatal(c)
 	}
 }
+
+func TestOngoingMeetingKeepsAttendanceContextAndDirectResponse(t *testing.T) {
+	now := time.Now()
+	s := domain.State{Booking: &domain.Booking{ID: "ongoing", Start: now.Add(-time.Minute), End: now.Add(44 * time.Minute)}}
+	if got := textContext(s, domain.Event{}, nil, "", now)["meeting_status"]; got != "in_progress" {
+		t.Fatal(got)
+	}
+	a := domain.DialogueAssessment{Intent: "value", Source: "decisions"}
+	if got := SelectAssessment(s, domain.Event{Text: "vou entrar agora"}, a, now); got != "attendance" {
+		t.Fatal(got)
+	}
+	d := constrainSpecialist(s, domain.Event{}, domain.Decision{Action: "offer_slots"}, a, now)
+	if d.Action != "reply" {
+		t.Fatal("reopened agenda at meeting start", d)
+	}
+	if !strings.Contains(specialistInstructions("Arkom", "persuasion"), "RESPOSTA DIRETA") {
+		t.Fatal("missing direct-response instructions")
+	}
+	s.Stage = "choosing_slot"
+	s.Offered = []domain.Slot{{ID: "replacement", Start: now.Add(time.Hour)}}
+	d = constrainSpecialist(s, domain.Event{Text: "o primeiro"}, domain.Decision{Action: "reschedule", SlotID: "replacement"}, domain.DialogueAssessment{Intent: "select"}, now)
+	if d.Action != "reschedule" {
+		t.Fatal("blocked choice after explicit reschedule", d)
+	}
+	d = constrainSpecialist(s, domain.Event{Text: "Vou me atrasar dez minutos"}, domain.Decision{Action: "reply", Message: "Pode entrar, o consultor espera."}, a, now)
+	if d.Action != "reply" || strings.Contains(d.Message, "consultor espera") || !strings.Contains(d.Message, "intervalo") {
+		t.Fatal("invented host availability", d)
+	}
+}

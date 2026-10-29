@@ -42,3 +42,17 @@ func TestSpecialistsAreExplicitAndRequireSupportedDecisionsModel(t *testing.T) {
 		t.Fatal("legacy configuration requires Decisions", err)
 	}
 }
+
+func TestMeetingStartRequiresItsOwnTemplateButNotVoiceCadence(t *testing.T) {
+	for k, v := range map[string]string{"BIA_MODE": "shadow", "BIA_DATABASE_URL": "postgres://unused", "BIA_API_TOKEN": strings.Repeat("x", 32), "BIA_MESSAGING_PROVIDER": "twilio", "BIA_MEETING_START_ENABLED": "true", "TWILIO_MEETING_START_CONTENT_SID": "HX" + strings.Repeat("a", 32), "TWILIO_ACCOUNT_SID": "AC" + strings.Repeat("b", 32), "TWILIO_AUTH_TOKEN": "test", "TWILIO_WHATSAPP_FROM": "+5511936246321", "BIA_VOICE_PUBLIC_URL": "https://example.com", "BIA_MEETING_REMINDERS_ENABLED": "false"} {
+		t.Setenv(k, v)
+	}
+	c, err := Load()
+	if err != nil || !c.Policy.MeetingStart || c.Policy.MeetingReminders {
+		t.Fatal(c.Policy, err)
+	}
+	t.Setenv("TWILIO_MEETING_START_CONTENT_SID", "")
+	if _, err = Load(); err == nil {
+		t.Fatal("enabled T0 without template")
+	}
+}

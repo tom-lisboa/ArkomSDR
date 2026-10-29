@@ -19,6 +19,7 @@ import (
 // TwilioMessaging records an attempt before making a non-idempotent POST.
 // An interrupted attempt without a SID requires review; it is never resent.
 type TwilioMessaging struct {
+	MeetingStartContentSID                            string
 	IntroVideoContentSID                              string
 	PreparationContentSID                             string
 	FormContentSID, ContentBaseURL                    string
@@ -133,6 +134,21 @@ func (t *TwilioMessaging) Send(ctx context.Context, key string, s domain.State, 
 	}
 	if purpose == "booking_confirmation" && !messageWindowOpen(s, now) {
 		return Receipt{}, &Deferred{Code: "booking_confirmation_awaiting_whatsapp", After: time.Minute}
+	}
+	if purpose == "meeting_start" && !messageWindowOpen(s, now) {
+		zone := t.TimeZone
+		if zone == "" {
+			zone = "America/Cuiaba"
+		}
+		opening := domain.MeetingStartOpening(s, domain.Policy{TimeZone: zone})
+		if text != opening.Text || text == "" {
+			return Receipt{}, &Failure{Code: "meeting_start_template_text_mismatch"}
+		}
+		if err := t.templateReady(ctx, t.MeetingStartContentSID); err != nil {
+			return Receipt{}, err
+		}
+		variables, _ := json.Marshal(opening.Variables)
+		return t.send(ctx, key, s, text, url.Values{"ContentSid": {t.MeetingStartContentSID}, "ContentVariables": {string(variables)}}, now)
 	}
 	return t.send(ctx, key, s, text, url.Values{"Body": {text}}, now)
 }

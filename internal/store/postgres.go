@@ -58,6 +58,9 @@ var preparationSchema string
 //go:embed intro_video.sql
 var introVideoSchema string
 
+//go:embed meeting_start.sql
+var meetingStartSchema string
+
 var ErrConflict = errors.New("idempotency key reused with different payload")
 var ErrLease = errors.New("lease lost; stale worker cannot commit")
 
@@ -148,6 +151,9 @@ func (d *DB) Migrate(ctx context.Context) error {
 		return e
 	}
 	if _, e = tx.Exec(ctx, introVideoSchema); e != nil {
+		return e
+	}
+	if _, e = tx.Exec(ctx, meetingStartSchema); e != nil {
 		return e
 	}
 	return tx.Commit(ctx)

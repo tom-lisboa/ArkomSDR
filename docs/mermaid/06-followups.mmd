@@ -12,6 +12,15 @@ flowchart TD
     PSCHED --> PT30["T menos 30 minutos<br/>Áudio pronto pelo worker de mídia"]
     PSCHED --> PT15["T menos 15 minutos<br/>Texto e fluxo de autorização da chamada"]
     PSCHED --> PT5["T menos 5 minutos<br/>SMS transacional"]
+    PSCHED --> PTNOW["T: início da reunião<br/>WhatsApp com resposta direta"]
+    PTNOW --> PCNOW{"Contato liberado e dentro de T a T mais 5 minutos?"}
+    PCNOW -->|Não| PSKNOW["Pular aviso expirado ou bloqueado"]
+    PCNOW -->|Sim| PWIN{"Sessão recente de WhatsApp?"}
+    PWIN -->|Sim| PN["Enviar aviso com CONFIRMO ou REMARCAR"]
+    PWIN -->|Não| PAPP{"Template de início aprovado?"}
+    PAPP -->|Sim| PN
+    PAPP -->|Não| PWAIT["Adiar o mesmo job até aprovação ou expiração"]
+    PN --> PREPLY["Resposta entra na mesma conversa; reunião segue relevante até o fim"]
     PT0 --> PC0{"Ainda antes de T menos 30, dentro da validade e do horário permitido?"}
     PC0 -->|Sim| PREP["Pedir exemplo de tarefa para preparar a reunião"]
     PC0 -->|Não| PSK0["Pular preparação; não enviar atrasada"]

@@ -147,6 +147,8 @@ sem esperar os horários T−30/T−15 e sem mudar a reunião no banco.
 O [lembrete SMS em T−5](docs/sms-reminders.md) usa o mesmo worker de follow-up,
 com autorização própria no formulário e botão opcional `/reminders/sms` para demonstração.
 
+O [aviso por WhatsApp no início da reunião](docs/followups.md) pede uma resposta direta (`CONFIRMO` ou `REMARCAR`) e tem template próprio fora da janela. A Bia mantém o contexto da reunião durante o intervalo reservado; confirmação é intenção de presença, sem inferir comparecimento real.
+
 Disponibilidade e reserva pelo formulário: [contrato dos endpoints](docs/form-calendar.md).
 
 Abertura com confirmação da reserva, preparação após 15 minutos e correção dos erros do formulário: [contrato e diagnóstico](docs/test-form-troubleshooting.md).

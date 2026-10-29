@@ -33,7 +33,7 @@ func New(base worker.Worker) *Worker {
 		if why != "" || due.After(now) || !domain.IsMeetingReminder(fx) {
 			return due, why
 		}
-		if fx.Purpose == "meeting_preparation" {
+		if fx.Purpose == "meeting_preparation" || fx.Purpose == "meeting_start" {
 			return due, ""
 		}
 		if fx.Purpose == "meeting_sms" {
@@ -64,6 +64,13 @@ func (w *Worker) RunScheduler(ctx context.Context) {
 	tick := time.NewTicker(30 * time.Second)
 	defer tick.Stop()
 	for {
+		if w.runtime.Policy.MeetingStart {
+			step, cancel := context.WithTimeout(ctx, 20*time.Second)
+			if err := w.runtime.DB.ReconcileMeetingStart(step, time.Now().UTC(), w.runtime.Live); err != nil && ctx.Err() == nil {
+				slog.Error("meeting start reconciliation failed")
+			}
+			cancel()
+		}
 		if w.runtime.Policy.MeetingPreparation {
 			step, cancel := context.WithTimeout(ctx, 20*time.Second)
 			if err := w.runtime.DB.ReconcilePreparation(step, time.Now().UTC(), w.runtime.Live); err != nil && ctx.Err() == nil {
@@ -139,6 +146,15 @@ func NextContact(p domain.Policy, s domain.State, fx domain.Effect, now time.Tim
 		}
 		if p.TestPhone != "" && s.Profile.Phone != p.TestPhone {
 			return time.Time{}, "test_phone_mismatch"
+		}
+		return now, ""
+	}
+	if fx.Purpose == "meeting_start" {
+		if !p.MeetingStart || p.TestPhone != "" {
+			return time.Time{}, "meeting_start_disabled"
+		}
+		if ok, why := domain.Deliverable(s, fx, now); !ok {
+			return time.Time{}, why
 		}
 		return now, ""
 	}

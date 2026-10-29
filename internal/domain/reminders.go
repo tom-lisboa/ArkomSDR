@@ -33,7 +33,7 @@ func MeetingSequence(s State, now time.Time) []Effect {
 }
 
 func IsMeetingReminder(fx Effect) bool {
-	return fx.Purpose == "meeting_preparation" || fx.Purpose == "meeting_audio" || fx.Purpose == "meeting_call" || fx.Purpose == "meeting_sms"
+	return fx.Purpose == "meeting_preparation" || fx.Purpose == "meeting_audio" || fx.Purpose == "meeting_call" || fx.Purpose == "meeting_sms" || fx.Purpose == "meeting_start"
 }
 
 // Preparation is measured from the successful opening, not from the meeting.

@@ -14,9 +14,24 @@ uma etapa por clique usando os mesmos workers, mesmo com a cadência desligada.
 | Após confirmar o envio do texto | Follow-up → voz | Solicita permissão pelo botão nativo do WhatsApp. |
 | Após o cliente permitir | Voz → agenda | Confere a reserva e inicia uma única ligação de lembrete. |
 | T−5 minutos | Follow-up → SMS | Envia lembrete por SMS aos contatos que autorizaram esse canal. |
+| T: início da reunião | Follow-up → WhatsApp | Informa o horário real e pede resposta CONFIRMO ou REMARCAR. |
 
 O [SMS](sms-reminders.md) tem ativação independente e não depende do áudio instalado
 nem da janela de atendimento do WhatsApp.
+
+O WhatsApp no início tem ativação independente por `BIA_MEETING_START_ENABLED` e usa `TWILIO_MEETING_START_CONTENT_SID` aprovado quando não há sessão recente. O job fica elegível no início real da reserva e expira cinco minutos depois, limitado também ao fim da reunião. A reconciliação recupera reinícios nesse intervalo sem repetir uma etapa já concluída. O aviso continua sujeito a processamento da fila e entrega do provedor.
+
+Exemplo de texto, com valores gerados a partir do cadastro e da reserva:
+
+> Oi, Ana! Chegou o horário da sua reunião com o time da Arkom: 30/10 às 14:00 (America/Cuiaba).
+>
+> São 45 minutos para avaliar onde a IA pode ajudar no seu negócio. Você consegue participar agora?
+>
+> Responda CONFIRMO para confirmar presença ou REMARCAR para escolher outro horário.
+
+Não há anúncio de sala aberta nem de consultor esperando. Este aviso não inclui link de reunião. `CONFIRMO` registra intenção de comparecer, inclusive no intervalo da reunião, sem marcar presença real. `REMARCAR` consulta novas vagas e preserva a reserva atual até a troca concluir. Durante esse intervalo o contexto usa `meeting_status=in_progress`, evitando uma nova oferta automática por simples confirmação ou atraso.
+
+O texto de T−15 passou a trazer horário, duração e benefício da conversa antes do pedido de autorização da ligação, sem reapresentar a Bia. Os prompts de texto `bia-specialists-v2` orientam uma chamada específica para ação quando cabe avançar; agradecimento, pausa, recusa e saída não geram outro convite. Condições e resultados comerciais não são inventados para obter resposta.
 
 O botão não autoriza a ligação sozinho: a resposta nativa precisa ser validada.
 Sem aceite, não há chamada. A ligação pode começar após T−15, quando o cliente
@@ -27,17 +42,19 @@ A preparação tem ativação independente por `BIA_MEETING_PREPARATION_ENABLED`
 
 ## Estado de ativação
 
+Em 29/10/2026, o aviso de início foi publicado e habilitado na homologação, release `r-36043e9ddb53`, migração 16. A verificação após publicação confirmou os sete serviços ativos, `/readyz` disponível e três jobs futuros na fila `followup`. A Twilio confirmou o template `arkom_reuniao_agora_v1` como `approved`, categoria `UTILITY`, permitindo também o caminho fora da sessão. Esse é um retrato da publicação, não um status atualizado automaticamente; a aprovação é reconsultada antes de cada envio por template.
+
 `BIA_MEETING_REMINDERS_ENABLED=false` continua sendo o padrão de instalação.
 No servidor de teste, a cadência foi ativada em 28/10/2026 após instalar a gravação
 `1-daqui-a-pouco-A.mp3` fornecida pelo usuário: 19,28 segundos, convertida para
 OGG/Opus mono 48 kHz. O arquivo permanece fora do Git e foi validado por checksum,
 decodificação completa e acesso HTTPS público.
-Os templates aprovados para mensagens fora da janela de atendimento ainda não
-estão integrados a esta cadência. O código usa uma margem conservadora de **23
-horas desde a última mensagem recebida**. Com a janela fechada, registra
-`approved_template_required_outside_session` e não envia texto, áudio ou botão.
-Logo, o envio a todos os clientes em T−30/T−15 depende também dessa janela ou de
-uma futura integração com templates aprovados; a cadência não contorna a regra.
+O código usa uma margem conservadora de **23 horas desde a última mensagem recebida**.
+T−30 e T−15 continuam dependendo dessa sessão: fora dela, registram
+`approved_template_required_outside_session` e não enviam áudio, texto ou botão.
+O aviso no início tem template próprio `arkom_reuniao_agora_v1`; fora da sessão,
+o adaptador verifica a aprovação e adia o mesmo job enquanto estiver pendente,
+sem ultrapassar sua validade. A preparação após a abertura também tem template próprio.
 
 A cadência é independente de `BIA_DISABLE_FOLLOWUPS=true`, que continua bloqueando
 as retomadas antigas. Quando a cadência nova está ligada, os antigos lembretes de
@@ -91,6 +108,8 @@ as retomadas antigas. Quando a cadência nova está ligada, os antigos lembretes
 - Horários persistidos em UTC; quiet hours 08h–20h no fuso do cliente (ou padrão).
 - Tolerância de 5 minutos para cada disparo: áudio até T−25, texto/botão até T−10.
   Atrasos maiores são descartados, sem tentar compensar depois da reunião.
+- O aviso de início tem intervalo próprio T até T+5 minutos, sempre antes do fim da reserva. Atrasos maiores não são recuperados.
+- No início, o envio solicitado para o horário reservado não é deslocado pelas quiet hours; consentimento, pausa, humano e validade continuam sendo verificados.
 - Reconciliação a cada 30 segundos e na partida inclui reservas anteriores à
   ativação. IDs derivados de cliente, reserva, horário e etapa impedem duplicidade.
 - Opt-out, pausa, atendimento humano, troca de reserva e cancelamento são
@@ -101,12 +120,15 @@ as retomadas antigas. Quando a cadência nova está ligada, os antigos lembretes
   como skipped/simulated não é ressuscitada pela reconciliação.
 - Áudio e texto compartilham limites diários/globais e um registro anterior ao POST
   da Twilio. Resultado incerto exige revisão; não existe reenvio automático cego.
+- Falha no aviso opcional de início é registrada sem colocar o WhatsApp inteiro em atendimento humano.
 - O hash identifica uma gravação imutável. A API verifica tamanho, cabeçalho
   OGG/Opus e SHA-256, suporta GET/HEAD/Range e não lista arquivos do servidor.
 - Permissões continuam limitadas pelo worker de voz (uma solicitação por 24h,
   duas por semana). O agendador não reaproveita autorização para ligar repetidamente.
 
 ## Verificação
+
+Esta atualização passou pela suíte completa com `go test -race ./... -count=1`, incluindo integração com PostgreSQL isolado, e por `go vet ./...`. Os testes do aviso verificam janela/template, aprovação pendente, execução única após reinício, fila correta, prazo, cancelamento, remarcação e bloqueios do contato. Quatro turnos sintéticos com API real validaram consulta do horário, atraso e escolha de uma nova vaga, sem enviar WhatsApp nem alterar a agenda de clientes. A experiência no aparelho com a nova etapa ainda precisa ser homologada.
 
 `GET /v1/followups` (privado) informa ativação, áudio pronto e contagens por fila e
 status. `GET /v1/jobs/{id}` informa resultado/motivo de descarte; IDs contendo `/`

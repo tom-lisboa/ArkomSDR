@@ -111,10 +111,7 @@ func textContext(s domain.State, e domain.Event, slots []domain.Slot, scheduling
 	if e.CalendarUnavailable {
 		status = "unavailable"
 	}
-	meetingStatus := "not_scheduled"
-	if s.Booking != nil && s.Booking.Outcome == "" && s.Booking.Start.After(now) {
-		meetingStatus = "upcoming"
-	}
+	meetingStatus := domain.MeetingStatus(s, now)
 	return map[string]any{
 		"dialogue":        s.Dialogue,
 		"allowed_actions": dialogueAllowedActions(s),

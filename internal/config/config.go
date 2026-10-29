@@ -14,6 +14,7 @@ import (
 )
 
 type Config struct {
+	MeetingStartContentSID              string
 	Specialists                         bool
 	DecisionsModel                      string
 	IntroVideoEnabled                   bool
@@ -83,9 +84,10 @@ func Load() (Config, error) {
 	c.FormAutoContact = os.Getenv("BIA_FORM_AUTO_CONTACT") == "true"
 	c.FormContentSID = os.Getenv("TWILIO_FORM_CONTACT_CONTENT_SID")
 	c.PreparationContentSID = os.Getenv("TWILIO_PREPARATION_CONTENT_SID")
+	c.MeetingStartContentSID = os.Getenv("TWILIO_MEETING_START_CONTENT_SID")
 	c.BookedContentSID = os.Getenv("TWILIO_BOOKED_CONTACT_CONTENT_SID")
 	c.BookedQuestionSID = os.Getenv("TWILIO_BOOKED_QUESTION_CONTENT_SID")
-	for _, sid := range []string{c.BookedContentSID, c.BookedQuestionSID, c.PreparationContentSID} {
+	for _, sid := range []string{c.BookedContentSID, c.BookedQuestionSID, c.PreparationContentSID, c.MeetingStartContentSID} {
 		if sid != "" && (len(sid) != 34 || !strings.HasPrefix(sid, "HX")) {
 			return c, errors.New("invalid booked template SID")
 		}
@@ -137,6 +139,7 @@ func Load() (Config, error) {
 	c.Policy.DisableFollowups = os.Getenv("BIA_DISABLE_FOLLOWUPS") == "true"
 	c.Policy.MeetingPreparation = os.Getenv("BIA_MEETING_PREPARATION_ENABLED") == "true"
 	c.Policy.MeetingReminders = os.Getenv("BIA_MEETING_REMINDERS_ENABLED") == "true"
+	c.Policy.MeetingStart = os.Getenv("BIA_MEETING_START_ENABLED") == "true"
 	c.Policy.SMSReminders = os.Getenv("BIA_SMS_REMINDERS_ENABLED") == "true"
 	c.SMSFrom = os.Getenv("TWILIO_SMS_FROM")
 	if c.SMSFrom != "" {
@@ -203,6 +206,9 @@ func Load() (Config, error) {
 		return c, errors.New("intro video requires Twilio, a verified MP4 and its approved template")
 	}
 	c.Policy.WhatsAppPhone = v.Sender
+	if c.Policy.MeetingStart && (c.MessagingProvider != "twilio" || c.MeetingStartContentSID == "" || c.TestPhone != "") {
+		return c, errors.New("meeting start requires Twilio, its approved template and unrestricted recipient configuration")
+	}
 	if c.Policy.MeetingPreparation && (c.MessagingProvider != "twilio" || c.PreparationContentSID == "" || c.TestPhone != "") {
 		return c, errors.New("meeting preparation requires Twilio, an approved preparation template and unrestricted recipient configuration")
 	}

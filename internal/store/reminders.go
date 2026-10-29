@@ -22,10 +22,18 @@ func (d *DB) ReconcileSMSReminders(ctx context.Context, now time.Time, live bool
 	return d.reconcileReminders(ctx, now, live, domain.SMSSequence)
 }
 
-func (d *DB) reconcileReminders(ctx context.Context, now time.Time, live bool, sequence func(domain.State, time.Time) []domain.Effect) error {
+func (d *DB) ReconcileMeetingStart(ctx context.Context, now time.Time, live bool) error {
+	return d.reconcileReminders(ctx, now, live, domain.MeetingStartSequence, domain.MeetingStartGrace)
+}
+
+func (d *DB) reconcileReminders(ctx context.Context, now time.Time, live bool, sequence func(domain.State, time.Time) []domain.Effect, lookback ...time.Duration) error {
+	from := now
+	if len(lookback) > 0 {
+		from = now.Add(-lookback[0])
+	}
 	after := ""
 	for {
-		rows, err := d.Pool.Query(ctx, `SELECT id,state FROM bia_go.leads WHERE id>$1 AND state->'booking'->>'start' IS NOT NULL AND (state->'booking'->>'start')::timestamptz>$2 ORDER BY id LIMIT 100`, after, now)
+		rows, err := d.Pool.Query(ctx, `SELECT id,state FROM bia_go.leads WHERE id>$1 AND state->'booking'->>'start' IS NOT NULL AND (state->'booking'->>'start')::timestamptz>$2 ORDER BY id LIMIT 100`, after, from)
 		if err != nil {
 			return err
 		}
