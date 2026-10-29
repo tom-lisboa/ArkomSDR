@@ -15,7 +15,6 @@ func IsOptOut(text string) bool { return stopRE.MatchString(strings.TrimSpace(te
 
 var cancelRE = regexp.MustCompile(`(?i)^(por favor[, ]*)?(quero |pode |preciso )?(cancelar|cancele|cancela)( minha| a| essa| esta)? (reunião|reuniao|call|reserva|vaga)[.! ]*$`)
 var confirmRE = regexp.MustCompile(`(?i)^(sim[,! ]*)?(confirmo( minha presença| minha presenca)?|estarei (lá|la|presente)|vou participar|presença confirmada|presenca confirmada)[.! ]*$`)
-var casualAckRE = regexp.MustCompile(`(?i)^(claro|ok|okay|certo|combinado|fechou|beleza|perfeito)[.! ]*$`)
 var bareYesRE = regexp.MustCompile(`(?i)^(sim|s)[.! ]*$`)
 
 // Reduce is deterministic: it reads no clock, database or network. The planner
@@ -281,12 +280,18 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 				offer(&s, &r, e, slots, p, now)
 				break
 			}
-			if casualAckRE.MatchString(strings.TrimSpace(e.Text)) {
-				message("reply", "Combinado. "+bookingText(*s.Booking, p, s))
-				break
-			}
 			if !confirmRE.MatchString(strings.TrimSpace(e.Text)) && !(bareYesRE.MatchString(strings.TrimSpace(e.Text)) && lastAssistantAskedAttendance(s)) {
-				handoff("ambiguous_confirmation")
+				// The planner sometimes uses confirm to acknowledge an existing
+				// booking or a greeting. Without an explicit presence confirmation,
+				// keep the conversation open and leave the booking unchanged.
+				text := strings.TrimSpace(d.Message)
+				if text == "" || !SafeReply(text, s, p) || strings.Contains(strings.ToLower(text), "confirm") {
+					text = bookingText(*s.Booking, p, s)
+				}
+				r.Decision.Action = "reply"
+				r.Decision.Reason = "presence_not_explicit"
+				r.Decision.Message = text
+				message("reply", text)
 				break
 			}
 			b := *s.Booking

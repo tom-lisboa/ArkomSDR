@@ -91,6 +91,47 @@ func TestGuardCases(t *testing.T) {
 		})
 	}
 }
+
+func TestUnprovenPresenceConfirmationKeepsConversationOpen(t *testing.T) {
+	for _, text := range []string{"pá\nopa", "oi", "claro", "fechou", "já tenho horário né?", "sim"} {
+		t.Run(text, func(t *testing.T) {
+			s, p, now := fixture()
+			s.Booking = &Booking{ID: "existing", Start: now.Add(time.Hour), End: now.Add(105 * time.Minute)}
+			s.History = []Turn{{Role: "assistant", Text: "Posso te ligar para lembrar da reunião?"}}
+			e := Event{ID: "greeting", LeadID: s.ID, Kind: "message.received", At: now, Text: text}
+			r := Reduce(s, e, Decision{Action: "confirm", Message: "Combinado.", Evidence: "current_message=" + text}, nil, p, now)
+			if r.State.Human || r.State.Paused || r.State.Booking.ConfirmedAt != nil || r.Decision.Action != "reply" || count(r, "send", "reply") != 1 || count(r, "crm", "") != 0 {
+				t.Fatalf("ordinary reply blocked contact or changed attendance: %+v", r)
+			}
+			for _, fx := range []Effect{{Kind: "prepare_audio", Purpose: "meeting_audio"}, {Kind: "send", Purpose: "meeting_call"}} {
+				if ok, why := Deliverable(r.State, fx, now); !ok {
+					t.Fatal("greeting blocked reminder", why)
+				}
+			}
+		})
+	}
+}
+
+func TestPresenceConfirmationNeedsExplicitAnswer(t *testing.T) {
+	for _, text := range []string{"confirmo minha presença", "estarei lá", "sim"} {
+		s, p, now := fixture()
+		s.Booking = &Booking{ID: "existing", Start: now.Add(time.Hour)}
+		s.History = []Turn{{Role: "assistant", Text: "Você confirma sua presença?"}}
+		r := Reduce(s, Event{ID: "confirmed", Kind: "message.received", At: now, Text: text}, Decision{Action: "confirm"}, nil, p, now)
+		if r.State.Human || r.State.Booking.ConfirmedAt == nil || count(r, "crm", "presence_confirmed") != 1 {
+			t.Fatal("explicit attendance confirmation lost", text, r)
+		}
+	}
+}
+
+func TestUnprovenConfirmationCannotAnnouncePresence(t *testing.T) {
+	s, p, now := fixture()
+	s.Booking = &Booking{ID: "existing", Start: now.Add(time.Hour)}
+	r := Reduce(s, Event{ID: "hello", Kind: "message.received", At: now, Text: "opa"}, Decision{Action: "confirm", Message: "Presença confirmada!"}, nil, p, now)
+	if r.State.Human || r.State.Booking.ConfirmedAt != nil || len(r.Effects) != 1 || strings.Contains(r.Effects[0].Text, "Presença confirmada") {
+		t.Fatal("fabricated attendance reached the contact", r)
+	}
+}
 func TestBookingRequiresOfferedSlotAndSameCloser(t *testing.T) {
 	s, p, now := fixture()
 	slot := Slot{ID: "S1", Provider: "local", CloserID: 9, Start: now.Add(2 * time.Hour), End: now.Add(3 * time.Hour)}

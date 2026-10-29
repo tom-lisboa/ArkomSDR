@@ -22,6 +22,7 @@ Mostre `message` ao usuário, em vez de "O webhook respondeu 409". Não trate to
 | `sms_consent_required` | Falta autorização específica de SMS. `consent: true` sozinho autoriza WhatsApp. Repetir o disparo não registra autorização. |
 | `sms_phone_required` | Falta celular válido para SMS, com o nono dígito brasileiro. |
 | `contact_update_pending` | A preferência de SMS está na fila; consultar status e aguardar sua aplicação. |
+| `contact_blocked` | Verificar pausa, saída solicitada, responsável pelo contato e atendimento humano. Uma saudação ou confirmação ambígua do modelo não deve ativar atendimento humano. |
 | `reminder_audio_not_ready` | A gravação ainda não foi instalada; esconder/desabilitar botão de áudio. |
 | `future_booking_required` | Sem reunião futura no contexto; concluir o agendamento e aguardar o worker de agenda. |
 | `contact_busy` | Há processamento de atendimento; repetir a MESMA reserva após alguns segundos, sem trocar horário nem chave. |
@@ -44,6 +45,8 @@ Content-Type: application/json
 Retorna `booking`, `has_future_booking`, `sms_consent`, `sms_consent_pending`, `sms_phone_valid`, `sms_configured`, `audio_ready`, `call_configured`, `contact_blocked`. Não cria reserva, mensagem ou ligação. O corpo só é aceito quando a submissão ativa, de até 24 horas, pertence ao telefone informado.
 
 Use a reserva atual para atualizar a tela se o contato agendou pela IA. Esses campos são pré-requisitos, não promessa de entrega; os triggers ainda conferem janela, permissões, limites e mudanças da reunião na hora de executar.
+
+Confirmação de presença exige uma resposta explícita. Se o modelo interpretar uma saudação como `confirm`, o motor converte a proposta em resposta de texto, mantém a reunião e não registra presença nem bloqueia os lembretes. A regressão cobre mensagens fragmentadas, execução da resposta e os três botões, incluindo os workers de áudio, SMS e voz com provedores simulados.
 
 ## Registrar ou retirar autorização de SMS sem recadastrar
 

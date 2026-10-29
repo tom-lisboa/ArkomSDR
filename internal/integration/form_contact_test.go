@@ -46,6 +46,13 @@ func TestAutomaticFormQueuesContactWithoutInbound(t *testing.T) {
 	m := &countingMessenger{}
 	w := runtimeWorker(db, time.Now(), m)
 	drain(t, w)
+	if m.Count.Load() != 0 {
+		t.Fatal("opening sent before the form booking grace period")
+	}
+	if _, err := db.Pool.Exec(ctx, `UPDATE bia_go.jobs SET due_at=now() WHERE payload->>'purpose'='form_contact'`); err != nil {
+		t.Fatal(err)
+	}
+	drain(t, w)
 	s, err := db.Lead(ctx, domain.LeadKey("+5577999749058"))
 	if err != nil || s.Profile.Company != "Empresa Ana" || s.Profile.Revenue == nil || *s.Profile.Revenue != 0 || !s.LastInbound.IsZero() || s.Owner != "go" || s.LastFormContactAt == nil || m.Count.Load() != 1 {
 		t.Fatal(s, m.Count.Load(), err)
@@ -53,6 +60,10 @@ func TestAutomaticFormQueuesContactWithoutInbound(t *testing.T) {
 	// A changed UUID is a new submission, but does not spam a recent contact.
 	if post("automatic-two", body).Code != 202 {
 		t.Fatal("second form failed")
+	}
+	drain(t, w)
+	if _, err := db.Pool.Exec(ctx, `UPDATE bia_go.jobs SET due_at=now() WHERE payload->>'purpose'='form_contact'`); err != nil {
+		t.Fatal(err)
 	}
 	drain(t, w)
 	if m.Count.Load() != 1 {
@@ -101,6 +112,10 @@ func TestAutomaticFormPreservesControlAndExistingConversation(t *testing.T) {
 			}
 			m := &countingMessenger{}
 			w := runtimeWorker(db, now, m)
+			drain(t, w)
+			if _, err := db.Pool.Exec(ctx, `UPDATE bia_go.jobs SET due_at=now() WHERE payload->>'purpose'='form_contact'`); err != nil {
+				t.Fatal(err)
+			}
 			drain(t, w)
 			current, err := db.Lead(ctx, s.ID)
 			if err != nil || current.Profile.Company != "Atualizada" || current.Profile.ConversationID != s.Profile.ConversationID || !current.LastInbound.Equal(s.LastInbound) || current.Owner != s.Owner || current.OptedOut != s.OptedOut || current.Paused != s.Paused || current.Human != s.Human {

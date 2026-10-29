@@ -157,7 +157,7 @@ func TestDemoRemindersUseExistingWorkersImmediately(t *testing.T) {
 			posts++
 			if r.Form.Get("MediaUrl") != "" {
 				audios++
-			} else if !strings.Contains(r.Form.Get("Body"), "Autorize") {
+			} else if !strings.Contains(r.Form.Get("Body"), "permitir chamadas") {
 				t.Error("missing call invitation")
 			}
 		}

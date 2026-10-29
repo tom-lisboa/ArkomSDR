@@ -75,7 +75,7 @@ func TestMeetingSequenceAcrossWorkersAndRestart(t *testing.T) {
 				if r.Form.Get("MediaUrl") != a.URL() || r.Form.Has("Body") {
 					t.Error("audio payload", r.Form)
 				}
-			} else if !strings.Contains(r.Form.Get("Body"), "Autorize") {
+			} else if !strings.Contains(r.Form.Get("Body"), "permitir chamadas") {
 				t.Error("missing invitation")
 			}
 			fmt.Fprintf(w, `{"sid":%q,"status":"sent"}`, "MM"+fmt.Sprintf("%032d", posts))
