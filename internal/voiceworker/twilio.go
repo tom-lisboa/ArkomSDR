@@ -57,7 +57,15 @@ func (t *Twilio) request(ctx context.Context, method, path string, values url.Va
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return &providers.Failure{Code: "voice_provider_rejected", Ambiguous: method != "GET" && resp.StatusCode >= 500}
+		var failure struct {
+			Code int `json:"code"`
+		}
+		_ = json.NewDecoder(io.LimitReader(resp.Body, 64<<10)).Decode(&failure)
+		code := "voice_provider_rejected"
+		if failure.Code != 0 {
+			code = "twilio_" + strconv.Itoa(failure.Code)
+		}
+		return &providers.Failure{Code: code, Ambiguous: method != "GET" && resp.StatusCode >= 500}
 	}
 	if out != nil && json.NewDecoder(io.LimitReader(resp.Body, 128<<10)).Decode(out) != nil {
 		return &providers.Failure{Code: "voice_invalid_response", Ambiguous: method != "GET"}
@@ -76,6 +84,22 @@ func (t *Twilio) Permission(ctx context.Context, to, sender string) (string, err
 		e = &providers.Failure{Code: "voice_missing_message_sid", Ambiguous: true}
 	}
 	return r.SID, e
+}
+
+// A successful POST only queues the permission message. Its eventual delivery
+// can still fail, including 37010 when permanent permission already exists.
+func (t *Twilio) PermissionStatus(ctx context.Context, id, phone, sender string) (providers.TwilioMessage, error) {
+	var m providers.TwilioMessage
+	if !providers.ValidMessageSID(id) {
+		return m, ErrBlocked
+	}
+	if err := t.request(ctx, "GET", "/Messages/"+id+".json", nil, &m); err != nil {
+		return m, err
+	}
+	if m.SID != id || m.From != "whatsapp:"+sender || m.To != "whatsapp:"+phone {
+		return m, ErrBlocked
+	}
+	return m, nil
 }
 func (t *Twilio) Dial(ctx context.Context, r Request, to string) (string, error) {
 	if t.AllowedPhone != "" && to != t.AllowedPhone {

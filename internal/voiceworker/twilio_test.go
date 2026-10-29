@@ -92,3 +92,27 @@ func TestNativePermissionAcceptsMediaSID(t *testing.T) {
 		}
 	}
 }
+
+func TestPermissionDeliveryAndProviderErrorCode(t *testing.T) {
+	id := "MM" + strings.Repeat("5", 32)
+	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, `{"code":37010}`)
+			return
+		}
+		fmt.Fprintf(w, `{"sid":%q,"status":"failed","error_code":37010,"from":"whatsapp:+5565999999901","to":"whatsapp:+5565999999900"}`, id)
+	}))
+	defer mock.Close()
+	tw := &Twilio{Account: "AC" + strings.Repeat("1", 32), AuthToken: "test", Client: mock.Client(), BaseURL: mock.URL}
+	if _, err := tw.Permission(context.Background(), "+5565999999900", "+5565999999901"); err == nil || providers.Classify(err).Code != "twilio_37010" {
+		t.Fatal("provider error code lost", err)
+	}
+	m, err := tw.PermissionStatus(context.Background(), id, "+5565999999900", "+5565999999901")
+	if err != nil || m.ErrorCode == nil || *m.ErrorCode != 37010 {
+		t.Fatal("queued delivery failure lost", m, err)
+	}
+	if _, err := tw.PermissionStatus(context.Background(), id, "+5565999999999", "+5565999999901"); err == nil {
+		t.Fatal("permission status for another recipient accepted")
+	}
+}

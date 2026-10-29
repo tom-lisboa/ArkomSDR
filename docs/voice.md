@@ -1,5 +1,9 @@
 > Atualização: ligações agora são apenas lembretes de reunião existente. Consulte [contexto e roteiro atuais](reminder-context.md). Trechos abaixo sobre `schedule`, `book_slot` e convite automático descrevem a implementação anterior e não estão habilitados.
 
+O worker confere o resultado final da entrega do pedido de autorização. Se a Twilio retornar [37010](https://www.twilio.com/docs/api/errors/37010), registra que o cliente já concedeu autorização permanente e segue com uma única chamada para a solicitação de lembrete. As próximas solicitações podem reutilizar essa autorização; a revogação continua bloqueando chamadas. Mensagem entregue ou lida, sozinha, não autoriza ligação. A autorização permanente não expira após sete dias; a temporária, sim.
+
+Limpar os cadastros no Postgres e os buffers no Redis reinicia o atendimento local. Isso não revoga a autorização armazenada no WhatsApp, que pode continuar dispensando o botão no próximo teste.
+
 # Worker de voz: WhatsApp com autorização
 
 O sexto worker usa **Twilio WhatsApp Business Calling**, **Twilio Media Streams** e **OpenAI Realtime pelo SDK Go v3**. A chamada acontece dentro do WhatsApp. Não há fallback automático para telefonia comum. Integração publicada e primeira chamada real concluída em 28/10/2026, com conversa confirmada pelo usuário. Operação restrita ao número de teste; reserva real ainda não homologada. Veja [resultado e limitações](whatsapp.md).

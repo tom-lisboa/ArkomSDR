@@ -136,7 +136,7 @@ func (s Repository) Claim(ctx context.Context, token string) (Request, error) {
  WHERE id=(SELECT id FROM bia_go.voice_requests WHERE state IN ('new','ready') AND due_at<=now() ORDER BY due_at,id FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING `+requestColumns, token))
 }
 func (s Repository) Finish(ctx context.Context, r Request, state, providerID, code string) error {
-	ct, e := s.DB.Pool.Exec(ctx, `UPDATE bia_go.voice_requests SET state=$3,permission_sid=CASE WHEN $4<>'' AND state='requesting' THEN $4 ELSE permission_sid END,call_sid=CASE WHEN $4<>'' AND state='dialing' THEN $4 ELSE call_sid END,error_code=NULLIF($5,''),lease_token=NULL,lease_until=NULL,updated_at=now() WHERE id=$1 AND lease_token=$2 AND lease_until>now()`, r.ID, r.Token, state, providerID, code)
+	ct, e := s.DB.Pool.Exec(ctx, `UPDATE bia_go.voice_requests SET state=$3,permission_sid=CASE WHEN $4<>'' AND state='requesting' THEN $4 ELSE permission_sid END,call_sid=CASE WHEN $4<>'' AND state='dialing' THEN $4 ELSE call_sid END,error_code=NULLIF($5,''),due_at=CASE WHEN $3='awaiting_permission' THEN now()+interval '5 seconds' ELSE due_at END,lease_token=NULL,lease_until=NULL,updated_at=now() WHERE id=$1 AND lease_token=$2 AND lease_until>now()`, r.ID, r.Token, state, providerID, code)
 	if e != nil {
 		return e
 	}
@@ -145,8 +145,12 @@ func (s Repository) Finish(ctx context.Context, r Request, state, providerID, co
 	}
 	return nil
 }
+
+func (s Repository) ClaimPermission(ctx context.Context, token string) (Request, error) {
+	return scanRequest(s.DB.Pool.QueryRow(ctx, `UPDATE bia_go.voice_requests SET lease_token=$1,lease_until=now()+interval '2 minutes' WHERE id=(SELECT id FROM bia_go.voice_requests WHERE state='awaiting_permission' AND permission_sid IS NOT NULL AND due_at<=now() AND expires_at>now() AND (lease_until IS NULL OR lease_until<now()) ORDER BY due_at,id FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING `+requestColumns, token))
+}
 func (s Repository) Defer(ctx context.Context, r Request, due time.Time) error {
-	ct, e := s.DB.Pool.Exec(ctx, `UPDATE bia_go.voice_requests SET state=CASE WHEN state='requesting' THEN 'new' ELSE 'ready' END,due_at=$3,lease_token=NULL,lease_until=NULL WHERE id=$1 AND lease_token=$2 AND lease_until>now()`, r.ID, r.Token, due)
+	ct, e := s.DB.Pool.Exec(ctx, `UPDATE bia_go.voice_requests SET state=CASE WHEN state='requesting' THEN 'new' WHEN state='awaiting_permission' THEN state ELSE 'ready' END,due_at=$3,lease_token=NULL,lease_until=NULL WHERE id=$1 AND lease_token=$2 AND lease_until>now()`, r.ID, r.Token, due)
 	if e != nil {
 		return e
 	}
@@ -183,7 +187,7 @@ func (s Repository) Permission(ctx context.Context, eventID, phone, sender strin
 	} else {
 		// Each invitation authorizes at most one automatic call. Permanent platform
 		// permission does not start another campaign or bypass a new invitation.
-		_, e = tx.Exec(ctx, `UPDATE bia_go.voice_requests SET state='ready',permission_at=$3,permission_expires_at=CASE WHEN $4 THEN NULL ELSE $3+interval '7 days' END,permanent=$4,due_at=now(),updated_at=now() WHERE lead_id=$1 AND sender=$2 AND mode='live' AND state='awaiting_permission' AND date_trunc('second',created_at)<=$3 AND expires_at>now() AND (revoked_at IS NULL OR revoked_at<$3)`, lead, sender, at, permanent)
+		_, e = tx.Exec(ctx, `UPDATE bia_go.voice_requests SET state='ready',permission_at=$3,permission_expires_at=CASE WHEN $4 THEN NULL ELSE $3+interval '7 days' END,permanent=$4,due_at=now(),lease_token=NULL,lease_until=NULL,updated_at=now() WHERE lead_id=$1 AND sender=$2 AND mode='live' AND state IN ('requesting','awaiting_permission') AND date_trunc('second',created_at)<=$3 AND expires_at>now() AND (revoked_at IS NULL OR revoked_at<$3)`, lead, sender, at, permanent)
 	}
 	if e != nil {
 		return e
@@ -194,7 +198,7 @@ func (s Repository) Permission(ctx context.Context, eventID, phone, sender strin
 // MarkPermanentPermission handles Twilio 37010: WhatsApp confirms the consumer
 // already granted permanent calling permission, so another button is invalid.
 func (s Repository) MarkPermanentPermission(ctx context.Context, r Request, at time.Time) error {
-	ct, err := s.DB.Pool.Exec(ctx, `UPDATE bia_go.voice_requests SET state='ready',permission_at=$3,permission_expires_at=NULL,permanent=true,due_at=now(),error_code=NULL,lease_token=NULL,lease_until=NULL,updated_at=now() WHERE id=$1 AND lease_token=$2 AND lease_until>now() AND state='requesting'`, r.ID, r.Token, at)
+	ct, err := s.DB.Pool.Exec(ctx, `UPDATE bia_go.voice_requests SET state='ready',permission_at=$3,permission_expires_at=NULL,permanent=true,due_at=now(),error_code=NULL,lease_token=NULL,lease_until=NULL,updated_at=now() WHERE id=$1 AND lease_token=$2 AND lease_until>now() AND state IN ('requesting','awaiting_permission')`, r.ID, r.Token, at)
 	if err != nil {
 		return err
 	}
@@ -221,7 +225,7 @@ func (s Repository) Active(ctx context.Context, r Request) (domain.State, error)
 	if e != nil {
 		return domain.State{}, e
 	}
-	if fresh.LeadID != r.LeadID || fresh.Purpose != "confirm" || fresh.Mode != "live" || fresh.Revoked != nil || fresh.PermissionAt == nil || fresh.PermissionExpires == nil || !time.Now().Before(*fresh.PermissionExpires) {
+	if fresh.LeadID != r.LeadID || fresh.Purpose != "confirm" || fresh.Mode != "live" || fresh.Revoked != nil || fresh.PermissionAt == nil || (!fresh.Permanent && (fresh.PermissionExpires == nil || !time.Now().Before(*fresh.PermissionExpires))) {
 		return domain.State{}, ErrBlocked
 	}
 	switch fresh.State {

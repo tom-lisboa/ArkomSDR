@@ -9,6 +9,7 @@ import (
 	"errors"
 	"github.com/jackc/pgx/v5"
 	"log/slog"
+	"strconv"
 	"time"
 )
 
@@ -20,6 +21,10 @@ type Worker struct {
 	Live                bool
 	AllowOutsideSession bool
 	Now                 func() time.Time
+}
+
+type permissionStatusProvider interface {
+	PermissionStatus(context.Context, string, string, string) (providers.TwilioMessage, error)
 }
 
 func (w *Worker) Run(ctx context.Context) {
@@ -44,6 +49,10 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 		return false, e
 	}
 	r, e := w.Repo.Claim(ctx, hex.EncodeToString(token[:]))
+	checker, checksPermission := w.Provider.(permissionStatusProvider)
+	if errors.Is(e, pgx.ErrNoRows) && checksPermission {
+		r, e = w.Repo.ClaimPermission(ctx, hex.EncodeToString(token[:]))
+	}
 	if errors.Is(e, pgx.ErrNoRows) {
 		return false, nil
 	}
@@ -108,6 +117,27 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 	if !w.Live || w.Provider == nil {
 		return finish("skipped", "", "voice_not_enabled")
 	}
+	if r.State == "awaiting_permission" {
+		m, err := checker.PermissionStatus(ctx, r.PermissionSID, st.Profile.Phone, r.Sender)
+		if err != nil {
+			if errors.Is(err, ErrBlocked) {
+				return finish("failed", "", "permission_message_mismatch")
+			}
+			return true, w.Repo.Defer(ctx, r, now.Add(30*time.Second))
+		}
+		if m.ErrorCode != nil || m.Status == "failed" || m.Status == "undelivered" {
+			code := "voice_permission_delivery_failed"
+			if m.ErrorCode != nil {
+				code = "twilio_" + strconv.Itoa(*m.ErrorCode)
+			}
+			return w.failed(ctx, r, &providers.Failure{Code: code})
+		}
+		due := now.Add(15 * time.Second)
+		if m.Status == "delivered" || m.Status == "read" {
+			due = r.Expires
+		}
+		return true, w.Repo.Defer(ctx, r, due)
+	}
 	if r.State == "requesting" {
 		if !w.AllowOutsideSession && (st.LastInbound.IsZero() || now.Sub(st.LastInbound) > 24*time.Hour) {
 			return finish("skipped", "", "approved_template_required_outside_session")
@@ -144,7 +174,7 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 }
 func (w *Worker) failed(ctx context.Context, r Request, e error) (bool, error) {
 	f := providers.Classify(e)
-	if r.State == "requesting" && f.Code == "twilio_37010" {
+	if (r.State == "requesting" || r.State == "awaiting_permission") && f.Code == "twilio_37010" {
 		return true, w.Repo.MarkPermanentPermission(ctx, r, time.Now().UTC())
 	}
 	state := "failed"

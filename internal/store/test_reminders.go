@@ -117,12 +117,16 @@ func (d *DB) QueueTestReminder(ctx context.Context, id, submission, phone, actio
 		return deny("voice_request_in_progress")
 	}
 	if action == "call" {
+		var permanent bool
+		if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM bia_go.voice_requests WHERE lead_id=$1 AND mode=$2 AND permanent AND permission_at IS NOT NULL AND revoked_at IS NULL)`, s.ID, mode).Scan(&permanent); err != nil {
+			return "", false, err
+		}
 		var daily, weekly int
 		err = tx.QueryRow(ctx, `SELECT count(*) FILTER(WHERE created_at>now()-interval '24 hours'),count(*) FROM bia_go.voice_requests WHERE lead_id=$1 AND mode=$2 AND created_at>now()-interval '7 days' AND (permission_sid IS NOT NULL OR state='uncertain')`, s.ID, mode).Scan(&daily, &weekly)
 		if err != nil {
 			return "", false, err
 		}
-		if daily >= 1 || weekly >= 2 {
+		if !permanent && (daily >= 1 || weekly >= 2) {
 			return deny("permission_request_limit")
 		}
 	}
