@@ -1,0 +1,29 @@
+{
+  "friendly_name": "arkom_no_reply_24h_v2",
+  "language": "pt_BR",
+  "variables": {
+    "1": "Ana",
+    "2": "bia1.sample.sample.sample.sample",
+    "3": "bia1.sample.sample.sample.sample",
+    "4": "bia1.sample.sample.sample.sample"
+  },
+  "types": {
+    "twilio/quick-reply": {
+      "body": "Oi, {{1}}! retomando seu cadastro na Arkom: ainda faz sentido avaliar como aplicar IA no seu negócio?\n\nPosso consultar os horários por aqui. Se não for o momento, toque em Agora não.",
+      "actions": [
+        {
+          "title": "Ver horários",
+          "id": "{{2}}"
+        },
+        {
+          "title": "Tirar dúvida",
+          "id": "{{3}}"
+        },
+        {
+          "title": "Agora não",
+          "id": "{{4}}"
+        }
+      ]
+    }
+  }
+}

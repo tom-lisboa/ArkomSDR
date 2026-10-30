@@ -33,6 +33,9 @@ func New(base worker.Worker) *Worker {
 		if why != "" || due.After(now) || !domain.IsMeetingReminder(fx) {
 			return due, why
 		}
+		if domain.IsProactive(fx.Purpose) {
+			return due, ""
+		}
 		if fx.Purpose == "meeting_preparation" || fx.Purpose == "meeting_start" {
 			return due, ""
 		}
@@ -64,6 +67,13 @@ func (w *Worker) RunScheduler(ctx context.Context) {
 	tick := time.NewTicker(30 * time.Second)
 	defer tick.Stop()
 	for {
+		if w.runtime.Policy.NoReplyEnabled || w.runtime.Policy.MeetingCheckins {
+			step, cancel := context.WithTimeout(ctx, 20*time.Second)
+			if err := w.runtime.DB.ReconcileProactive(step, time.Now().UTC(), w.runtime.Live, w.runtime.Policy); err != nil && ctx.Err() == nil {
+				slog.Error("proactive cadence reconciliation failed")
+			}
+			cancel()
+		}
 		if w.runtime.Policy.MeetingStart {
 			step, cancel := context.WithTimeout(ctx, 20*time.Second)
 			if err := w.runtime.DB.ReconcileMeetingStart(step, time.Now().UTC(), w.runtime.Live); err != nil && ctx.Err() == nil {
@@ -138,6 +148,26 @@ func (w *Worker) effect(ctx context.Context, j store.Job, s domain.State, fx dom
 // Recheck the current timezone and quiet hours at delivery, including after a
 // restart or profile update. Never extend a reminder beyond its original expiry.
 func NextContact(p domain.Policy, s domain.State, fx domain.Effect, now time.Time) (time.Time, string) {
+	if domain.IsProactive(fx.Purpose) {
+		if p.TestPhone != "" || domain.IsNoReply(fx.Purpose) && !p.NoReplyEnabled || domain.IsMeetingCheckin(fx.Purpose) && !p.MeetingCheckins {
+			return time.Time{}, "proactive_cadence_disabled"
+		}
+		if domain.IsNoReply(fx.Purpose) && (p.NoReplySince.IsZero() || fx.CadenceAnchor.Before(p.NoReplySince)) {
+			return time.Time{}, "before_cadence_activation"
+		}
+		if ok, why := domain.Deliverable(s, fx, now); !ok {
+			return time.Time{}, why
+		}
+		// Final reminders are tied to the requested meeting time, including 07:55.
+		if fx.Purpose == "meeting_checkin_5m" || fx.Purpose == "meeting_checkin_7m_after" {
+			return now, ""
+		}
+		due := p.NextContact(now, s)
+		if !fx.Expires.IsZero() && !due.Before(fx.Expires) {
+			return time.Time{}, "contact_window_expired"
+		}
+		return due, ""
+	}
 	// Explicit demo actions bypass only the cadence and contact hours. Consent,
 	// booking, session, provider limits and delivery checks still apply.
 	if domain.IsMeetingReminder(fx) && fx.ManualReminder {

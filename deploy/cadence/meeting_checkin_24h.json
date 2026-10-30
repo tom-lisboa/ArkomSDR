@@ -1,0 +1,31 @@
+{
+  "friendly_name": "arkom_meeting_checkin_24h_v2",
+  "language": "pt_BR",
+  "variables": {
+    "1": "Ana",
+    "2": "31/10 às 14:00",
+    "3": "45",
+    "4": "bia1.sample.sample.sample.sample",
+    "5": "bia1.sample.sample.sample.sample",
+    "6": "bia1.sample.sample.sample.sample"
+  },
+  "types": {
+    "twilio/quick-reply": {
+      "body": "Oi, {{1}}! lembrete da sua reunião com a Arkom: {{2}}, com duração de {{3}} minutos.\n\nVocê mantém esse horário? Confirme sua presença ou escolha remarcar.",
+      "actions": [
+        {
+          "title": "Confirmar presença",
+          "id": "{{4}}"
+        },
+        {
+          "title": "Remarcar",
+          "id": "{{5}}"
+        },
+        {
+          "title": "Preciso de ajuda",
+          "id": "{{6}}"
+        }
+      ]
+    }
+  }
+}

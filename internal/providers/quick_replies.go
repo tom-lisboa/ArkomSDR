@@ -41,20 +41,23 @@ func (t *TwilioMessaging) sendButtons(ctx context.Context, key string, s domain.
 		}
 	} else {
 		var o domain.Opening
-		switch purpose {
-		case "form_contact":
+		switch {
+		case domain.IsProactive(purpose):
+			o = domain.ProactiveOpening(s, p, purpose)
+			sid = t.ProactiveContentSIDs[purpose]
+		case purpose == "form_contact":
 			o = domain.ContactOpening(s, p, now)
 			sid = t.QuickReplies.Form
-		case "form_context":
+		case purpose == "form_context":
 			o = domain.ContactContextOpening(s, p, now)
 			sid = t.QuickReplies.Context
 			if o.Kind == "booked_context_question" {
 				sid = t.QuickReplies.ContextQuestion
 			}
-		case "meeting_preparation":
+		case purpose == "meeting_preparation":
 			o = domain.PreparationOpening(s)
 			sid = t.QuickReplies.Preparation
-		case "meeting_start":
+		case purpose == "meeting_start":
 			o = domain.MeetingStartOpening(s, p)
 			sid = t.QuickReplies.MeetingStart
 		default:

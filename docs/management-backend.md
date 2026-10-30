@@ -16,6 +16,8 @@ A API da equipe é escrita em Go, usa o Postgres atual e consulta os mesmos regi
 - Operações humanas: assumir, pausar, devolver à IA, atribuir responsável, anotar, responder no WhatsApp, encerrar, ganhar/perder venda e registrar ou corrigir comparecimento.
 - Indicadores por período e série diária, com unidades e denominadores explícitos.
 
+O histórico de follow-ups inclui a sequência sem resposta após a abertura (15 minutos, 2 horas, dia seguinte e 3 dias) e os avisos adicionais de reunião (24h, 2h e 5 minutos antes, e ajuda em T+7 sem resposta recente). Cada propósito e resultado é consultável no mesmo recurso `/leads/{id}/followups` e participa das métricas existentes. A entrega depende das regras de contato e dos templates; pendente, expirado, pulado e enviado não são tratados como equivalentes. Veja [a cadência ampliada](followups.md).
+
 ## Avisos aos vendedores
 
 Cada usuário `operator` ou `admin` conecta sua própria instância de WhatsApp na Lumi. A API guarda a chave da instância cifrada e nunca a devolve ao frontend. A sessão do painel identifica o vendedor em todos os endpoints abaixo; não aceite IDs de outro vendedor no navegador.

@@ -161,9 +161,41 @@ O comparecimento registrado atualiza a reunião e a memória dos agentes de text
 ## Escopo deste portal
 Aqui você consulta documentação e exemplos. Dados reais de pessoas e ações de atendimento continuam protegidos pela API autenticada.`},
 ];
+articles.splice(articles.findIndex(a=>a.id==='paginacao'),0,{
+ id:'cadencias',title:'Follow-ups e botões',group:'Operação',icon:'calendar',description:'Retomadas sem resposta e avisos para comparecer à reunião.',markdown:`O acompanhamento usa o worker de follow-up e o mesmo histórico do SDR. Cada etapa tem identidade e prazo próprios.
+
+## Sem resposta à abertura
+| Momento | Próximo passo |
+|---|---|
+| 15 minutos | Retomar a abertura e facilitar a escolha. |
+| 2 horas | Explicar o valor da conversa e oferecer horários. |
+| Dia seguinte | Conferir se ainda faz sentido seguir. |
+| 3 dias | Último contato da sequência. |
+
+As quatro etapas oferecem **Ver horários**, **Tirar dúvida** e **Agora não**. Param com resposta, reserva, pausa, saída ou atendimento humano. Respeitam os horários de contato e não se acumulam após reinício. A ativação tem um corte explícito: contatos anteriores não entram automaticamente.
+
+## Reunião marcada
+| Momento | Canal e ação |
+|---|---|
+| 15 minutos após abertura | WhatsApp de preparação, quando ainda houver antecedência. |
+| 24 horas antes | WhatsApp para manter ou remarcar o horário. |
+| 2 horas antes | WhatsApp para confirmar o compromisso. |
+| 30 minutos antes | Áudio já preparado. |
+| 15 minutos antes | WhatsApp com botões e pedido nativo de permissão da ligação. |
+| 5 minutos antes | WhatsApp e SMS para quem autorizou SMS. |
+| No início | WhatsApp para confirmar, remarcar ou pedir ajuda. |
+| 7 minutos após início | Ajuda somente sem resposta ou confirmação recente. |
+
+Os avisos oferecem **Confirmar presença**, **Remarcar** e **Preciso de ajuda**. A chamada continua dependendo da permissão nativa. O aviso posterior ao início não afirma que a pessoa faltou; o comparecimento continua sendo registrado pela equipe.
+
+## Entrega e histórico
+Consulte \`GET /leads/{id}/followups\`. Os propósitos \`no_reply_*\` identificam retomadas e \`meeting_checkin_*\` os novos avisos de reunião. Eles entram nos contadores existentes. Mostre situação e motivo de descarte: pendente, enviado, pulado e falho não significam a mesma coisa.
+
+Fora da sessão recente de WhatsApp, o transporte exige o modelo específico aprovado. Enquanto um modelo estiver em análise, o job aguarda sem ultrapassar sua validade. Dentro da sessão, os botões de sessão podem ser usados. Essa restrição não deve aparecer como se uma mensagem já tivesse sido entregue.`
+});
 const groups = [
  {title:'Comece por aqui',items:['inicio','primeiros-passos','autenticacao']},
- {title:'Operação',items:['leads','controle-humano','comparecimento','alertas-vendedores']},
+ {title:'Operação',items:['leads','controle-humano','comparecimento','cadencias','alertas-vendedores']},
  {title:'Dados e indicadores',items:['temperatura','metricas','paginacao']},
  {title:'Referência',items:['api','erros','arquitetura']},
 ];

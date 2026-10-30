@@ -1,0 +1,29 @@
+{
+  "friendly_name": "arkom_no_reply_2h_v2",
+  "language": "pt_BR",
+  "variables": {
+    "1": "Ana",
+    "2": "bia1.sample.sample.sample.sample",
+    "3": "bia1.sample.sample.sample.sample",
+    "4": "bia1.sample.sample.sample.sample"
+  },
+  "types": {
+    "twilio/quick-reply": {
+      "body": "Oi, {{1}}! a conversa com o time serve para entender seu negócio e avaliar onde a IA pode ajudar. Sem precisar decidir nada agora.\n\nQuer escolher um horário ou tirar uma dúvida primeiro?",
+      "actions": [
+        {
+          "title": "Ver horários",
+          "id": "{{2}}"
+        },
+        {
+          "title": "Tirar dúvida",
+          "id": "{{3}}"
+        },
+        {
+          "title": "Agora não",
+          "id": "{{4}}"
+        }
+      ]
+    }
+  }
+}

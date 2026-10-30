@@ -16,6 +16,7 @@ import (
 )
 
 type Config struct {
+	ProactiveContentSIDs                          map[string]string
 	LumiURL, LumiUserAPIKey                       string
 	SalesStalledAfter                             time.Duration
 	ManagementEnabled                             bool
@@ -192,6 +193,33 @@ func Load() (Config, error) {
 		return c, err
 	}
 	c.Policy.DisableFollowups = os.Getenv("BIA_DISABLE_FOLLOWUPS") == "true"
+	c.Policy.NoReplyEnabled = os.Getenv("BIA_NO_REPLY_ENABLED") == "true"
+	c.Policy.MeetingCheckins = os.Getenv("BIA_MEETING_CHECKINS_ENABLED") == "true"
+	if raw := os.Getenv("BIA_NO_REPLY_SINCE"); raw != "" {
+		at, err := time.Parse(time.RFC3339Nano, raw)
+		if err != nil {
+			return c, errors.New("invalid BIA_NO_REPLY_SINCE")
+		}
+		c.Policy.NoReplySince = at
+	}
+	if c.Policy.NoReplyEnabled && c.Policy.NoReplySince.IsZero() {
+		return c, errors.New("no-reply cadence requires an explicit activation timestamp")
+	}
+	c.ProactiveContentSIDs = map[string]string{}
+	for purpose := range domain.ProactivePatterns {
+		key := "TWILIO_" + strings.ToUpper(purpose) + "_SID"
+		sid := os.Getenv(key)
+		if sid != "" && (len(sid) != 34 || !strings.HasPrefix(sid, "HX")) {
+			return c, errors.New("invalid " + key)
+		}
+		if (domain.IsNoReply(purpose) && c.Policy.NoReplyEnabled || domain.IsMeetingCheckin(purpose) && c.Policy.MeetingCheckins) && sid == "" {
+			return c, errors.New("proactive cadence requires " + key)
+		}
+		c.ProactiveContentSIDs[purpose] = sid
+	}
+	if (c.Policy.NoReplyEnabled || c.Policy.MeetingCheckins) && (c.MessagingProvider != "twilio" || !c.QuickReplies.Enabled || c.TestPhone != "") {
+		return c, errors.New("proactive cadences require Twilio buttons and unrestricted recipient configuration")
+	}
 	c.Policy.MeetingPreparation = os.Getenv("BIA_MEETING_PREPARATION_ENABLED") == "true"
 	c.Policy.MeetingReminders = os.Getenv("BIA_MEETING_REMINDERS_ENABLED") == "true"
 	c.Policy.MeetingStart = os.Getenv("BIA_MEETING_START_ENABLED") == "true"

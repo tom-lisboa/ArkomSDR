@@ -1,6 +1,6 @@
 ---
 title: Arkom — jornada do cliente, workers, agentes e follow-ups
-date: 2026-10-29
+date: 2026-10-30
 tags:
   - arkom
   - sdr
@@ -13,7 +13,7 @@ tags:
 
 Documento para importar ou colar no Obsidian. Cada bloco `mermaid` funciona de forma independente; o primeiro dá a visão de cima e os demais abrem os caminhos.
 
-Base: implementação e configuração consultadas no servidor em **29/10/2026**, incluindo o case Camozzi, especialistas de texto com Decisions e aviso por WhatsApp no início da reunião. O mapa descreve os caminhos implementados; isso não significa que todos foram homologados em atendimento real.
+Base atualizada em **30/10/2026** com retomadas sem resposta e WhatsApp adicional antes e depois do início da reunião. Os registros e referências de publicação em 29/10 são históricos. O mapa descreve os caminhos implementados; isso não significa que todos foram homologados em atendimento real.
 
 **Como ler:** decisões aparecem em losangos. Estados finais de uma etapa podem voltar à conversa quando houver uma nova mensagem. Trechos explicitamente marcados como desligados, dependentes de evento ou propostos não devem ser tratados como automações ativas.
 
@@ -34,7 +34,8 @@ flowchart TD
     AS --> VID
     VID --> R{"Cliente responde?"}
     R -->|Sim| CT
-    R -->|Não| ESP["Aguardar; não há retomada específica da abertura hoje"]
+    R -->|Não, sem reserva| ESP["Retomadas: 15 min, 2h, dia seguinte e 3 dias; param com resposta ou reserva"]
+    ESP -->|Responde| CT
     CT --> EX["Execução escolhe agente e valida a decisão em Go"]
     EX --> INT{"Intenção e estado atual"}
     INT -->|Sem reunião| AG["Consultar vagas e oferecer até dois horários"]
@@ -63,7 +64,9 @@ flowchart TD
 
 O bloco de cadência é independente de o cliente responder à primeira mensagem. **Entretanto, áudio e convite de ligação exigem uma resposta recente no WhatsApp**, além de reserva válida. O SMS usa autorização própria e não depende dessa janela.
 
-## 2. O que está ligado hoje
+## 2. Histórico de ativação e configuração
+
+Atualização de 30/10: retomadas próprias sem resposta e avisos adicionais de reunião ligados no release `r-22e51efb15a9`, com corte explícito para novas aberturas. Modelos pendentes de aprovação só são usados fora da sessão depois de aprovados. A tabela abaixo preserva o retrato anterior; a seção 7 traz a cadência atual.
 
 | Caminho | Situação observada no servidor |
 |---|---|
@@ -310,43 +313,44 @@ Há proteções adicionais para contextos de reuniões em grupo e troca de respo
 
 ```mermaid
 flowchart TD
-    P0["Cadastro e conversa"] --> P1{"Existe reunião futura?"}
-    P0 --> PCASE["Entrega da abertura mais 2 segundos<br/>Case Camozzi único; expira em 15 minutos"]
-    P1 -->|Não| PNO["Atendimento busca agendamento"]
-    PNO --> PO{"Horários já foram oferecidos?"}
-    PO -->|Não e cliente em silêncio| PSIL["Aguardar; sem sequência própria de retomada da abertura"]
-    PO -->|Sim| P2H["Retomada em mais 2 horas<br/>IMPLEMENTADA, DESLIGADA"]
-    P2H -.-> PR["Se habilitada: perguntar se quer seguir; resposta volta à conversa"]
-    P1 -->|Sim| PBOOK["Agenda grava ou atualiza a reserva"]
-    PBOOK --> PSCHED["Scheduler reconcilia etapas a cada 30 segundos"]
-    PSCHED --> PT0["T0 mais 15 minutos<br/>Preparação por WhatsApp"]
-    PSCHED --> PT30["T menos 30 minutos<br/>Áudio pronto pelo worker de mídia"]
-    PSCHED --> PT15["T menos 15 minutos<br/>Texto e fluxo de autorização da chamada"]
-    PSCHED --> PT5["T menos 5 minutos<br/>SMS transacional"]
-    PSCHED --> PTNOW["T: início da reunião<br/>WhatsApp com resposta direta"]
-    PTNOW --> PCNOW{"Contato liberado e dentro de T a T mais 5 minutos?"}
-    PCNOW -->|Não| PSKNOW["Pular aviso expirado ou bloqueado"]
-    PCNOW -->|Sim| PWIN{"Sessão recente de WhatsApp?"}
-    PWIN -->|Sim| PN["Enviar aviso com CONFIRMO ou REMARCAR"]
-    PWIN -->|Não| PAPP{"Template de início aprovado?"}
-    PAPP -->|Sim| PN
-    PAPP -->|Não| PWAIT["Adiar o mesmo job até aprovação ou expiração"]
-    PN --> PREPLY["Resposta entra na mesma conversa; reunião segue relevante até o fim"]
-    PT0 --> PC0{"Ainda antes de T menos 30, dentro da validade e do horário permitido?"}
-    PC0 -->|Sim| PREP["Pedir exemplo de tarefa para preparar a reunião"]
-    PC0 -->|Não| PSK0["Pular preparação; não enviar atrasada"]
-    PT30 --> PC30{"Sessão recente de WhatsApp, áudio pronto e contato liberado?"}
-    PC30 -->|Sim| PAUD["Enviar a gravação instalada"]
-    PC30 -->|Não| PSK30["Pular ou bloquear conforme o motivo"]
-    PT15 --> PC15{"Sessão recente e contato liberado?"}
-    PC15 -->|Sim| PCALL["Entrar no fluxo de permissão e ligação"]
-    PC15 -->|Não| PSK15["Não iniciar chamada por esse caminho"]
-    PT5 --> PC5{"Autorizou SMS e há celular válido?"}
-    PC5 -->|Sim| PSMS["Enviar SMS; não exige janela de WhatsApp"]
-    PC5 -->|Não| PSK5["Não enviar SMS"]
-    PBOOK --> POLD["Lembretes clássicos T menos 24h, 2h e 15min<br/>ALTERNATIVA INATIVA nesta configuração"]
-    PE["Evento explícito de no-show"] --> PREC["Recuperação por WhatsApp<br/>IMPLEMENTADA, ENVIO DESLIGADO"]
-    PREC -.-> PR
+    OPEN["Abertura entregue e contexto salvo"] --> BOOK{"Já tem reunião?"}
+    OPEN --> CASE["Case Camozzi, uma vez"]
+    BOOK -->|Não| NR["Sequência sem resposta: 15 min, 2h, dia seguinte e 3 dias"]
+    NR --> NG{"Ainda sem resposta, sem reserva e contato liberado?"}
+    NG -->|Não| STOP["Interromper retomadas"]
+    NG -->|Sim| HOURS["Respeitar 08h-20h e espaçar envios adiados"]
+    HOURS --> NBTN["Ver horários / Tirar dúvida / Agora não"]
+    NBTN -->|Responde| CHAT["Mesma conversa e especialistas"]
+    NBTN -->|Agora não| PAUSE["Pausar contatos"]
+    CHAT -->|Agenda| BOOKED["Reserva no Postgres"]
+    BOOK -->|Sim| BOOKED
+    BOOKED --> SCH["Worker follow-up: reconciliação a cada 30 segundos"]
+    SCH --> PREP["15 min após abertura: preparação"]
+    SCH --> D1["24h antes: confirmar ou remarcar"]
+    SCH --> H2["2h antes: reforçar horário e confirmação"]
+    SCH --> A30["30 min antes: áudio pelo worker de mídia"]
+    SCH --> C15["15 min antes: texto com botões"]
+    C15 --> PERM["Após entrega: pedir permissão nativa de ligação"]
+    PERM -->|Permitiu| VOICE["Voz confere agenda e faz um lembrete"]
+    PERM -->|Não permitiu| NOVOICE["Não ligar"]
+    SCH --> W5["5 min antes: WhatsApp com botões"]
+    SCH --> SMS["5 min antes: SMS, com autorização própria"]
+    SCH --> T0["No início: WhatsApp com confirmação, remarcação e ajuda"]
+    SCH --> PLUS["7 min após início: oferecer ajuda"]
+    PLUS --> RECENT{"Houve resposta ou confirmação nos 15 min finais?"}
+    RECENT -->|Sim| SKIP["Pular aviso de ajuda"]
+    RECENT -->|Não| HELP["Oferecer ajuda sem afirmar ausência"]
+    D1 --> MB["Confirmar presença / Remarcar / Preciso de ajuda"]
+    H2 --> MB
+    W5 --> MB
+    T0 --> MB
+    HELP --> MB
+    MB --> CHAT
+    SCH --> VALID["Revalidar consentimento, humano, pausa, reserva e validade antes de enviar"]
+    VALID --> WINDOW{"Sessão recente de WhatsApp?"}
+    WINDOW -->|Não| TMPL["Usar modelo específico aprovado pela Meta"]
+    WINDOW -->|Sim| LIVE["Botões nativos de sessão"]
+    RESULT["Equipe informa compareceu ou faltou"] --> OUT["Atualizar memória e métricas; nunca inferir falta pelo relógio"]
 ```
 
 | Etapa | Quando fica elegível | Janela e condições principais | Conteúdo e responsável |
@@ -354,6 +358,9 @@ flowchart TD
 | Abertura | Cerca de 10s após ativar formulário público | Cadastro elegível; template aprovado fora da sessão; validade de 24h; intervalo mínimo entre aberturas de 15min | Execução envia texto/template montado com perfil e reserva |
 | Vídeo Camozzi | Elegível 2s após o envio da abertura | Aguarda entrega da abertura; vence em 15min; contato liberado; template de vídeo fora da sessão | Mídia envia o MP4 instalado, uma vez por contato |
 | Confirmação de reserva | Após sucesso da agenda | Antes do início da reunião; aguarda janela de WhatsApp se não foi coberta pela abertura | Worker de agenda; não é uma nova geração livre de horários |
+| Retomadas da abertura | 15min, 2h, dia seguinte e 3 dias | Só aberturas após o corte de ativação; sem resposta e sem reserva; respeita horários e pausa | Follow-up com Ver horários, Tirar dúvida e Agora não |
+| WhatsApp adicional antes da reunião | T−24h, T−2h e T−5min | Reserva atual; modelos específicos aprovados fora da sessão; validade curta | Follow-up com confirmação, remarcação e ajuda |
+| Ajuda após início | T+7min | Até T+12, antes do fim, sem resposta/confirmação desde T−15; não infere falta | Follow-up oferece ajuda ou remarcação |
 | Preparação | T0 + 15min | Só se há reunião; vence após 5min ou em T−30, o que ocorrer primeiro; respeita horário permitido | Follow-up envia texto/template de preparação, sem depoimento |
 | Áudio | T−30min | Vence em T−25; sessão recente de WhatsApp, consentimento e arquivo pronto; horário permitido | Follow-up encaminha; mídia envia a gravação existente |
 | Convite/chamada | T−15min | Texto e início do pedido de permissão até T−10; chamada depende de permissão e reunião ainda futura | Follow-up envia texto; voz trata autorização e chamada |
@@ -369,7 +376,7 @@ flowchart TD
 - Os IDs das etapas incluem reserva e horário. Reconciliação e reinício não recriam automaticamente uma etapa já concluída ou pulada. Uma remarcação cria outra identidade de cadência.
 - O horário normal de contato é 08:00–20:00 no fuso do cliente. Se o próximo horário permitido estiver depois da validade da etapa, ela é pulada. O SMS T−5 tem regra própria e pode sair, por exemplo, às 07:55 para reunião às 08:00.
 - A aplicação usa uma margem conservadora de **23h desde a última entrada** para a sessão de WhatsApp. Abertura e preparação têm templates próprios para fora dessa sessão. Áudio não dispõe desse mesmo caminho de template; a permissão de chamada fora de sessão não está habilitada.
-- Confirmar intenção de comparecer não cancela os lembretes. Não existe hoje uma ramificação de cadência diferente para quem confirmou e quem não confirmou.
+- Confirmar intenção de comparecer não marca presença nem cancela os avisos anteriores à reunião. Resposta ou confirmação desde T−15 dispensa o aviso de ajuda em T+7.
 - O áudio é um arquivo pronto; o worker não gera uma versão personalizada para cada pessoa.
 - Como não há link de sala configurado, a confirmação não contém link fictício. O texto atual do SMS também não inclui link de sala.
 
@@ -457,7 +464,7 @@ O áudio passa por Twilio Media Streams e OpenAI Realtime, com interrupção da 
 ```mermaid
 flowchart TD
     S0["Cliente está no atendimento"] --> SE{"Evento ou comportamento"}
-    SE -->|Silêncio sem reunião e sem oferta| SSW["Aguardar; sem sequência específica ativa"]
+    SE -->|Silêncio sem reunião e sem oferta| SSW["Cadência sem resposta: 15 min, 2h, dia seguinte e 3 dias"]
     SE -->|Silêncio após oferta| SOFF["Retomada mais 2h existe, mas está desligada"]
     SE -->|Silêncio com reunião| SBOOK["Cadência continua se os requisitos de cada canal permitirem"]
     SE -->|Vou pensar ou aviso depois| STHINK["Responder brevemente e respeitar decisão"]
@@ -650,7 +657,7 @@ flowchart LR
 | Agendamento inicial | `persuasion` e `scheduling`, com prompts próprios e Decisions | Avaliar conversas e comparar agendamento real |
 | Comparecimento | Especialista `attendance`; cadência determinística | Medir presença e qualidade das respostas de preparação |
 | Objeções | Especialista próprio, memória de motivos e argumentos enviados | Ampliar biblioteca com casos reais e medir resolução reconhecida pelo cliente |
-| Retomada sem resposta | Uma retomada de oferta existe, mas está desligada; não cobre toda abertura | Projetar uma cadência finita, com saída explícita, intervalo e critérios por estágio |
+| Retomada sem resposta | Cadência finita implementada: 15 min, 2h, dia seguinte e 3 dias, com botões e pausa | Avaliar resposta e agendamento por etapa antes de alterar os intervalos |
 | Reagendamento pedido na voz | Apenas nota para consulta | Passagem durável para texto/agenda e confirmação do cliente antes de alterar a reserva |
 | Falta à reunião | Evento externo e especialidade `recovery` | Integrar presença real e definir uma sequência curta de recuperação |
 | Depois da reunião | Não há cadência comercial própria | Definir proposta, decisão, fechamento e pós-venda somente após existir resultado confiável |
@@ -703,7 +710,7 @@ flowchart LR
 | Resposta em partes | `internal/domain/reply_parts.go`, `internal/worker/reply_typing.go` |
 | Parâmetros | `internal/config/config.go`, `internal/config/voice.go`; valores não secretos conferidos no servidor |
 
-Valores observados: `live`, contato automático e vídeo de abertura ligados, retomadas gerais desligadas, preparação/reunião/SMS/voz ligados, sem restrição a um único telefone de teste, sem URL de sala, sem URL de agendamento e sem pedido de permissão de voz fora da sessão. Os limites atuais de homologação são 100 envios por contato/dia e 300 globais/hora; não são uma recomendação de cadência comercial.
+Retrato de 29/10, anterior à cadência ampliada: `live`, contato automático e vídeo de abertura ligados, retomadas gerais desligadas, preparação/reunião/SMS/voz ligados, sem restrição a um único telefone de teste, sem URL de sala, sem URL de agendamento e sem pedido de permissão de voz fora da sessão. Os limites atuais de homologação são 100 envios por contato/dia e 300 globais/hora; não são uma recomendação de cadência comercial.
 
 ## 17. Respostas rápidas nativas
 

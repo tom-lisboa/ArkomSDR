@@ -50,7 +50,7 @@ func cursorValues(c *cursor) (any, string) {
 	return c.At, c.ID
 }
 
-const followupPurposes = `('followup','reminder','recovery','meeting_preparation','meeting_audio','meeting_call','meeting_sms','meeting_start')`
+const followupPurposes = `('followup','reminder','recovery','meeting_preparation','meeting_audio','meeting_call','meeting_sms','meeting_start','no_reply_15m','no_reply_2h','no_reply_24h','no_reply_72h','meeting_checkin_24h','meeting_checkin_2h','meeting_checkin_5m','meeting_checkin_7m_after')`
 const deliveredSQL = `mode='live' AND kind='effect' AND payload->>'kind' IN ('send','send_audio','send_sms','send_video') AND COALESCE(result->>'chunked','false')<>'true'`
 
 func leadCTE() string {

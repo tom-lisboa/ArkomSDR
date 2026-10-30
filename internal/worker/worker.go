@@ -229,7 +229,7 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 	}
 	if fx.Kind != "crm" {
 		conv, version := fx.ConversationID, fx.ConversationVersion
-		if domain.IsMeetingReminder(fx) || fx.Purpose == "intro_video" {
+		if domain.IsMeetingReminder(fx) || domain.IsNoReply(fx.Purpose) || fx.Purpose == "intro_video" {
 			conv, version = "", 0
 		}
 		pending, e := w.DB.HasNewInput(ctx, s.ID, conv, version)
@@ -406,7 +406,7 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 		// Never fabricate a success message after a timeout or unknown response.
 		if fx.Kind != "crm" {
 			// Optional outreach failures must not take over the WhatsApp conversation.
-			if fx.Kind != "send_sms" && fx.Kind != "send_video" && fx.Purpose != "meeting_start" && fx.Purpose != "form_context" {
+			if fx.Kind != "send_sms" && fx.Kind != "send_video" && !domain.IsProactive(fx.Purpose) && fx.Purpose != "meeting_start" && fx.Purpose != "form_context" {
 				s.Human = true
 			}
 			s.Reasons = append(s.Reasons, f.Code)

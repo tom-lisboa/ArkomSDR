@@ -124,6 +124,7 @@ type Decision struct {
 }
 
 type Effect struct {
+	CadenceAnchor       time.Time         `json:"cadence_anchor,omitempty"`
 	OperatorID          string            `json:"operator_id,omitempty"`
 	Dialogue            *DialogueDelivery `json:"dialogue,omitempty"`
 	AfterMessageID      string            `json:"after_message_id,omitempty"`
@@ -158,6 +159,9 @@ type Result struct {
 }
 
 type Policy struct {
+	NoReplyEnabled     bool
+	NoReplySince       time.Time
+	MeetingCheckins    bool
 	MeetingStart       bool
 	MeetingPreparation bool
 	SMSReminders       bool

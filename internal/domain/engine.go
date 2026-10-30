@@ -578,6 +578,12 @@ func Deliverable(s State, fx Effect, now time.Time) (bool, string) {
 	if s.Human {
 		return false, "human_takeover"
 	}
+	if IsProactive(fx.Purpose) {
+		if fx.BookingID != "" && (s.Booking == nil || s.Booking.ID != fx.BookingID || !s.Booking.Start.Equal(fx.BookingStart)) {
+			return false, "stale_booking"
+		}
+		return proactiveDeliverable(s, fx, now)
+	}
 	if fx.Purpose == "intro_video" && (s.Paused || !s.Profile.Consent) {
 		return false, "intro_video_contact_blocked"
 	}
@@ -658,6 +664,9 @@ func Render(s State, fx Effect, p Policy, now time.Time) string {
 }
 
 func render(s State, fx Effect, p Policy, now time.Time) string {
+	if IsProactive(fx.Purpose) {
+		return ProactiveOpening(s, p, fx.Purpose).Text
+	}
 	if fx.Purpose == "form_context" {
 		return ContactContextOpening(s, p, now).Text
 	}

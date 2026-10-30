@@ -20,6 +20,7 @@ import (
 // TwilioMessaging records an attempt before making a non-idempotent POST.
 // An interrupted attempt without a SID requires review; it is never resent.
 type TwilioMessaging struct {
+	ProactiveContentSIDs                              map[string]string
 	QuickReplies                                      QuickReplyConfig
 	Buttons                                           quickreply.Signer
 	MeetingStartContentSID                            string
@@ -105,6 +106,9 @@ func (t *TwilioMessaging) Send(ctx context.Context, key string, s domain.State, 
 	}
 	if receipt, handled, err := t.sendButtons(ctx, key, s, text, purpose, now); handled {
 		return receipt, err
+	}
+	if domain.IsProactive(purpose) {
+		return Receipt{}, &Deferred{Code: "cadence_buttons_required", After: time.Minute}
 	}
 	if purpose == "form_contact" && !messageWindowOpen(s, now) {
 		zone := t.TimeZone

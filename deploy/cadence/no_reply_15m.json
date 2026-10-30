@@ -1,0 +1,29 @@
+{
+  "friendly_name": "arkom_no_reply_15m_v2",
+  "language": "pt_BR",
+  "variables": {
+    "1": "Ana",
+    "2": "bia1.sample.sample.sample.sample",
+    "3": "bia1.sample.sample.sample.sample",
+    "4": "bia1.sample.sample.sample.sample"
+  },
+  "types": {
+    "twilio/quick-reply": {
+      "body": "Oi, {{1}}! conseguiu ver minha mensagem? Posso te mostrar os horários para conversar com o time da Arkom.\n\nToque em Ver horários ou me diga sua dúvida.",
+      "actions": [
+        {
+          "title": "Ver horários",
+          "id": "{{2}}"
+        },
+        {
+          "title": "Tirar dúvida",
+          "id": "{{3}}"
+        },
+        {
+          "title": "Agora não",
+          "id": "{{4}}"
+        }
+      ]
+    }
+  }
+}

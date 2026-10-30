@@ -4,6 +4,9 @@ O Go escolhe o próximo passo pela etapa e envia o Content da Twilio com botões
 
 | Momento | Botões |
 |---|---|
+| Retomadas sem resposta, em 15min/2h/dia seguinte/3 dias | Ver horários · Tirar dúvida · Agora não |
+| WhatsApp T−24h, T−2h, T−5min e ajuda T+7min | Confirmar presença · Remarcar · Preciso de ajuda |
+| Texto T−15, antes da permissão nativa de ligação | Confirmar presença · Remarcar · Preciso de ajuda |
 | Cadastro sem reserva | Ver horários · Tirar dúvida |
 | Cadastro com reserva e objetivo informado, na segunda mensagem curta | Confirmar presença · Remarcar · Tirar dúvida |
 | Cadastro com reserva sem objetivo | Atendimento · Vendas · Operação |
@@ -32,7 +35,7 @@ Cliques repetidos do mesmo Message SID não geram outra execução. Botões de o
 
 A implementação segue [twilio/quick-reply](https://www.twilio.com/docs/content/twilio-quick-reply). Os botões da imagem “Entrar agora” e “Entrar na reunião” são botões de URL, conforme [twilio/call-to-action](https://www.twilio.com/docs/content/twilio-call-to-action). Dependem de uma sala real e de outro Content aprovado. Ainda não há sala configurada neste projeto: o recurso de entrar na sala permanece pendente. “Remarcar” aqui abre a conversa com a agenda em Go; não redireciona para um site.
 
-A atualização não acrescenta disparos em T+6 ou T+14. Ausência só pode gerar recuperação após o evento de presença existente `attendance.no_show`; o relógio, a entrega de WhatsApp e um clique de confirmação não comprovam que o cliente faltou.
+A ampliação de 30/10 inclui ajuda em T+7, apenas sem interação/confirmacão recente e com a reunião ainda em andamento. Essa mensagem não afirma ausência. Recuperação por falta continua dependendo do evento explícito `attendance.no_show`; o relógio, a entrega de WhatsApp e um clique de confirmação não comprovam comparecimento ou falta.
 
 ## Verificação
 

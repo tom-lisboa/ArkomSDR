@@ -1,0 +1,29 @@
+{
+  "friendly_name": "arkom_no_reply_72h_v2",
+  "language": "pt_BR",
+  "variables": {
+    "1": "Ana",
+    "2": "bia1.sample.sample.sample.sample",
+    "3": "bia1.sample.sample.sample.sample",
+    "4": "bia1.sample.sample.sample.sample"
+  },
+  "types": {
+    "twilio/quick-reply": {
+      "body": "Oi, {{1}}! vou encerrar esta sequência para não ficar insistindo. Se quiser conversar com o time da Arkom, posso te mostrar os horários.\n\nToque abaixo para seguir ou pausar o contato.",
+      "actions": [
+        {
+          "title": "Ver horários",
+          "id": "{{2}}"
+        },
+        {
+          "title": "Tirar dúvida",
+          "id": "{{3}}"
+        },
+        {
+          "title": "Agora não",
+          "id": "{{4}}"
+        }
+      ]
+    }
+  }
+}

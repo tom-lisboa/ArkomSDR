@@ -116,6 +116,9 @@ func (k Signer) Resolve(s domain.State, e *domain.Event, p domain.Policy, now ti
 	case "help":
 		e.Text = "Tenho uma dúvida sobre a reunião."
 		d.Action, d.Message = "reply", "Claro! Me diga sua dúvida para eu te ajudar."
+	case "not_now":
+		e.Text = "Agora não. Quero pausar os contatos."
+		d.Action = "pause"
 	case "about":
 		e.Text = "Como funciona a reunião?"
 		d.Action, d.Message = "reply", "É uma conversa com o time para entender seu negócio e avaliar onde a IA pode ajudar. Vamos escolher um horário?"
@@ -143,6 +146,12 @@ func (k Signer) Options(s domain.State, text, purpose string, p domain.Policy, n
 		}
 		return out
 	}
+	if domain.IsNoReply(purpose) {
+		return makeButtons("schedule", "Ver horários", "help", "Tirar dúvida", "not_now", "Agora não")
+	}
+	if domain.IsMeetingCheckin(purpose) {
+		return makeButtons("confirm", "Confirmar presença", "reschedule", "Remarcar", "help", "Preciso de ajuda")
+	}
 	if purpose == "form_context" || purpose == "meeting_preparation" {
 		if purpose == "meeting_preparation" || strings.TrimSpace(s.Profile.Goal) == "" {
 			return makeButtons("service", "Atendimento", "sales", "Vendas", "operations", "Operação")
@@ -155,7 +164,7 @@ func (k Signer) Options(s domain.State, text, purpose string, p domain.Policy, n
 		} // CTA follows in the short context bubble.
 		return makeButtons("schedule", "Ver horários", "help", "Tirar dúvida")
 	}
-	if purpose == "meeting_start" || purpose == "booking_confirmation" || purpose == "reminder" || purpose == "voice_reminder" {
+	if purpose == "meeting_call" || purpose == "meeting_start" || purpose == "booking_confirmation" || purpose == "reminder" || purpose == "voice_reminder" {
 		if domain.HasActiveMeeting(s, now) {
 			return makeButtons("confirm", "Confirmar presença", "reschedule", "Remarcar", "help", "Preciso de ajuda")
 		}
