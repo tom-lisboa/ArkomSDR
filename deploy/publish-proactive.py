@@ -5,8 +5,8 @@ import hashlib, io, json, shlex, subprocess, tarfile
 
 root=Path(__file__).resolve().parents[1]
 metadata=json.loads((root/'.local/deploy/cadence-templates-result.json').read_text())
-assert len(metadata)==8 and all(v['status']=='approved' if k.startswith('no_reply_') else v['status'] in ('approved','pending','received') for k,v in metadata.items()),'No-reply templates must be approved; meeting models must be approved or under review'
-assets={k:json.loads((root/'deploy/cadence'/(k+'.json')).read_text()) for k in metadata}
+assets={p.stem:json.loads(p.read_text()) for p in (root/'deploy/cadence').glob('*.json')}
+assert metadata.keys()==assets.keys() and all(v['status']=='approved' if k.startswith('no_reply_') else v['status'] in ('approved','pending','received') for k,v in metadata.items()),'No-reply templates must be approved; meeting models must be approved or under review'
 binary=root/'.local/deploy/bia'
 release='r-'+hashlib.sha256(binary.read_bytes()).hexdigest()[:12]
 ssh=['ssh','-i',str(Path.home()/'.ssh/arkom_dev'),'-o','IdentitiesOnly=yes','-o','BatchMode=yes','dev@24.199.100.186']

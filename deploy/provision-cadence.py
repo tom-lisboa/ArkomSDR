@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create/submit the eight specific cadence templates. Never sends a message."""
+"""Create/submit the specific cadence templates. Never sends a message."""
 from pathlib import Path
 import json
 import subprocess

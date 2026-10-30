@@ -169,10 +169,12 @@ articles.splice(articles.findIndex(a=>a.id==='paginacao'),0,{
 |---|---|
 | 15 minutos | Retomar a abertura e facilitar a escolha. |
 | 2 horas | Explicar o valor da conversa e oferecer horários. |
+| 6 horas | Esclarecer como funciona antes de escolher um horário. |
 | Dia seguinte | Conferir se ainda faz sentido seguir. |
+| 2 dias | Convidar a retomar o cadastro e tirar uma dúvida. |
 | 3 dias | Último contato da sequência. |
 
-As quatro etapas oferecem **Ver horários**, **Tirar dúvida** e **Agora não**. Param com resposta, reserva, pausa, saída ou atendimento humano. Respeitam os horários de contato e não se acumulam após reinício. A ativação tem um corte explícito: contatos anteriores não entram automaticamente.
+As seis etapas oferecem um próximo passo por botão. Em 6h, **Ver horários**, **Como funciona** e **Agora não**. Em 48h, **Quero conversar**, **Tenho uma dúvida** e **Agora não**. Nas demais, **Ver horários**, **Tirar dúvida** e **Agora não**. Param com resposta, reserva, pausa, saída ou atendimento humano. Respeitam os horários de contato e não se acumulam após reinício. A ativação tem um corte explícito: contatos anteriores não entram automaticamente.
 
 ## Reunião marcada
 | Momento | Canal e ação |
@@ -180,6 +182,7 @@ As quatro etapas oferecem **Ver horários**, **Tirar dúvida** e **Agora não**.
 | 15 minutos após abertura | WhatsApp de preparação, quando ainda houver antecedência. |
 | 24 horas antes | WhatsApp para manter ou remarcar o horário. |
 | 2 horas antes | WhatsApp para confirmar o compromisso. |
+| 1 hora antes | WhatsApp para manter o horário, remarcar ou pedir ajuda. |
 | 30 minutos antes | Áudio já preparado. |
 | 15 minutos antes | WhatsApp com botões e pedido nativo de permissão da ligação. |
 | 5 minutos antes | WhatsApp e SMS para quem autorizou SMS. |

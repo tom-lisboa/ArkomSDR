@@ -1,11 +1,11 @@
 flowchart TD
     OPEN["Abertura entregue e contexto salvo"] --> BOOK{"Já tem reunião?"}
     OPEN --> CASE["Case Camozzi, uma vez"]
-    BOOK -->|Não| NR["Sequência sem resposta: 15 min, 2h, dia seguinte e 3 dias"]
+    BOOK -->|Não| NR["Sem resposta: 15 min, 2h, 6h, dia seguinte, 2 e 3 dias"]
     NR --> NG{"Ainda sem resposta, sem reserva e contato liberado?"}
     NG -->|Não| STOP["Interromper retomadas"]
     NG -->|Sim| HOURS["Respeitar 08h-20h e espaçar envios adiados"]
-    HOURS --> NBTN["Ver horários / Tirar dúvida / Agora não"]
+    HOURS --> NBTN["Ver horários ou Quero conversar / Como funciona ou Tirar dúvida / Agora não"]
     NBTN -->|Responde| CHAT["Mesma conversa e especialistas"]
     NBTN -->|Agora não| PAUSE["Pausar contatos"]
     CHAT -->|Agenda| BOOKED["Reserva no Postgres"]
@@ -14,6 +14,7 @@ flowchart TD
     SCH --> PREP["15 min após abertura: preparação"]
     SCH --> D1["24h antes: confirmar ou remarcar"]
     SCH --> H2["2h antes: reforçar horário e confirmação"]
+    SCH --> H1["1h antes: manter horário, remarcar ou pedir ajuda"]
     SCH --> A30["30 min antes: áudio pelo worker de mídia"]
     SCH --> C15["15 min antes: texto com botões"]
     C15 --> PERM["Após entrega: pedir permissão nativa de ligação"]
@@ -28,6 +29,7 @@ flowchart TD
     RECENT -->|Não| HELP["Oferecer ajuda sem afirmar ausência"]
     D1 --> MB["Confirmar presença / Remarcar / Preciso de ajuda"]
     H2 --> MB
+    H1 --> MB
     W5 --> MB
     T0 --> MB
     HELP --> MB

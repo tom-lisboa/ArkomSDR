@@ -12,10 +12,13 @@ import (
 var ProactivePatterns = map[string]string{
 	"no_reply_15m":             "Oi, {{1}}! conseguiu ver minha mensagem? Posso te mostrar os horários para conversar com o time da Arkom.\n\nToque em Ver horários ou me diga sua dúvida.",
 	"no_reply_2h":              "Oi, {{1}}! a conversa com o time serve para entender seu negócio e avaliar onde a IA pode ajudar. Sem precisar decidir nada agora.\n\nQuer escolher um horário ou tirar uma dúvida primeiro?",
+	"no_reply_6h":              "Oi, {{1}}! se ficou alguma dúvida sobre a conversa com o time da Arkom, posso explicar como funciona antes de você escolher um horário.\n\nPrefere ver os horários ou entender a proposta primeiro?",
 	"no_reply_24h":             "Oi, {{1}}! retomando seu cadastro na Arkom: ainda faz sentido avaliar como aplicar IA no seu negócio?\n\nPosso consultar os horários por aqui. Se não for o momento, toque em Agora não.",
+	"no_reply_48h":             "Oi, {{1}}! ainda podemos conversar sobre o que você quer melhorar no seu negócio. Quer retomar seu cadastro na Arkom?\n\nEscolha Quero conversar para ver os horários, ou me conte o que está te deixando em dúvida.",
 	"no_reply_72h":             "Oi, {{1}}! vou encerrar esta sequência para não ficar insistindo. Se quiser conversar com o time da Arkom, posso te mostrar os horários.\n\nToque abaixo para seguir ou pausar o contato.",
 	"meeting_checkin_24h":      "Oi, {{1}}! lembrete da sua reunião com a Arkom: {{2}}, com duração de {{3}} minutos.\n\nVocê mantém esse horário? Confirme sua presença ou escolha remarcar.",
 	"meeting_checkin_2h":       "Oi, {{1}}! sua reunião com a Arkom é hoje: {{2}}. Reserve {{3}} minutos para essa conversa.\n\nConsegue participar nesse horário? Confirme por aqui ou me avise se precisar remarcar.",
+	"meeting_checkin_1h":       "Oi, {{1}}! falta uma hora para sua reunião com a Arkom: {{2}}, com duração de {{3}} minutos.\n\nVocê mantém esse horário? Confirme sua presença ou toque abaixo se precisar remarcar ou de ajuda.",
 	"meeting_checkin_5m":       "Oi, {{1}}! sua reunião com a Arkom começa em poucos minutos: {{2}}. A duração é de {{3}} minutos.\n\nVai conseguir participar? Confirme abaixo. Se precisar, posso ajudar ou remarcar.",
 	"meeting_checkin_7m_after": "Oi, {{1}}! o horário da sua reunião com a Arkom já começou: {{2}}. A duração prevista é de {{3}} minutos.\n\nSe ainda precisar de ajuda para participar, toque abaixo. Se teve um imprevisto, podemos remarcar.",
 }
@@ -75,7 +78,7 @@ func NoReplySequence(s State, p Policy, now time.Time) []Effect {
 		purpose      string
 		after, grace time.Duration
 	}{
-		{"no_reply_15m", 15 * time.Minute, 45 * time.Minute}, {"no_reply_2h", 2 * time.Hour, 2 * time.Hour}, {"no_reply_24h", 24 * time.Hour, 12 * time.Hour}, {"no_reply_72h", 72 * time.Hour, 12 * time.Hour},
+		{"no_reply_15m", 15 * time.Minute, 45 * time.Minute}, {"no_reply_2h", 2 * time.Hour, 2 * time.Hour}, {"no_reply_6h", 6 * time.Hour, 2 * time.Hour}, {"no_reply_24h", 24 * time.Hour, 12 * time.Hour}, {"no_reply_48h", 48 * time.Hour, 12 * time.Hour}, {"no_reply_72h", 72 * time.Hour, 12 * time.Hour},
 	} {
 		due := p.NextContact(a.Add(step.after), s)
 		if !previous.IsZero() && due.Before(previous.Add(90*time.Minute)) {
@@ -101,7 +104,7 @@ func MeetingCheckinSequence(s State, p Policy, now time.Time) []Effect {
 		purpose       string
 		offset, grace time.Duration
 	}{
-		{"meeting_checkin_24h", -24 * time.Hour, 30 * time.Minute}, {"meeting_checkin_2h", -2 * time.Hour, 15 * time.Minute}, {"meeting_checkin_5m", -5 * time.Minute, 4 * time.Minute}, {"meeting_checkin_7m_after", 7 * time.Minute, 5 * time.Minute},
+		{"meeting_checkin_24h", -24 * time.Hour, 30 * time.Minute}, {"meeting_checkin_2h", -2 * time.Hour, 15 * time.Minute}, {"meeting_checkin_1h", -time.Hour, 10 * time.Minute}, {"meeting_checkin_5m", -5 * time.Minute, 4 * time.Minute}, {"meeting_checkin_7m_after", 7 * time.Minute, 5 * time.Minute},
 	} {
 		due := b.Start.Add(step.offset)
 		expires := due.Add(step.grace)

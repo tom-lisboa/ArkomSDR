@@ -147,6 +147,12 @@ func (k Signer) Options(s domain.State, text, purpose string, p domain.Policy, n
 		return out
 	}
 	if domain.IsNoReply(purpose) {
+		if purpose == "no_reply_6h" {
+			return makeButtons("schedule", "Ver horários", "about", "Como funciona", "not_now", "Agora não")
+		}
+		if purpose == "no_reply_48h" {
+			return makeButtons("schedule", "Quero conversar", "help", "Tenho uma dúvida", "not_now", "Agora não")
+		}
 		return makeButtons("schedule", "Ver horários", "help", "Tirar dúvida", "not_now", "Agora não")
 	}
 	if domain.IsMeetingCheckin(purpose) {

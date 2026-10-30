@@ -14,7 +14,9 @@ As retomadas da abertura agora têm uma sequência própria, independente das an
 |---|---|
 | 15 minutos | Retoma a abertura e oferece Ver horários, Tirar dúvida ou Agora não. |
 | 2 horas | Explica a utilidade da conversa e facilita a escolha do próximo passo. |
+| 6 horas | Oferece Ver horários, Como funciona e Agora não para esclarecer a proposta antes de agendar. |
 | Dia seguinte | Confere se ainda faz sentido seguir com o diagnóstico. |
+| 2 dias | Convida a retomar com Quero conversar, Tenho uma dúvida e Agora não. |
 | 3 dias | Última tentativa da sequência; informa que não vai continuar insistindo. |
 
 Uma resposta do cliente, reserva, atendimento humano, pausa, falta de consentimento ou saída invalida a sequência. `Agora não` pausa contatos e recebe uma confirmação curta. Um botão da campanha antiga não pode pausar uma reserva nova. Uma nova abertura tem identidade própria; jobs antigos não reaproveitam esse contexto.
@@ -23,15 +25,18 @@ As retomadas respeitam 08h–20h no fuso do contato. Etapas adiadas para a manh�
 
 Novos controles: `BIA_NO_REPLY_ENABLED`, `BIA_NO_REPLY_SINCE` e `BIA_MEETING_CHECKINS_ENABLED`. O processo continua sendo `followup`, com os mesmos leases, outbox e limites de envio. Os propósitos novos aparecem no histórico da API de gestão e nas métricas de follow-ups; o status privado `GET /v1/followups` informa ativação e horários das duas novas cadências.
 
-Os oito modelos específicos estão em `deploy/cadence`: quatro retomadas comerciais submetidas como `MARKETING` e quatro avisos transacionais de reunião submetidos como `UTILITY`. Fora da sessão recente, cada envio confere o modelo exato e a aprovação atual. Com aprovação pendente, adia o mesmo job até o prazo original; não usa corpo livre nem o modelo de sessão para contornar a janela. A versão inicial foi rejeitada por começar com variável; os corpos v2 incluem uma abertura literal e são os usados nesta implementação. `deploy/provision-cadence.py` cria/submete os modelos sem enviar mensagens. `deploy/publish-proactive.py` exige as quatro retomadas aprovadas e aceita avisos de reunião aprovados ou em análise. Publica o binário testado e ativa as flags preservando o ambiente e os dados. Dentro da sessão, os botões de sessão já podem atender os novos avisos; fora dela, modelos de reunião pendentes permanecem bloqueados por envio até aprovação ou expiração. Não é necessário novo deploy quando a aprovação chega.
+Os onze modelos específicos estão em `deploy/cadence`: seis retomadas comerciais submetidas como `MARKETING` e cinco avisos transacionais de reunião submetidos como `UTILITY`. Fora da sessão recente, cada envio confere o modelo exato e a aprovação atual. Com aprovação pendente, adia o mesmo job até o prazo original; não usa corpo livre nem o modelo de sessão para contornar a janela. Todos os corpos incluem uma abertura literal. `deploy/provision-cadence.py` cria/submete os modelos sem enviar mensagens. `deploy/publish-proactive.py` exige todas as retomadas aprovadas e aceita avisos de reunião aprovados ou em análise. Publica o binário testado e ativa as flags preservando o ambiente e os dados. Dentro da sessão, os botões de sessão já podem atender os novos avisos; fora dela, modelos de reunião pendentes permanecem bloqueados por envio até aprovação ou expiração. Não é necessário novo deploy quando a aprovação chega.
 
 **Publicação em 30/10/2026:** release `r-22e51efb15a9`, migração 19. As duas flags novas foram ativadas; a retomada da abertura usa corte de ativação em 30/10/2026 às 13:53 de Cuiabá, preservando contatos anteriores contra inclusão retroativa. No preflight, as quatro retomadas estavam aprovadas e os quatro avisos de reunião estavam em análise. Esse status externo pode mudar depois; o transporte consulta a aprovação no momento de cada envio. A suíte completa com PostgreSQL e `go test -race ./...`, `go vet` e o build Linux passaram. A verificação não disparou mensagens de demonstração para clientes.
+
+**Ampliação publicada em 30/10/2026:** release `r-94ec7e780979`, sem nova migração. Acrescenta retomadas em 6h e 48h, com menus próprios, e WhatsApp uma hora antes da reunião. A conferência final confirmou os onze modelos como `approved`, os sete serviços na mesma versão, API e voz saudáveis, os novos horários no status privado e as cadências anteriores preservadas. O corte de ativação original foi mantido. A suíte completa com PostgreSQL isolado e `-race`, `go vet`, build Linux e verificação do portal passaram; a validação usou transporte simulado e não enviou mensagens de demonstração para clientes. O teste no aparelho das três etapas novas continua dependendo da homologação da equipe.
 
 | Momento | Responsável | Ação |
 |---|---|---|
 | 15 minutos após a abertura | Follow-up | Pede um exemplo prático para preparar a reunião, sem depoimento. |
 | T−24 horas | Follow-up → WhatsApp | Lembra data/duração e oferece confirmação, remarcação ou ajuda. |
 | T−2 horas | Follow-up → WhatsApp | Reforça o horário e pede uma resposta por botão. |
+| T−1 hora | Follow-up → WhatsApp | Confere se o cliente mantém o horário e oferece confirmar, remarcar ou pedir ajuda. |
 | T−30 minutos | Follow-up → mídia | Envia a gravação da equipe como áudio OGG/Opus. |
 | T−15 minutos | Follow-up | Envia texto com horário local; inclui link apenas se existir na reserva. |
 | Após confirmar o envio do texto | Follow-up → voz | Solicita permissão pelo botão nativo do WhatsApp. |
@@ -41,9 +46,9 @@ Os oito modelos específicos estão em `deploy/cadence`: quatro retomadas comerc
 | T: início da reunião | Follow-up → WhatsApp | Informa o horário real e pede resposta CONFIRMO ou REMARCAR. |
 | T+7 minutos | Follow-up → WhatsApp | Oferece ajuda se não houve resposta ou confirmação desde T−15; não declara falta. |
 
-Os quatro novos avisos trazem Confirmar presença, Remarcar e Preciso de ajuda. T−15 também usa esses botões antes da solicitação nativa de autorização da chamada. Nunca existem duas ligações por acrescentar avisos de texto. Não há promessa de sala aberta ou consultor esperando; um link só pode ser oferecido quando existir na reserva.
+Os cinco avisos adicionais trazem Confirmar presença, Remarcar e Preciso de ajuda. T−15 também usa esses botões antes da solicitação nativa de autorização da chamada. Nunca existem duas ligações por acrescentar avisos de texto. Não há promessa de sala aberta ou consultor esperando; um link só pode ser oferecido quando existir na reserva.
 
-Os avisos novos de 24h e 2h respeitam os horários de contato e expiram respectivamente em 30 e 15 minutos. Não são gerados se coincidirem com os 15 minutos seguintes a uma abertura/reserva recente. T−5 vale até T−1 e T+7 até T+12, sempre antes do fim previsto. O aviso final não altera comparecimento: esse resultado continua dependendo de registro explícito da equipe.
+Os avisos de 24h, 2h e 1h respeitam os horários de contato e expiram respectivamente em 30, 15 e 10 minutos. Não são gerados se coincidirem com os 15 minutos seguintes a uma abertura/reserva recente. T−5 vale até T−1 e T+7 até T+12, sempre antes do fim previsto. O aviso final não altera comparecimento: esse resultado continua dependendo de registro explícito da equipe.
 
 O [SMS](sms-reminders.md) tem ativação independente e não depende do áudio instalado
 nem da janela de atendimento do WhatsApp.

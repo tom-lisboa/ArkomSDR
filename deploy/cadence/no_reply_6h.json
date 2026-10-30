@@ -1,0 +1,29 @@
+{
+  "friendly_name": "arkom_no_reply_6h_v1",
+  "language": "pt_BR",
+  "variables": {
+    "1": "Ana",
+    "2": "bia1.sample.sample.sample.sample",
+    "3": "bia1.sample.sample.sample.sample",
+    "4": "bia1.sample.sample.sample.sample"
+  },
+  "types": {
+    "twilio/quick-reply": {
+      "body": "Oi, {{1}}! se ficou alguma dúvida sobre a conversa com o time da Arkom, posso explicar como funciona antes de você escolher um horário.\n\nPrefere ver os horários ou entender a proposta primeiro?",
+      "actions": [
+        {
+          "title": "Ver horários",
+          "id": "{{2}}"
+        },
+        {
+          "title": "Como funciona",
+          "id": "{{3}}"
+        },
+        {
+          "title": "Agora não",
+          "id": "{{4}}"
+        }
+      ]
+    }
+  }
+}

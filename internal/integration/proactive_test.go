@@ -56,7 +56,7 @@ func TestNoReplyCadenceReconcilesWithoutDuplicateAndStopsAfterResponse(t *testin
 		t.Fatal(err)
 	}
 	w.Now = func() time.Time { return anchor.Add(73 * time.Hour) }
-	for range 3 {
+	for range len(steps) - 1 {
 		step(t, followupworker.New(*w), true)
 	}
 	if m.Count.Load() != 1 {
@@ -68,7 +68,7 @@ func TestNoReplyCadenceReconcilesWithoutDuplicateAndStopsAfterResponse(t *testin
 }
 
 func TestProactiveTemplatesDeliverButtonsOutsideSessionAndKeepChatAliveOnFailure(t *testing.T) {
-	for _, purpose := range []string{"no_reply_15m", "meeting_checkin_5m", "meeting_checkin_7m_after"} {
+	for _, purpose := range []string{"no_reply_15m", "no_reply_6h", "no_reply_48h", "meeting_checkin_1h", "meeting_checkin_5m", "meeting_checkin_7m_after"} {
 		t.Run(purpose, func(t *testing.T) {
 			db := setup(t)
 			ctx := context.Background()
@@ -82,11 +82,16 @@ func TestProactiveTemplatesDeliverButtonsOutsideSessionAndKeepChatAliveOnFailure
 			p.NoReplyEnabled = true
 			p.NoReplySince = anchor.Add(-time.Minute)
 			p.MeetingCheckins = true
-			if purpose == "no_reply_15m" {
-				a := now.Add(-20 * time.Minute)
+			if domain.IsNoReply(purpose) {
+				delay := map[string]time.Duration{"no_reply_15m": 15 * time.Minute, "no_reply_6h": 6 * time.Hour, "no_reply_48h": 48 * time.Hour}[purpose]
+				a := now.Add(-delay - time.Minute)
 				s.FirstContactAt = &a
+				p.NoReplySince = a.Add(-time.Minute)
 			} else {
 				start := now.Add(4 * time.Minute)
+				if purpose == "meeting_checkin_1h" {
+					start = now.Add(59 * time.Minute)
+				}
 				if purpose == "meeting_checkin_7m_after" {
 					start = now.Add(-8 * time.Minute)
 				}

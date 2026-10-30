@@ -12,6 +12,8 @@ Serviço novo e independente para captar leads, conversar, organizar agendamento
 
 **Mapa da jornada:** [fluxo completo em Mermaid para Obsidian](docs/fluxo-cliente-mermaid.md), com caminhos do cliente, follow-ups, exceções, workers e proposta de evolução dos agentes. Os diagramas individuais estão em [docs/mermaid](docs/mermaid).
 
+**Cadência com resposta direta:** sem resposta à abertura, retoma em 15 minutos, 2h, 6h, 24h, 48h e 72h. Uma resposta ou reserva interrompe essa sequência. Com reunião, acrescenta WhatsApp em T−24h, T−2h, T−1h, T−5min e ajuda em T+7 sem interação recente, além das etapas existentes. Os botões permitem consultar horários, entender a proposta, tirar dúvidas, confirmar, remarcar ou pausar, de acordo com a etapa. [Mensagens, prazos e condições](docs/followups.md).
+
 **Especialistas na mesma conversa:** [Decisions, roteamento Go e memória comercial](docs/specialists.md). Cada turno escolhe entre persuasão, objeções, agenda, comparecimento e recuperação, com prompts próprios e uma única identidade da Bia. A ativação é explícita por `BIA_SPECIALISTS_ENABLED`.
 
 **Case no início do contato:** o [vídeo Camozzi](docs/intro-video.md) é enviado pelo worker de mídia após a entrega da abertura, uma vez por contato. Fora da janela de atendimento, usa um template de vídeo aprovado próprio.

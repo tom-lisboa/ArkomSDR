@@ -5,7 +5,9 @@ O Go escolhe o próximo passo pela etapa e envia o Content da Twilio com botões
 | Momento | Botões |
 |---|---|
 | Retomadas sem resposta, em 15min/2h/dia seguinte/3 dias | Ver horários · Tirar dúvida · Agora não |
-| WhatsApp T−24h, T−2h, T−5min e ajuda T+7min | Confirmar presença · Remarcar · Preciso de ajuda |
+| Retomada sem resposta, em 6h | Ver horários · Como funciona · Agora não |
+| Retomada sem resposta, em 48h | Quero conversar · Tenho uma dúvida · Agora não |
+| WhatsApp T−24h, T−2h, T−1h, T−5min e ajuda T+7min | Confirmar presença · Remarcar · Preciso de ajuda |
 | Texto T−15, antes da permissão nativa de ligação | Confirmar presença · Remarcar · Preciso de ajuda |
 | Cadastro sem reserva | Ver horários · Tirar dúvida |
 | Cadastro com reserva e objetivo informado, na segunda mensagem curta | Confirmar presença · Remarcar · Tirar dúvida |

@@ -1,0 +1,29 @@
+{
+  "friendly_name": "arkom_no_reply_48h_v1",
+  "language": "pt_BR",
+  "variables": {
+    "1": "Ana",
+    "2": "bia1.sample.sample.sample.sample",
+    "3": "bia1.sample.sample.sample.sample",
+    "4": "bia1.sample.sample.sample.sample"
+  },
+  "types": {
+    "twilio/quick-reply": {
+      "body": "Oi, {{1}}! ainda podemos conversar sobre o que você quer melhorar no seu negócio. Quer retomar seu cadastro na Arkom?\n\nEscolha Quero conversar para ver os horários, ou me conte o que está te deixando em dúvida.",
+      "actions": [
+        {
+          "title": "Quero conversar",
+          "id": "{{2}}"
+        },
+        {
+          "title": "Tenho uma dúvida",
+          "id": "{{3}}"
+        },
+        {
+          "title": "Agora não",
+          "id": "{{4}}"
+        }
+      ]
+    }
+  }
+}

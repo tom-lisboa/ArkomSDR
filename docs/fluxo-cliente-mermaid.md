@@ -34,7 +34,7 @@ flowchart TD
     AS --> VID
     VID --> R{"Cliente responde?"}
     R -->|Sim| CT
-    R -->|Não, sem reserva| ESP["Retomadas: 15 min, 2h, dia seguinte e 3 dias; param com resposta ou reserva"]
+    R -->|Não, sem reserva| ESP["Retomadas: 15 min, 2h, 6h, dia seguinte, 2 e 3 dias; param com resposta ou reserva"]
     ESP -->|Responde| CT
     CT --> EX["Execução escolhe agente e valida a decisão em Go"]
     EX --> INT{"Intenção e estado atual"}
@@ -315,11 +315,11 @@ Há proteções adicionais para contextos de reuniões em grupo e troca de respo
 flowchart TD
     OPEN["Abertura entregue e contexto salvo"] --> BOOK{"Já tem reunião?"}
     OPEN --> CASE["Case Camozzi, uma vez"]
-    BOOK -->|Não| NR["Sequência sem resposta: 15 min, 2h, dia seguinte e 3 dias"]
+    BOOK -->|Não| NR["Sem resposta: 15 min, 2h, 6h, dia seguinte, 2 e 3 dias"]
     NR --> NG{"Ainda sem resposta, sem reserva e contato liberado?"}
     NG -->|Não| STOP["Interromper retomadas"]
     NG -->|Sim| HOURS["Respeitar 08h-20h e espaçar envios adiados"]
-    HOURS --> NBTN["Ver horários / Tirar dúvida / Agora não"]
+    HOURS --> NBTN["Ver horários ou Quero conversar / Como funciona ou Tirar dúvida / Agora não"]
     NBTN -->|Responde| CHAT["Mesma conversa e especialistas"]
     NBTN -->|Agora não| PAUSE["Pausar contatos"]
     CHAT -->|Agenda| BOOKED["Reserva no Postgres"]
@@ -328,6 +328,7 @@ flowchart TD
     SCH --> PREP["15 min após abertura: preparação"]
     SCH --> D1["24h antes: confirmar ou remarcar"]
     SCH --> H2["2h antes: reforçar horário e confirmação"]
+    SCH --> H1["1h antes: manter horário, remarcar ou pedir ajuda"]
     SCH --> A30["30 min antes: áudio pelo worker de mídia"]
     SCH --> C15["15 min antes: texto com botões"]
     C15 --> PERM["Após entrega: pedir permissão nativa de ligação"]
@@ -342,6 +343,7 @@ flowchart TD
     RECENT -->|Não| HELP["Oferecer ajuda sem afirmar ausência"]
     D1 --> MB["Confirmar presença / Remarcar / Preciso de ajuda"]
     H2 --> MB
+    H1 --> MB
     W5 --> MB
     T0 --> MB
     HELP --> MB
@@ -358,8 +360,8 @@ flowchart TD
 | Abertura | Cerca de 10s após ativar formulário público | Cadastro elegível; template aprovado fora da sessão; validade de 24h; intervalo mínimo entre aberturas de 15min | Execução envia texto/template montado com perfil e reserva |
 | Vídeo Camozzi | Elegível 2s após o envio da abertura | Aguarda entrega da abertura; vence em 15min; contato liberado; template de vídeo fora da sessão | Mídia envia o MP4 instalado, uma vez por contato |
 | Confirmação de reserva | Após sucesso da agenda | Antes do início da reunião; aguarda janela de WhatsApp se não foi coberta pela abertura | Worker de agenda; não é uma nova geração livre de horários |
-| Retomadas da abertura | 15min, 2h, dia seguinte e 3 dias | Só aberturas após o corte de ativação; sem resposta e sem reserva; respeita horários e pausa | Follow-up com Ver horários, Tirar dúvida e Agora não |
-| WhatsApp adicional antes da reunião | T−24h, T−2h e T−5min | Reserva atual; modelos específicos aprovados fora da sessão; validade curta | Follow-up com confirmação, remarcação e ajuda |
+| Retomadas da abertura | 15min, 2h, 6h, dia seguinte, 2 e 3 dias | Só aberturas após o corte de ativação; sem resposta e sem reserva; respeita horários e pausa | Follow-up com horários, explicação, dúvidas e pausa por botões |
+| WhatsApp adicional antes da reunião | T−24h, T−2h, T−1h e T−5min | Reserva atual; modelos específicos aprovados fora da sessão; validade curta | Follow-up com confirmação, remarcação e ajuda |
 | Ajuda após início | T+7min | Até T+12, antes do fim, sem resposta/confirmação desde T−15; não infere falta | Follow-up oferece ajuda ou remarcação |
 | Preparação | T0 + 15min | Só se há reunião; vence após 5min ou em T−30, o que ocorrer primeiro; respeita horário permitido | Follow-up envia texto/template de preparação, sem depoimento |
 | Áudio | T−30min | Vence em T−25; sessão recente de WhatsApp, consentimento e arquivo pronto; horário permitido | Follow-up encaminha; mídia envia a gravação existente |
@@ -464,7 +466,7 @@ O áudio passa por Twilio Media Streams e OpenAI Realtime, com interrupção da 
 ```mermaid
 flowchart TD
     S0["Cliente está no atendimento"] --> SE{"Evento ou comportamento"}
-    SE -->|Silêncio sem reunião e sem oferta| SSW["Cadência sem resposta: 15 min, 2h, dia seguinte e 3 dias"]
+    SE -->|Silêncio sem reunião e sem oferta| SSW["Cadência sem resposta: 15 min, 2h, 6h, dia seguinte, 2 e 3 dias"]
     SE -->|Silêncio após oferta| SOFF["Retomada mais 2h existe, mas está desligada"]
     SE -->|Silêncio com reunião| SBOOK["Cadência continua se os requisitos de cada canal permitirem"]
     SE -->|Vou pensar ou aviso depois| STHINK["Responder brevemente e respeitar decisão"]
@@ -657,7 +659,7 @@ flowchart LR
 | Agendamento inicial | `persuasion` e `scheduling`, com prompts próprios e Decisions | Avaliar conversas e comparar agendamento real |
 | Comparecimento | Especialista `attendance`; cadência determinística | Medir presença e qualidade das respostas de preparação |
 | Objeções | Especialista próprio, memória de motivos e argumentos enviados | Ampliar biblioteca com casos reais e medir resolução reconhecida pelo cliente |
-| Retomada sem resposta | Cadência finita implementada: 15 min, 2h, dia seguinte e 3 dias, com botões e pausa | Avaliar resposta e agendamento por etapa antes de alterar os intervalos |
+| Retomada sem resposta | Cadência finita implementada: 15 min, 2h, 6h, dia seguinte, 2 e 3 dias, com botões e pausa | Avaliar resposta e agendamento por etapa antes de alterar os intervalos |
 | Reagendamento pedido na voz | Apenas nota para consulta | Passagem durável para texto/agenda e confirmação do cliente antes de alterar a reserva |
 | Falta à reunião | Evento externo e especialidade `recovery` | Integrar presença real e definir uma sequência curta de recuperação |
 | Depois da reunião | Não há cadência comercial própria | Definir proposta, decisão, fechamento e pós-venda somente após existir resultado confiável |
