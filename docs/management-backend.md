@@ -16,6 +16,35 @@ A API da equipe é escrita em Go, usa o Postgres atual e consulta os mesmos regi
 - Operações humanas: assumir, pausar, devolver à IA, atribuir responsável, anotar, responder no WhatsApp, encerrar, ganhar/perder venda e registrar ou corrigir comparecimento.
 - Indicadores por período e série diária, com unidades e denominadores explícitos.
 
+## Avisos aos vendedores
+
+Cada usuário `operator` ou `admin` conecta sua própria instância de WhatsApp na Lumi. A API guarda a chave da instância cifrada e nunca a devolve ao frontend. A sessão do painel identifica o vendedor em todos os endpoints abaixo; não aceite IDs de outro vendedor no navegador.
+
+### Conectar por QR Code
+
+1. `POST /sellers/whatsapp`, com `{}`, cria uma instância por usuário. Repetir retorna a mesma conexão.
+2. `POST /sellers/whatsapp/qr`, com `{}`, solicita a geração do QR.
+3. Consulte `GET /sellers/whatsapp` até `qr_available=true` e carregue `GET /sellers/whatsapp/qr.png` com o mesmo Bearer. No frontend, use `fetch` autenticado e um Blob para mostrar a imagem; não coloque tokens em URLs.
+4. Depois do pareamento, o status deve ser `connected`. O Go consulta o número do dispositivo na Lumi. O vendedor recebe o alerta no próprio WhatsApp, na conversa de mensagens para si mesmo.
+
+`PATCH /sellers/whatsapp`, com `{"notifications_enabled":false}`, pausa os avisos do próprio vendedor. `POST /sellers/whatsapp/disconnect`, com `{}`, desativa avisos e solicita logout. A reconexão usa a mesma instância; depois de parear, reative os avisos com PATCH. `GET /sellers` permite ao administrador consultar as conexões, o prazo de parada e se a Lumi está configurada.
+
+### Quando um lead está parado
+
+O prazo padrão é **30 minutos sem interação do cliente ou evento de negócio e sem avanço de etapa**, configurável no servidor. O worker de follow-up consulta o mesmo funil da API de gestão a cada 30 segundos. Envios automáticos de lembretes não reiniciam esse relógio. Na primeira observação, usa os horários reais do cadastro, primeiro contato e últimas entradas; nas mudanças seguintes, reinicia o relógio da etapa.
+
+São acompanhadas as etapas `contact_pending`, `contacted`, `engaged`, `scheduling`, `awaiting_attendance`, `no_show` e `cancelled`. Reuniões futuras, reuniões em andamento, comparecimento já registrado, contatos pausados, sem autorização ou com saída solicitada e negócios encerrados/ganhos/perdidos ficam fora. Atendimento humano ainda aberto pode gerar aviso. Em resultado de reunião pendente, o relógio nunca começa antes do fim previsto.
+
+Todos os vendedores habilitados para avisos, com usuário ativo e conexão confirmada recentemente, recebem uma notificação por episódio de parada. Uma nova entrada ou mudança de etapa cria outro episódio, que precisa completar o prazo novamente. O aviso contém nome, empresa, telefone do cliente, etapa, minutos de espera e link para abrir a conversa no WhatsApp.
+
+### Disparo por POST e histórico
+
+`POST /leads/{id}/notifications/stalled`, com `{}` e `Idempotency-Key`, permite ao painel solicitar a mesma notificação. A rota aplica as regras de parada; não força aviso de lead novo nem de reunião futura. Agendador e POST compartilham a mesma prevenção de duplicação por lead, episódio e vendedor. A mesma chave e usuário recuperam o resultado anterior; usar a chave para outro lead devolve conflito.
+
+`GET /notifications?lead_id=...&status=...` lista o histórico por cursor. `pending` aguarda o worker; `sending` é a chamada ao transporte; `accepted` significa enfileirado na Lumi; `sent` exige confirmação posterior de envio pela Lumi e não comprova leitura no aparelho. `failed` registra rejeição ou falha de envio; `uncertain` exige revisão; `skipped` registra aviso obsoleto e `simulated` identifica execução em modo shadow. Os alertas não contam como follow-ups enviados ao cliente e não alteram a propriedade ou o contexto da conversa.
+
+Se a Lumi não estiver configurada, as rotas de integração devolvem `503 lumi_not_configured`. Antes do prazo, o disparo devolve `409 lead_not_stalled`; sem vendedor conectado, `409 no_connected_sellers`. Esses dois conflitos não consomem a chave de idempotência. O endpoint atual de envio da Lumi não garante idempotência: se a requisição tiver resultado ambíguo, o worker registra `uncertain` e não repete o envio automaticamente.
+
 ## Autenticação e papéis
 
 `BIA_MANAGEMENT_ENABLED=true` monta somente a API de gestão. `BIA_MANAGEMENT_ORIGINS` aceita origens exatas do frontend; `http://localhost:porta` é permitido em desenvolvimento. A URL pública configurada também é permitida. Não há CORS curinga. Um BFF sem cabeçalho Origin pode chamar a API normalmente.

@@ -20,6 +20,7 @@ import (
 	"arkom/bia/internal/contextworker"
 	"arkom/bia/internal/followupworker"
 	"arkom/bia/internal/httpapi"
+	"arkom/bia/internal/lumi"
 	"arkom/bia/internal/management"
 	"arkom/bia/internal/mediaworker"
 	"arkom/bia/internal/providers"
@@ -173,6 +174,16 @@ func run() error {
 	vw := &voiceworker.Worker{Agenda: agenda, Repo: vr, Provider: vp, Policy: c.Policy, Live: c.Voice.Enabled, AllowOutsideSession: c.Voice.ApprovedOutsideSession}
 	vs := &voiceworker.Server{Repo: vr, Provider: vp, Account: c.Voice.Account, Sender: c.Voice.Sender, AuthToken: c.Voice.AuthToken, PublicURL: c.Voice.PublicURL, Enabled: c.Voice.Enabled}
 	vs.Messages, vs.Mode, vs.TimeZone, vs.TestPhone = twilioMessages, c.Mode, c.Policy.TimeZone, c.TestPhone
+	panel := &management.Server{DB: db, Mode: c.Mode, Policy: c.Policy, Origins: c.ManagementOrigins, CredentialKey: c.Token, StalledAfter: c.SalesStalledAfter, Download: &providers.Downloader{Account: c.Voice.Account, AuthToken: c.Voice.AuthToken, HTTP: providers.MediaHTTP()}}
+	if c.LumiUserAPIKey != "" {
+		panel.Lumi, err = lumi.New(c.LumiURL, c.LumiUserAPIKey)
+		if err != nil {
+			return err
+		}
+	}
+	if c.Voice.PublicURL != "" {
+		panel.Origins = append(panel.Origins, c.Voice.PublicURL)
+	}
 	if c.Voice.Enabled {
 		vs.Bridge = &voiceworker.Bridge{Repo: vr, Provider: vp, Connect: voiceworker.OpenAIConnect(c.OpenAIKey, c.Voice.Model), Tools: voiceworker.Tools{Repo: vr, Agenda: agenda, Policy: c.Policy}, Model: c.Voice.Model, Voice: c.Voice.Voice, TranscriptionModel: c.Voice.TranscriptionModel, Brand: c.Policy.Brand, MaxDuration: c.Voice.MaxDuration}
 	}
@@ -183,6 +194,9 @@ func run() error {
 	}
 	if *role == "all" || *role == "followup" {
 		start(fw.RunScheduler)
+		if c.ManagementEnabled {
+			start(panel.RunSalesAlerts)
+		}
 	}
 	if *role == "all" || *role == "scheduling" {
 		start(func(ctx context.Context) { sw.RunAvailability(ctx, c.Availability) })
@@ -216,10 +230,6 @@ func run() error {
 	}
 	api := &httpapi.Server{IntroVideo: c.IntroVideo, ReminderAudio: c.ReminderAudio, TestFormToken: c.TestFormToken, DB: db, Calendar: calendar, Token: c.Token, Mode: c.Mode, Policy: c.Policy, VoiceSender: c.Voice.Sender, VoiceEnabled: c.Voice.Enabled}
 	if c.ManagementEnabled {
-		panel := &management.Server{DB: db, Mode: c.Mode, Policy: c.Policy, Origins: c.ManagementOrigins, Download: &providers.Downloader{Account: c.Voice.Account, AuthToken: c.Voice.AuthToken, HTTP: providers.MediaHTTP()}}
-		if c.Voice.PublicURL != "" {
-			panel.Origins = append(panel.Origins, c.Voice.PublicURL)
-		}
 		api.Management = panel.Handler()
 	}
 	api.FormAutoContact = c.FormAutoContact

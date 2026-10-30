@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"arkom/bia/internal/domain"
+	"arkom/bia/internal/lumi"
 	"arkom/bia/internal/providers"
 	"arkom/bia/internal/store"
 	"github.com/jackc/pgx/v5"
@@ -20,12 +21,15 @@ import (
 var errInput = errors.New("invalid_input")
 
 type Server struct {
-	DB       *store.DB
-	Mode     string
-	Policy   domain.Policy
-	Origins  []string
-	Download *providers.Downloader
-	Now      func() time.Time
+	Lumi          *lumi.Client
+	CredentialKey string
+	StalledAfter  time.Duration
+	DB            *store.DB
+	Mode          string
+	Policy        domain.Policy
+	Origins       []string
+	Download      *providers.Downloader
+	Now           func() time.Time
 }
 
 func (s *Server) now() time.Time {
@@ -103,6 +107,15 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("GET "+prefix+"/leads/{id}/bookings", s.leadRoute("viewer", s.bookings))
 	m.HandleFunc("GET "+prefix+"/leads/{id}/media/{asset}", s.leadRoute("viewer", s.media))
 	m.HandleFunc("GET "+prefix+"/metrics", s.auth("viewer", s.metrics))
+	m.HandleFunc("GET "+prefix+"/sellers", s.auth("admin", s.sellers))
+	m.HandleFunc("GET "+prefix+"/sellers/whatsapp", s.auth("operator", s.sellerStatus))
+	m.HandleFunc("POST "+prefix+"/sellers/whatsapp", s.auth("operator", s.connectSeller))
+	m.HandleFunc("PATCH "+prefix+"/sellers/whatsapp", s.auth("operator", s.sellerPreferences))
+	m.HandleFunc("POST "+prefix+"/sellers/whatsapp/qr", s.auth("operator", s.sellerQRCommand))
+	m.HandleFunc("GET "+prefix+"/sellers/whatsapp/qr.png", s.auth("operator", s.sellerQRImage))
+	m.HandleFunc("POST "+prefix+"/sellers/whatsapp/disconnect", s.auth("operator", s.disconnectSeller))
+	m.HandleFunc("POST "+prefix+"/leads/{id}/notifications/stalled", s.leadRoute("operator", s.notifyStalled))
+	m.HandleFunc("GET "+prefix+"/notifications", s.auth("viewer", s.notifications))
 	m.HandleFunc("GET "+prefix+"/openapi.json", s.auth("viewer", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write(openAPI)

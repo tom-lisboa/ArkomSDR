@@ -4,6 +4,8 @@ export function operations(contract) {
 export function requestExample(operation) {
   const name = operation.requestBody?.content?.['application/json']?.schema?.$ref?.split('/').at(-1);
   return {
+    Empty: {},
+    SellerPreferences: { notifications_enabled: true },
     Login: { username: 'seu.usuario', password: 'SUA_SENHA' },
     UserCreate: { username: 'novo.operador', name: 'Operador Exemplo', role: 'operator', password: 'SENHA_INDIVIDUAL_FORTE' },
     UserUpdate: { enabled: true, role: 'operator' },

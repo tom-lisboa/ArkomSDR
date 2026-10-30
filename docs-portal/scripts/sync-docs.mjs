@@ -87,6 +87,7 @@ Um lead agendado pode estar em atendimento humano. Reunião confirmada não sign
 \`GET /leads/{id}\` reúne formulário, reserva, horários oferecidos, memória comercial, resultados anteriores e flags operacionais. Use \`revision\` para proteger ações que dependem da ficha atualizada.` },
   { id:'controle-humano',title:'Controle humano',group:'Operação',icon:'hand',description:'Assuma, responda e devolva a conversa à IA.',markdown:section('Comandos da equipe').replace('| `kind`','## Ações disponíveis\n\n| `kind`').replace('Assumir ou pausar invalida','## Interromper e retomar\n\nAssumir ou pausar invalida').replace('Tomar controle revoga','## Encerramento de ligação\n\nTomar controle revoga').replace('Resposta manual exige','## Respostas e encerramento\n\nResposta manual exige')},
   { id:'comparecimento',title:'Reuniões e comparecimento',group:'Operação',icon:'calendar',description:'Registre presença e mantenha a IA informada.',markdown:'## Registrar o resultado'+code('json','{\n  "kind": "attendance",\n  "booking_id": "booking_exemplo",\n  "outcome": "attended",\n  "reason": "Presença conferida pela equipe"\n}')+'Envie para `POST /leads/{id}/actions`, com `Idempotency-Key`.\n\n## Regras de comparecimento\n\n'+section('Comparecimento e memória da IA')+'\n\n## Resultado pendente\n\nQuando a reunião terminar sem resultado registrado, mantenha o comparecimento pendente. A passagem do horário não transforma silêncio em falta.'},
+  { id:'alertas-vendedores', title:'Avisos aos vendedores', group:'Operação', icon:'users', description:'QR individual e alertas de leads parados no funil.', markdown:section('Avisos aos vendedores') },
   { id:'temperatura',title:'Temperatura do lead',group:'Dados e indicadores',icon:'thermometer',description:'Os sinais que formam o score de engajamento.',markdown:section('Temperatura matemática').replace('| Evidência observável','## Sinais e pesos\n\n| Evidência observável').replace('A soma é limitada','## Faixas e interpretação\n\nA soma é limitada')},
   { id:'metricas',title:'Métricas e conversão',group:'Dados e indicadores',icon:'chart',description:'Definições, denominadores e períodos para os indicadores.',markdown:section('Métricas e definições').replace('- `snapshot`:','## Grupos de indicadores\n\n- `snapshot`:').replace('As taxas são frações','## Unidades e leitura\n\nAs taxas são frações')},
   { id:'paginacao',title:'Paginação e histórico',group:'Dados e indicadores',icon:'list',description:'Carregue filas, mensagens e transcrições.',markdown:
@@ -162,7 +163,7 @@ Aqui você consulta documentação e exemplos. Dados reais de pessoas e ações 
 ];
 const groups = [
  {title:'Comece por aqui',items:['inicio','primeiros-passos','autenticacao']},
- {title:'Operação',items:['leads','controle-humano','comparecimento']},
+ {title:'Operação',items:['leads','controle-humano','comparecimento','alertas-vendedores']},
  {title:'Dados e indicadores',items:['temperatura','metricas','paginacao']},
  {title:'Referência',items:['api','erros','arquitetura']},
 ];

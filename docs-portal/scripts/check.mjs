@@ -8,7 +8,7 @@ const published = JSON.parse(await readFile('public/openapi.json','utf8'));
 assert.deepEqual(published,source,'Public contract must match the Go contract');
 const data = JSON.parse(await readFile('src/lib/content.generated.json','utf8'));
 const ops = operations(source);
-assert.equal(ops.length,18);
+assert.equal(ops.length,27);
 for (const op of ops) {
   const example=curlExample(op,source.servers[0].url);
   assert(!example.includes('undefined'));

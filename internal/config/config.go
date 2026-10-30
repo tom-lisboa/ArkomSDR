@@ -3,6 +3,7 @@ package config
 import (
 	"arkom/bia/internal/casemedia"
 	"arkom/bia/internal/domain"
+	"arkom/bia/internal/lumi"
 	"arkom/bia/internal/providers"
 	"arkom/bia/internal/remindermedia"
 	"arkom/bia/internal/store"
@@ -15,6 +16,8 @@ import (
 )
 
 type Config struct {
+	LumiURL, LumiUserAPIKey                       string
+	SalesStalledAfter                             time.Duration
 	ManagementEnabled                             bool
 	ManagementOrigins                             []string
 	QuickReplies                                  providers.QuickReplyConfig
@@ -55,6 +58,19 @@ func env(k, d string) string {
 func Load() (Config, error) {
 	c := Config{RedisURL: env("BIA_REDIS_URL", "redis://127.0.0.1:6389/0"), MediaModel: os.Getenv("OPENAI_MEDIA_MODEL"), Address: env("BIA_ADDR", "127.0.0.1:8080"), DSN: os.Getenv("BIA_DATABASE_URL"), Token: os.Getenv("BIA_API_TOKEN"), Mode: env("BIA_MODE", "shadow"), OpenAIKey: os.Getenv("OPENAI_API_KEY"), OpenAIModel: os.Getenv("OPENAI_MODEL"), AudioModel: os.Getenv("OPENAI_AUDIO_MODEL"), GatewayURL: os.Getenv("BIA_GATEWAY_URL"), GatewayToken: os.Getenv("BIA_GATEWAY_TOKEN"), Workers: 4}
 	c.ManagementEnabled = os.Getenv("BIA_MANAGEMENT_ENABLED") == "true"
+	c.LumiURL = env("BIA_LUMI_URL", "https://lume-io.com")
+	c.LumiUserAPIKey = os.Getenv("BIA_LUMI_USER_API_KEY")
+	c.SalesStalledAfter = 30 * time.Minute
+	if raw := os.Getenv("BIA_SALES_STALLED_AFTER"); raw != "" {
+		v, err := time.ParseDuration(raw)
+		if err != nil || v < time.Minute || v > 7*24*time.Hour {
+			return c, errors.New("invalid BIA_SALES_STALLED_AFTER")
+		}
+		c.SalesStalledAfter = v
+	}
+	if _, err := lumi.New(c.LumiURL, c.LumiUserAPIKey); err != nil {
+		return c, err
+	}
 	for _, origin := range strings.Split(os.Getenv("BIA_MANAGEMENT_ORIGINS"), ",") {
 		if origin = strings.TrimSpace(origin); origin != "" {
 			parsed, e := url.Parse(origin)

@@ -2,6 +2,8 @@
 
 **Documentação para a equipe de frontend:** [Arkom Docs — portal em Svelte](https://24.199.100.186/docs/), com guias, busca, exemplos e contrato OpenAPI. [Desenvolvimento e publicação do portal](docs-portal/README.md).
 
+**Alertas aos vendedores:** [integração Lumi e configuração](docs/seller-alerts.md). Cada vendedor pode parear uma instância própria por QR; leads sem interação ou avanço por 30 minutos geram um aviso para todos os vendedores conectados. A ativação depende da chave de usuário da Lumi no ambiente do servidor.
+
 Serviço novo e independente para captar leads, conversar, organizar agendamentos e acompanhar comparecimento. Implementado do zero a partir da análise do fluxo exportado e dos problemas relatados em 27/10/2026.
 
 **Estado atual:** núcleo executável, API, fila persistente, agenda própria e testes locais. O padrão é `shadow`: registra decisões e ações propostas, sem enviar WhatsApp, reservar em serviços externos ou alterar o n8n. As integrações antigas ficaram para depois, conforme a decisão desta conversa. Não é uma substituição de produção já homologada.

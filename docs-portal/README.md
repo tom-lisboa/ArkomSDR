@@ -22,7 +22,7 @@ Abra <http://127.0.0.1:4187/docs/>. O portal usa rotas por hash, incluindo links
 
 - `../internal/management/openapi.json` é a fonte dos endpoints, parâmetros e schemas.
 - `../docs/management-backend.md` contém o guia técnico do backend.
-- `scripts/sync-docs.mjs` seleciona somente conteúdo adequado à documentação pública e monta os dez guias. Instruções administrativas de operação e credenciais ficam fora do portal.
+- `scripts/sync-docs.mjs` seleciona somente conteúdo adequado à documentação pública e monta os guias públicos. Instruções administrativas de operação e credenciais ficam fora do portal.
 - `npm run sync` atualiza os arquivos gerados. O comando também roda antes de desenvolvimento, check e build.
 
 Depois de alterar o contrato ou os guias, gere e publique novamente. O portal é uma cópia estática vinculada à publicação; não lê o OpenAPI autenticado em tempo real.
