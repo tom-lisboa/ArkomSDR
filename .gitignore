@@ -26,3 +26,10 @@ docs/*result.json
 *.m4a
 __pycache__/
 *.pyc
+
+# Documentation portal build outputs
+/docs-portal/node_modules/
+/docs-portal/dist/
+/docs-portal/src/lib/content.generated.json
+/docs-portal/public/openapi.json
+/docs-portal/public/guia-integracao.md

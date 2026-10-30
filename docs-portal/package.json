@@ -1,0 +1,15 @@
+{
+  "name": "arkom-developer-docs",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "sync": "node scripts/sync-docs.mjs",
+    "dev": "npm run sync && vite --host 127.0.0.1 --port 4187 --strictPort",
+    "build": "npm run sync && vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 4187 --strictPort",
+    "check": "node scripts/check.mjs"
+  },
+  "dependencies": { "dompurify": "3.4.17", "marked": "18.1.2", "svelte": "5.57.3" },
+  "devDependencies": { "@sveltejs/vite-plugin-svelte": "7.3.1", "vite": "8.3.5" }
+}

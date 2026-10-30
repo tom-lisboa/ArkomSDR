@@ -1,5 +1,7 @@
 # ArkomSDR
 
+**Documentação para a equipe de frontend:** [Arkom Docs — portal em Svelte](https://24.199.100.186/docs/), com guias, busca, exemplos e contrato OpenAPI. [Desenvolvimento e publicação do portal](docs-portal/README.md).
+
 Serviço novo e independente para captar leads, conversar, organizar agendamentos e acompanhar comparecimento. Implementado do zero a partir da análise do fluxo exportado e dos problemas relatados em 27/10/2026.
 
 **Estado atual:** núcleo executável, API, fila persistente, agenda própria e testes locais. O padrão é `shadow`: registra decisões e ações propostas, sem enviar WhatsApp, reservar em serviços externos ou alterar o n8n. As integrações antigas ficaram para depois, conforme a decisão desta conversa. Não é uma substituição de produção já homologada.

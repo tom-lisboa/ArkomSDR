@@ -11,6 +11,12 @@ https://24.199.100.186 {
     }
     header X-Content-Type-Options nosniff
     header Cache-Control no-store
+    redir /docs /docs/ 308
+    handle_path /docs/* {
+        root * /var/www/arkom-docs/current
+        header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+        file_server
+    }
     handle /voice/* {
         reverse_proxy 127.0.0.1:8081
     }

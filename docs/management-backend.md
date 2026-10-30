@@ -1,5 +1,7 @@
 # Backend de gestão do SDR
 
+**Guia público para integração:** [Arkom Docs](https://24.199.100.186/docs/), com busca, exemplos e download do contrato. O portal em Svelte documenta esta API; não é o painel operacional. Consulte [como atualizar e publicar](../docs-portal/README.md).
+
 A API da equipe é escrita em Go, usa o Postgres atual e consulta os mesmos registros dos workers. Não há frontend neste pacote. O contrato OpenAPI 3 está em `internal/management/openapi.json`; o mesmo arquivo é servido por `GET /v1/management/openapi.json` após login. Ele pode ser importado no Postman ou usado para gerar o cliente do futuro painel.
 
 ## O que o frontend pode construir
