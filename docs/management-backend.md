@@ -1,6 +1,6 @@
 # Backend de gestão do SDR
 
-**Guia público para integração:** [Arkom Docs](https://24.199.100.186/docs/), com busca, exemplos e download do contrato. O portal em Svelte documenta esta API; não é o painel operacional. Consulte [como atualizar e publicar](../docs-portal/README.md).
+**Guia público para integração:** [Arkom Docs](https://sdk.arkom.ai/docs/), com busca, exemplos e download do contrato. O portal em Svelte documenta esta API; não é o painel operacional. Consulte [como atualizar e publicar](../docs-portal/README.md).
 
 A API da equipe é escrita em Go, usa o Postgres atual e consulta os mesmos registros dos workers. Não há frontend neste pacote. O contrato OpenAPI 3 está em `internal/management/openapi.json`; o mesmo arquivo é servido por `GET /v1/management/openapi.json` após login. Ele pode ser importado no Postman ou usado para gerar o cliente do futuro painel.
 
@@ -17,6 +17,21 @@ A API da equipe é escrita em Go, usa o Postgres atual e consulta os mesmos regi
 - Indicadores por período e série diária, com unidades e denominadores explícitos.
 
 O histórico de follow-ups inclui a sequência sem resposta após a abertura (15 minutos, 2 horas, 6 horas, dia seguinte, 2 dias e 3 dias) e os avisos adicionais de reunião (24h, 2h, 1h e 5 minutos antes, e ajuda em T+7 sem resposta recente). Cada propósito e resultado é consultável no mesmo recurso `/leads/{id}/followups` e participa das métricas existentes. A entrega depende das regras de contato e dos templates; pendente, expirado, pulado e enviado não são tratados como equivalentes. Veja [a cadência ampliada](followups.md).
+
+## Google Agenda
+
+O callback oficial é **`https://sdk.arkom.ai/v1/management/integrations/google/callback`**. Cadastre essa URI exata no cliente OAuth do tipo aplicativo Web do Google Console. O fluxo é por usuário da equipe, com acesso mínimo `operator` para conectar ou desconectar. O frontend nunca recebe Client Secret, access token ou refresh token do Google.
+
+1. Com a sessão do painel, envie `POST /integrations/google/authorize`. A resposta contém `authorization_url` e `expires_at`.
+2. Navegue para essa URL no mesmo navegador, por exemplo `window.location.assign(authorization_url)`. É um endereço temporário do próprio backend que define um cookie protegido e redireciona ao consentimento do Google. Não tente trocar o código no frontend nem enviar a sessão Bearer nessa navegação. A tentativa vence em dez minutos; iniciar outra invalida a anterior.
+3. O Google retorna ao callback. O backend verifica o estado, o navegador e a sessão original, troca o código com PKCE e guarda os tokens cifrados. O retorno de sucesso mostra uma confirmação simples; o usuário pode voltar ao painel. O estado não pode ser reutilizado, inclusive depois de uma troca de token malsucedida.
+4. Consulte `GET /integrations/google/status` usando a sessão. `configured` informa se o servidor está preparado; `connected` informa que existe uma concessão armazenada para esse usuário. Isso não comprova que o Google não a tenha revogado desde a última consulta.
+5. `GET /integrations/google/calendars?page_token=...` lista agendas, renovando o token quando necessário. Use `next_page_token` para continuar. A consulta é somente leitura e retorna ID, nome, fuso, papel de acesso e indicação de agenda principal.
+6. `POST /integrations/google/disconnect` remove a conexão local e os retornos pendentes. Não revoga a concessão inteira do aplicativo no Google, pois ela pode ser usada por outra conexão da equipe. Para revogar no provedor, use as configurações da própria conta Google.
+
+Esta etapa solicita somente `calendar.calendarlist.readonly`. **Ainda não cria eventos, não consulta conflitos de horário e não sincroniza reservas do SDR com o Google.** `synchronization_enabled` permanece `false`; as reservas continuam no PostgreSQL. A implementação da sincronização exigirá os escopos adicionais correspondentes e nova autorização.
+
+Sem configuração, as rotas operacionais respondem `503 google_not_configured`; o status continua consultável. Sem conexão, a consulta de agendas responde `409 google_not_connected`. Recusa, expiração, navegador diferente, sessão revogada ou tentativa repetida exigem iniciar outra autorização. Falhas do provedor são resumidas em `google_token_exchange_failed`, `google_refresh_failed` ou `google_calendar_unavailable`; respostas do Google e tokens não são expostos ao navegador.
 
 ## Avisos aos vendedores
 

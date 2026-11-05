@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"arkom/bia/internal/domain"
+	"arkom/bia/internal/googlecalendar"
 	"arkom/bia/internal/lumi"
 	"arkom/bia/internal/providers"
 	"arkom/bia/internal/store"
@@ -21,6 +22,7 @@ import (
 var errInput = errors.New("invalid_input")
 
 type Server struct {
+	Google        *googlecalendar.Client
 	Lumi          *lumi.Client
 	CredentialKey string
 	StalledAfter  time.Duration
@@ -84,6 +86,12 @@ func (s *Server) leadRoute(role string, next http.HandlerFunc) http.HandlerFunc 
 func (s *Server) Handler() http.Handler {
 	m := http.NewServeMux()
 	prefix := "/v1/management"
+	m.HandleFunc("POST "+prefix+"/integrations/google/authorize", s.auth("operator", s.googleAuthorize))
+	m.HandleFunc("GET "+prefix+"/integrations/google/start", s.googleStart)
+	m.HandleFunc("GET "+googlecalendar.CallbackPath, s.googleCallback)
+	m.HandleFunc("GET "+prefix+"/integrations/google/status", s.auth("viewer", s.googleStatus))
+	m.HandleFunc("GET "+prefix+"/integrations/google/calendars", s.auth("operator", s.googleCalendars))
+	m.HandleFunc("POST "+prefix+"/integrations/google/disconnect", s.auth("operator", s.googleDisconnect))
 	m.HandleFunc("POST "+prefix+"/auth/login", s.login)
 	m.HandleFunc("POST "+prefix+"/auth/logout", s.auth("viewer", func(w http.ResponseWriter, r *http.Request) {
 		_, err := s.DB.Pool.Exec(r.Context(), `DELETE FROM bia_go.management_sessions WHERE token_hash=$1`, digest(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")))

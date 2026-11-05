@@ -2,10 +2,13 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Arkom SDR Management API",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "Backend da equipe. Isolado do token interno do SDR. Autenticação por sessão Bearer de 12h. Todas as datas em RFC3339; métricas de taxa são frações e denominadores vazios retornam null. Nenhuma interface frontend é fornecida."
   },
   "servers": [
+    {
+      "url": "https://sdk.arkom.ai"
+    },
     {
       "url": "https://24.199.100.186"
     }
@@ -3335,6 +3338,627 @@
           }
         ]
       }
+    },
+    "/v1/management/integrations/google/authorize": {
+      "post": {
+        "summary": "Iniciar conexão Google",
+        "operationId": "post__integrations_google_authorize",
+        "description": "Permissão mínima: operator. Cria tentativa única de dez minutos vinculada à sessão. Navegue no mesmo navegador para authorization_url. Não envie Bearer para essa URL nem diretamente ao Google. Não altera reservas.",
+        "responses": {
+          "400": {
+            "description": "Retorno inválido, expirado, recusado ou já utilizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sessão ausente ou expirada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou origem não permitida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Google não conectado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Concessão incompleta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Falha na comunicação com Google",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Integração não configurada ou armazenamento indisponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleAuthorization"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/management/integrations/google/start": {
+      "get": {
+        "summary": "Navegar para autorização Google",
+        "operationId": "get__integrations_google_start",
+        "description": "Navegação pública com ticket criado por authorize. Define cookie Secure, HttpOnly e SameSite=Lax e redireciona ao Google com PKCE. Ticket só pode iniciar uma vez.",
+        "responses": {
+          "400": {
+            "description": "Retorno inválido, expirado, recusado ou já utilizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sessão ausente ou expirada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou origem não permitida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Google não conectado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Concessão incompleta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Falha na comunicação com Google",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Integração não configurada ou armazenamento indisponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Redireciona para consentimento do Google",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              },
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "ticket",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64
+            }
+          }
+        ]
+      }
+    },
+    "/v1/management/integrations/google/callback": {
+      "get": {
+        "summary": "Receber autorização do Google",
+        "operationId": "get__integrations_google_callback",
+        "description": "Callback oficial: https://sdk.arkom.ai/v1/management/integrations/google/callback. Navegação pública protegida por state de uso único, PKCE e cookie do navegador. Vinculada à sessão e papel originais, nunca a um usuário informado na URL. Responde HTML para navegação e JSON nos demais casos. Tokens são cifrados no servidor e não são devolvidos ao frontend. Ainda não sincroniza reservas.",
+        "responses": {
+          "400": {
+            "description": "Retorno inválido, expirado, recusado ou já utilizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sessão ausente ou expirada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou origem não permitida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Google não conectado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Concessão incompleta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Falha na comunicação com Google",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Integração não configurada ou armazenamento indisponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Conexão salva com segurança",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "synchronization_enabled": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    }
+                  }
+                }
+              },
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "state",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64
+            }
+          },
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 8192
+            }
+          },
+          {
+            "in": "query",
+            "name": "error",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "__Host-bia-google-oauth",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/management/integrations/google/status": {
+      "get": {
+        "summary": "Consultar conexão Google",
+        "operationId": "get__integrations_google_status",
+        "description": "Permissão mínima: viewer. Retorna somente a conexão do usuário da sessão e se o servidor está configurado. Não retorna tokens. Sincronização de reservas permanece desativada.",
+        "responses": {
+          "400": {
+            "description": "Retorno inválido, expirado, recusado ou já utilizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sessão ausente ou expirada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou origem não permitida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Google não conectado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Concessão incompleta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Falha na comunicação com Google",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Integração não configurada ou armazenamento indisponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/management/integrations/google/calendars": {
+      "get": {
+        "summary": "Listar agendas conectadas",
+        "operationId": "get__integrations_google_calendars",
+        "description": "Permissão mínima: operator. Consulta read-only de calendarList. Renova o token quando necessário e persiste refresh token rotacionado antes da consulta. Só acessa a própria conexão.",
+        "responses": {
+          "400": {
+            "description": "Retorno inválido, expirado, recusado ou já utilizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sessão ausente ou expirada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou origem não permitida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Google não conectado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Concessão incompleta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Falha na comunicação com Google",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Integração não configurada ou armazenamento indisponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleCalendarPage"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page_token",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          }
+        ]
+      }
+    },
+    "/v1/management/integrations/google/disconnect": {
+      "post": {
+        "summary": "Desconectar Google no SDR",
+        "operationId": "post__integrations_google_disconnect",
+        "description": "Permissão mínima: operator. Remove tokens locais e tentativas pendentes do próprio usuário. Não revoga no Google a concessão inteira do aplicativo e não apaga eventos ou reservas.",
+        "responses": {
+          "400": {
+            "description": "Retorno inválido, expirado, recusado ou já utilizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sessão ausente ou expirada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Papel ou origem não permitida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Google não conectado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Concessão incompleta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Falha na comunicação com Google",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Integração não configurada ou armazenamento indisponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleDisconnected"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4866,6 +5490,125 @@
           "items",
           "next_cursor"
         ]
+      },
+      "GoogleAuthorization": {
+        "type": "object",
+        "required": [
+          "authorization_url",
+          "expires_at"
+        ],
+        "properties": {
+          "authorization_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL temporária de navegação no próprio backend; não é token de sessão."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "GoogleStatus": {
+        "type": "object",
+        "required": [
+          "configured",
+          "connected",
+          "redirect_uri",
+          "synchronization_enabled"
+        ],
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "connected": {
+            "type": "boolean",
+            "description": "Concessão armazenada localmente; não comprova validade atual no Google."
+          },
+          "redirect_uri": {
+            "type": "string",
+            "format": "uri"
+          },
+          "synchronization_enabled": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "connected_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "token_expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "GoogleCalendar": {
+        "type": "object",
+        "required": [
+          "id",
+          "summary",
+          "timeZone",
+          "accessRole",
+          "primary"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "timeZone": {
+            "type": "string"
+          },
+          "accessRole": {
+            "type": "string"
+          },
+          "primary": {
+            "type": "boolean"
+          }
+        }
+      },
+      "GoogleCalendarPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "next_page_token"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoogleCalendar"
+            }
+          },
+          "next_page_token": {
+            "type": "string"
+          }
+        }
+      },
+      "GoogleDisconnected": {
+        "type": "object",
+        "required": [
+          "connected"
+        ],
+        "properties": {
+          "connected": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          }
+        }
       }
     }
   }

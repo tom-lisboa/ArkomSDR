@@ -5,6 +5,29 @@ import (
 	"testing"
 )
 
+func TestGoogleOAuthRequiresExplicitActivationAndCredentials(t *testing.T) {
+	for k, v := range map[string]string{"BIA_MODE": "shadow", "BIA_DATABASE_URL": "postgres://unused", "BIA_API_TOKEN": strings.Repeat("x", 32), "BIA_MESSAGING_PROVIDER": "gateway", "BIA_MANAGEMENT_ENABLED": "true", "BIA_GOOGLE_ENABLED": "false", "BIA_GOOGLE_CLIENT_ID": "", "BIA_GOOGLE_CLIENT_SECRET": "", "BIA_GOOGLE_TOKEN_KEY": ""} {
+		t.Setenv(k, v)
+	}
+	if c, err := Load(); err != nil || c.Google.Enabled {
+		t.Fatal("disabled Google requires credentials", err)
+	}
+	t.Setenv("BIA_GOOGLE_ENABLED", "true")
+	if _, err := Load(); err == nil {
+		t.Fatal("enabled Google without credentials")
+	}
+	t.Setenv("BIA_GOOGLE_CLIENT_ID", "client")
+	t.Setenv("BIA_GOOGLE_CLIENT_SECRET", "secret")
+	t.Setenv("BIA_GOOGLE_TOKEN_KEY", strings.Repeat("k", 64))
+	if c, err := Load(); err != nil || !c.Google.Enabled {
+		t.Fatal(err)
+	}
+	t.Setenv("BIA_MANAGEMENT_ENABLED", "false")
+	if _, err := Load(); err == nil {
+		t.Fatal("enabled Google without staff API")
+	}
+}
+
 func TestPreparationFlagSurvivesPolicyInitialization(t *testing.T) {
 	for k, v := range map[string]string{
 		"BIA_MODE": "shadow", "BIA_DATABASE_URL": "postgres://unused", "BIA_API_TOKEN": strings.Repeat("x", 32),

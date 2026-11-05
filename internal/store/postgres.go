@@ -70,6 +70,9 @@ var salesAlertsSchema string
 //go:embed proactive.sql
 var proactiveSchema string
 
+//go:embed google_oauth.sql
+var googleOAuthSchema string
+
 var ErrConflict = errors.New("idempotency key reused with different payload")
 var ErrLease = errors.New("lease lost; stale worker cannot commit")
 
@@ -172,6 +175,9 @@ func (d *DB) Migrate(ctx context.Context) error {
 		return e
 	}
 	if _, e = tx.Exec(ctx, proactiveSchema); e != nil {
+		return e
+	}
+	if _, e = tx.Exec(ctx, googleOAuthSchema); e != nil {
 		return e
 	}
 	return tx.Commit(ctx)

@@ -2,7 +2,7 @@
 
 Portal público da documentação da API de gestão, feito em Svelte 5 e Vite.
 
-**Publicado:** <https://24.199.100.186/docs/>
+**Publicado:** <https://sdk.arkom.ai/docs/> (o endereço por IP continua disponível).
 
 O portal documenta a API; o painel operacional será construído pela equipe. A leitura é pública e não faz chamadas autenticadas nem contém dados de leads ou credenciais. Exemplos usam valores fictícios. O acesso aos dados reais continua exigindo uma sessão da API.
 
@@ -37,6 +37,6 @@ cd ..
 python3 deploy/publish-docs.py
 ```
 
-O check confere sincronização com o OpenAPI do Go, navegação, exemplos, compilação Svelte e ausência de caminhos operacionais nos guias públicos. A publicação envia apenas `dist/`, valida o Caddy e troca o link do release estático. Não publica `.env`, não reinicia containers e não altera registros do SDR. Se a configuração do Caddy tiver mudado fora do repositório, a publicação para para revisão. Se o reload ou a verificação HTTPS falhar, a configuração e o release anteriores são restaurados.
+O check confere sincronização com o OpenAPI do Go, navegação, exemplos, compilação Svelte e ausência de caminhos operacionais nos guias públicos. A publicação envia apenas `dist/`, valida o Caddy e troca o link do release estático. Não publica `.env`, não reinicia containers e não altera registros do SDR. Configurações de outras aplicações no Caddy são preservadas quando o bloco de documentação existente permanece igual; mudanças nesse bloco exigem revisão. Se o reload ou a verificação HTTPS falhar, a configuração e o release anteriores são restaurados.
 
 Destino padrão: servidor `dev@24.199.100.186`, identidade `~/.ssh/arkom_dev`, diretório `/var/www/arkom-docs`. Outros acessos podem ser passados com `--host` e `--identity`. A URL pública e o Caddy correspondem a este ambiente; altere os dois ao mudar de servidor. Node.js só é necessário para compilar; produção serve arquivos estáticos pelo Caddy.

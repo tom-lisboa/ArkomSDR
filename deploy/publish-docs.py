@@ -63,7 +63,12 @@ block = """    redir /docs /docs/ 308
 """
 previous_config = caddy.read_text()
 if previous_config not in (candidate, candidate.replace(block, '')):
-    raise SystemExit('Caddy changed independently; review the diff before publishing.')
+    # The VPS is shared. If the existing docs block is unchanged, keep the
+    # live configuration verbatim rather than overwriting other virtual hosts.
+    if previous_config.count(block) != 1:
+        raise SystemExit('Documentation routes changed independently; review before publishing.')
+    candidate = previous_config
+    (stage / 'Caddyfile').write_text(candidate)
 if current.exists() and not current.is_symlink():
     raise SystemExit('The documentation current path must be a symlink.')
 subprocess.run(['caddy', 'validate', '--config', str(stage / 'Caddyfile'), '--adapter', 'caddyfile'], check=True)

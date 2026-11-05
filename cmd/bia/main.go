@@ -19,6 +19,7 @@ import (
 	"arkom/bia/internal/config"
 	"arkom/bia/internal/contextworker"
 	"arkom/bia/internal/followupworker"
+	"arkom/bia/internal/googlecalendar"
 	"arkom/bia/internal/httpapi"
 	"arkom/bia/internal/lumi"
 	"arkom/bia/internal/management"
@@ -176,6 +177,10 @@ func run() error {
 	vs := &voiceworker.Server{Repo: vr, Provider: vp, Account: c.Voice.Account, Sender: c.Voice.Sender, AuthToken: c.Voice.AuthToken, PublicURL: c.Voice.PublicURL, Enabled: c.Voice.Enabled}
 	vs.Messages, vs.Mode, vs.TimeZone, vs.TestPhone = twilioMessages, c.Mode, c.Policy.TimeZone, c.TestPhone
 	panel := &management.Server{DB: db, Mode: c.Mode, Policy: c.Policy, Origins: c.ManagementOrigins, CredentialKey: c.Token, StalledAfter: c.SalesStalledAfter, Download: &providers.Downloader{Account: c.Voice.Account, AuthToken: c.Voice.AuthToken, HTTP: providers.MediaHTTP()}}
+	panel.Google, err = googlecalendar.New(c.Google)
+	if err != nil {
+		return err
+	}
 	if c.LumiUserAPIKey != "" {
 		panel.Lumi, err = lumi.New(c.LumiURL, c.LumiUserAPIKey)
 		if err != nil {

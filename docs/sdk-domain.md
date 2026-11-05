@@ -44,8 +44,8 @@ As evidências desta instalação ficam em `.local/deploy/sdk-domain/`, fora do 
 
 ## Google Agenda
 
-O domínio HTTPS está pronto para hospedar a integração. **O backend atual ainda não implementa o fluxo OAuth, o callback ou a sincronização com Google Calendar.** Não houve autorização de uma conta Google nesta publicação; não existem Client ID/Client Secret Google no runtime. A agenda do SDR permanece no PostgreSQL.
+O callback OAuth está implementado no Go em **`https://sdk.arkom.ai/v1/management/integrations/google/callback`**. Essa é a URI exata a cadastrar no cliente Web do Google Console. Veja [a configuração e os limites da integração](google-agenda.md).
 
-O endereço raiz do domínio não deve ser usado como callback. A URI de redirecionamento deverá corresponder exatamente à rota implementada quando a integração OAuth for adicionada. A documentação pública em `/docs/` descreve os endpoints atualmente disponíveis.
+A ativação depende de Client ID e Client Secret salvos no ambiente do servidor e de uma autorização feita pelo usuário no Google. Enquanto desativada, a rota responde `503 google_not_configured`. A conexão permite listar agendas e renovar tokens; a sincronização de reservas ainda não foi implementada. A agenda do SDR permanece no PostgreSQL.
 
 Referências: [HTTPS automático do Caddy](https://caddyserver.com/docs/automatic-https), [Full (strict) da Cloudflare](https://developers.cloudflare.com/ssl/origin-configuration/ssl-modes/full-strict/) e [OAuth para aplicações web do Google](https://developers.google.com/identity/protocols/oauth2/web-server).
