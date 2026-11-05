@@ -20,6 +20,8 @@ O histórico de follow-ups inclui a sequência sem resposta após a abertura (15
 
 ## Google Agenda
 
+**Acesso pronto para os vendedores:** [Conectar Google Agenda](https://sdk.arkom.ai/conectar-agenda/). A página exige login individual do SDR, abre o consentimento do Google em outra aba e permite conferir a conexão, listar agendas e desconectar. O endereço pode ser compartilhado com a equipe; cada tentativa é vinculada a quem entrou. Um administrador pode usar **Criar acesso de vendedor** na mesma página, com nome, usuário e senha inicial, para cadastrar um `operator`. Essa permissão inclui atendimento de leads. O acesso compartilhado de visualização não cria usuários nem conecta agendas.
+
 O callback oficial é **`https://sdk.arkom.ai/v1/management/integrations/google/callback`**. Cadastre essa URI exata no cliente OAuth do tipo aplicativo Web do Google Console. O fluxo é por usuário da equipe, com acesso mínimo `operator` para conectar ou desconectar. O frontend nunca recebe Client Secret, access token ou refresh token do Google.
 
 1. Com a sessão do painel, envie `POST /integrations/google/authorize`. A resposta contém `authorization_url` e `expires_at`.

@@ -19,6 +19,10 @@ sdk.arkom.ai {
     handle /v1/management/* {
         reverse_proxy 127.0.0.1:8080
     }
+    @google_connect path /conectar-agenda /conectar-agenda/*
+    handle @google_connect {
+        reverse_proxy 127.0.0.1:8080
+    }
     handle /webhooks/test-form/* {
         reverse_proxy 127.0.0.1:8080
     }

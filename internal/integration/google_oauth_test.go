@@ -224,6 +224,38 @@ func TestGoogleRoutesRequireRolesAndConfiguration(t *testing.T) {
 	}
 }
 
+func TestAdminCreatesIndividualSellerWhoCanStartOwnGoogleConnection(t *testing.T) {
+	db := setup(t)
+	admin := newPanel(t, db, time.Now(), "admin")
+	client, err := googlecalendar.New(googlecalendar.Config{Enabled: true, ClientID: "client", ClientSecret: "secret", TokenKey: strings.Repeat("k", 64), RedirectURL: googlecalendar.DefaultRedirectURL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	admin.s.Google = client
+	created := panelCall(t, admin, "POST", "/users", map[string]any{"username": "vendedor.demo", "name": "Vendedor de teste", "password": "seller-initial-password-12345", "role": "operator"}, "")
+	if created.Code != 201 || strings.Contains(created.Body.String(), "password") {
+		t.Fatal(created.Code, created.Body.String())
+	}
+	login := decodeMap(t, panelCall(t, admin, "POST", "/auth/login", map[string]any{"username": "vendedor.demo", "password": "seller-initial-password-12345"}, ""))
+	seller := admin
+	seller.token = login["access_token"].(string)
+	if user := login["user"].(map[string]any); user["role"] != "operator" || user["username"] != "vendedor.demo" {
+		t.Fatal("seller login is not isolated", user)
+	}
+	flow := beginGoogle(t, seller)
+	if flow.state == "" {
+		t.Fatal("new seller could not start authorization")
+	}
+	var username string
+	err = db.Pool.QueryRow(context.Background(), `SELECT u.username FROM bia_go.google_oauth_states o JOIN bia_go.management_users u ON u.id=o.user_id`).Scan(&username)
+	if err != nil || username != "vendedor.demo" {
+		t.Fatal("authorization was attached to the administrator", err)
+	}
+	if out := panelCall(t, seller, "POST", "/users", map[string]any{"username": "other.seller", "name": "Outro vendedor", "password": "other-initial-password-12345", "role": "admin"}, ""); out.Code != 403 {
+		t.Fatal("seller could create privileged accounts", out.Code)
+	}
+}
+
 func TestGoogleRejectsIncompleteGrantsAndConsumesFailedExchanges(t *testing.T) {
 	db := setup(t)
 	f := newPanel(t, db, time.Now(), "operator")

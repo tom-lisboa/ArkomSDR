@@ -37,6 +37,8 @@ func (s *Server) Handler() http.Handler {
 	m := http.NewServeMux()
 	if s.Management != nil {
 		m.Handle("/v1/management/", s.Management)
+		m.Handle("/conectar-agenda", s.Management)
+		m.Handle("/conectar-agenda/", s.Management)
 	}
 	m.Handle("/media/reminders/", s.ReminderAudio)
 	m.Handle(casemedia.Prefix, s.IntroVideo)

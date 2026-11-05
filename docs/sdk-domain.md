@@ -5,6 +5,7 @@ Publicado em 05/11/2026: **https://sdk.arkom.ai**.
 - `/` redireciona para `/docs/`.
 - `/docs/` serve a documentação Svelte existente.
 - `/healthz` verifica a API Go.
+- `/conectar-agenda/` permite que vendedores entrem com o acesso individual e conectem a própria conta Google. HTML, CSS e JavaScript são servidos pelo Go; os dados continuam exigindo a sessão autenticada.
 - `/v1/management/*` encaminha para a API de gestão, mantendo a autenticação do backend.
 - `/webhooks/test-form/*` encaminha para o formulário, mantendo a chave e as validações existentes.
 - Os demais caminhos retornam 404. A API interna não foi exposta.

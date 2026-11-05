@@ -6,6 +6,16 @@ Callback implementado no backend Go:
 https://sdk.arkom.ai/v1/management/integrations/google/callback
 ```
 
+## Acesso dos vendedores
+
+O endereço fixo para compartilhar com a equipe é **https://sdk.arkom.ai/conectar-agenda/**. A página é servida pelo backend Go e pode ser usada sem aguardar um botão no painel externo.
+
+Cada vendedor entra com seu próprio usuário do SDR (`operator` ou `admin`) e clica em **Conectar Google Agenda**. A autorização abre em outra aba. Depois de permitir o acesso no Google, ele volta à página para conferir a conexão e as agendas disponíveis. A página também permite renovar a autorização e desconectar a própria conta, com confirmação.
+
+O endereço é comum à equipe; a autorização gerada é individual e vinculada à sessão de quem entrou. A sessão do SDR permanece apenas na memória da página, sem armazenamento em `localStorage` ou `sessionStorage`. Recarregar a página exige entrar novamente. Nenhuma conta é conectada ou criada automaticamente.
+
+O administrador pode entrar na mesma página e usar **Criar acesso de vendedor**, informando nome, usuário e senha inicial. A criação usa a API administrativa existente e atribui `operator`, que permite atendimento de leads. A senha é enviada somente na criação; o administrador deve compartilhar o acesso individual com o vendedor. Nenhum cadastro ocorre automaticamente. O usuário compartilhado de visualização não pode criar acessos, autorizar conexões ou atender leads. Os nomes e e-mails dos vendedores não foram informados nesta entrega, portanto não foram criados usuários novos nem alteradas permissões de contas existentes.
+
 ## Preparar o Google Console
 
 1. Habilite Google Calendar API no projeto desejado.
@@ -28,7 +38,7 @@ BIA_GOOGLE_TOKEN_KEY=
 
 `BIA_GOOGLE_TOKEN_KEY` deve ser uma chave aleatória de pelo menos 32 caracteres. A publicação prepara uma chave de 256 bits no servidor, sem mostrá-la. Guarde-a com o ambiente e os backups: trocar a chave impede abrir as conexões existentes e exige reconexão. O servidor recusa ativar a integração sem os campos obrigatórios.
 
-Nesta entrega, a integração fica desativada até o responsável preencher as credenciais. Para prepará-las localmente, use `micro /Users/tomlisboa/Desktop/Arkon/.env` e preencha apenas `BIA_GOOGLE_CLIENT_ID` e `BIA_GOOGLE_CLIENT_SECRET`; a ativação e sincronização do ambiente do servidor devem ocorrer na publicação, sem copiar segredos para comandos ou mensagens.
+A integração é desativada por padrão. Para preparar as credenciais localmente, use `micro /Users/tomlisboa/Desktop/Arkon/.env` e preencha apenas `BIA_GOOGLE_CLIENT_ID` e `BIA_GOOGLE_CLIENT_SECRET`; a ativação e sincronização do ambiente do servidor devem ocorrer na publicação, sem copiar segredos para comandos ou mensagens. Neste servidor, as credenciais do aplicativo já foram configuradas; a autorização de cada conta Google continua sendo feita pelo próprio vendedor.
 
 Para atualizar somente essas duas credenciais e ativar o OAuth no release já publicado:
 

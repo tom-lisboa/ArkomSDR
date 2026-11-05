@@ -86,6 +86,12 @@ func (s *Server) leadRoute(role string, next http.HandlerFunc) http.HandlerFunc 
 func (s *Server) Handler() http.Handler {
 	m := http.NewServeMux()
 	prefix := "/v1/management"
+	m.HandleFunc("GET /conectar-agenda", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/conectar-agenda/", http.StatusPermanentRedirect)
+	})
+	m.HandleFunc("GET /conectar-agenda/{$}", googleConnectFile("index.html", "text/html; charset=utf-8"))
+	m.HandleFunc("GET /conectar-agenda/connect.css", googleConnectFile("connect.css", "text/css; charset=utf-8"))
+	m.HandleFunc("GET /conectar-agenda/connect.js", googleConnectFile("connect.js", "application/javascript; charset=utf-8"))
 	m.HandleFunc("POST "+prefix+"/integrations/google/authorize", s.auth("operator", s.googleAuthorize))
 	m.HandleFunc("GET "+prefix+"/integrations/google/start", s.googleStart)
 	m.HandleFunc("GET "+googlecalendar.CallbackPath, s.googleCallback)
