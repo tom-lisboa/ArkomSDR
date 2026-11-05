@@ -69,6 +69,7 @@ if previous_config not in (candidate, candidate.replace(block, '')):
         raise SystemExit('Documentation routes changed independently; review before publishing.')
     candidate = previous_config
     (stage / 'Caddyfile').write_text(candidate)
+configuration_changed = candidate != previous_config
 if current.exists() and not current.is_symlink():
     raise SystemExit('The documentation current path must be a symlink.')
 subprocess.run(['caddy', 'validate', '--config', str(stage / 'Caddyfile'), '--adapter', 'caddyfile'], check=True)
@@ -92,22 +93,26 @@ pending = base / ('current-' + release)
 pending.symlink_to(destination)
 try:
     pending.replace(current)
-    shutil.copyfile(stage / 'Caddyfile', caddy)
-    subprocess.run(['systemctl', 'reload', 'caddy'], check=True)
+    if configuration_changed:
+        shutil.copyfile(stage / 'Caddyfile', caddy)
+        subprocess.run(['systemctl', 'reload', 'caddy'], check=True)
     subprocess.run(['curl', '--fail', '--silent', '--show-error', '--max-time', '30',
                     '--output', '/dev/null', 'https://24.199.100.186/docs/'], check=True)
 except BaseException:
-    shutil.copyfile(backup, caddy)
+    if configuration_changed:
+        shutil.copyfile(backup, caddy)
     if old_target:
         pending.symlink_to(old_target)
         pending.replace(current)
     elif current.is_symlink():
         current.unlink()
-    subprocess.run(['systemctl', 'reload', 'caddy'], check=False)
+    if configuration_changed:
+        subprocess.run(['systemctl', 'reload', 'caddy'], check=False)
     raise
 print('Documentation release:', release)
 print('URL: https://24.199.100.186/docs/')
 print('Previous configuration preserved at:', backup)
+print('Caddy reloaded:', configuration_changed)
 '''
     run(ssh + ["sudo python3 - " + shlex.quote(stage) + " " + shlex.quote(release)], input=remote)
 
