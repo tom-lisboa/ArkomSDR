@@ -1,0 +1,31 @@
+# Public backend domain. Imported by the shared server Caddyfile.
+# Leave the existing IP virtual host and its Twilio webhook URLs in place.
+sdk.arkom.ai {
+    tls {
+        issuer acme {
+            dir https://acme-v02.api.letsencrypt.org/directory
+            disable_tlsalpn_challenge
+        }
+    }
+    header X-Content-Type-Options nosniff
+    header Cache-Control no-store
+    redir / /docs/ 302
+    redir /docs /docs/ 308
+    handle_path /docs/* {
+        root * /var/www/arkom-docs/current
+        header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+        file_server
+    }
+    handle /v1/management/* {
+        reverse_proxy 127.0.0.1:8080
+    }
+    handle /webhooks/test-form/* {
+        reverse_proxy 127.0.0.1:8080
+    }
+    handle /healthz {
+        reverse_proxy 127.0.0.1:8080
+    }
+    handle {
+        respond "Not found" 404
+    }
+}
