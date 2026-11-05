@@ -317,7 +317,7 @@ func (s *Server) googleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, &http.Cookie{Name: googleCookie, Value: "", Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: -1})
 	if strings.Contains(r.Header.Get("Accept"), "text/html") {
-		googleResultPage(w, 200, "Conta Google conectada", "A autorização desta conta foi salva. Volte à página de conexões para conferir suas contas e agendas. A sincronização de reuniões será habilitada separadamente.")
+		googleResultPage(w, 200, "Conta Google conectada", "A autorização desta conta foi salva. Volte à página de conexões, escolha a agenda que receberá as reuniões e ative o agendamento pelo SDR.")
 		return
 	}
 	write(w, 200, map[string]any{"connected": true, "account_id": account, "account_email": identity.Email, "synchronization_enabled": false})
@@ -334,13 +334,14 @@ func googleAudit(ctx context.Context, tx pgx.Tx, user, kind string) error {
 }
 
 type googleAccountStatus struct {
-	ID                string    `json:"id"`
-	Email             string    `json:"email"`
-	ConnectedAt       time.Time `json:"connected_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
-	TokenExpiresAt    time.Time `json:"token_expires_at"`
-	Scopes            []string  `json:"scopes"`
-	RequiresReconnect bool      `json:"requires_reconnect"`
+	SchedulingPermission bool      `json:"scheduling_permission"`
+	ID                   string    `json:"id"`
+	Email                string    `json:"email"`
+	ConnectedAt          time.Time `json:"connected_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
+	TokenExpiresAt       time.Time `json:"token_expires_at"`
+	Scopes               []string  `json:"scopes"`
+	RequiresReconnect    bool      `json:"requires_reconnect"`
 }
 
 func (s *Server) googleStatus(w http.ResponseWriter, r *http.Request) {
@@ -362,11 +363,20 @@ func (s *Server) googleStatus(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		accounts = append(accounts, a)
+		accounts[len(accounts)-1].SchedulingPermission = googlecalendar.CanSchedule(a.Scopes)
 	}
 	if readError(w, rows.Err()) {
 		return
 	}
 	result["accounts"], result["account_count"], result["connected"] = accounts, len(accounts), len(accounts) > 0
+	if s.Calendar != nil {
+		profile, err := s.Calendar.Profile(r.Context(), actor(r).ID)
+		if readError(w, err) {
+			return
+		}
+		result["scheduling"] = profile
+		result["synchronization_enabled"] = profile.Ready
+	}
 	// Keep the original single-account fields for existing consumers.
 	if len(accounts) == 1 {
 		a := accounts[0]
@@ -500,6 +510,9 @@ func (s *Server) googleDisconnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
+	if _, err = tx.Exec(r.Context(), `SELECT pg_advisory_xact_lock(hashtextextended('internal-calendar-capacity',0))`); readError(w, err) {
+		return
+	}
 	if readError(w, googleLock(r.Context(), tx, user)) {
 		return
 	}
@@ -515,6 +528,17 @@ func (s *Server) googleDisconnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if account != "" {
+		var active bool
+		if err = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM bia_go.google_booking_ops o LEFT JOIN bia_go.bookings b ON b.id=o.booking_id WHERE o.account_id=$1 AND (o.status='pending' OR (o.kind='book' AND o.status='confirmed' AND b.cancelled_at IS NULL AND (b.payload->>'end')::timestamptz>now())))`, account).Scan(&active); readError(w, err) {
+			return
+		}
+		if active {
+			fail(w, 409, "google_account_has_active_bookings")
+			return
+		}
+		if _, err = tx.Exec(r.Context(), `UPDATE bia_go.seller_calendars p SET enabled=false,updated_at=now() WHERE p.user_id=$1 AND (p.account_id=$2 OR EXISTS(SELECT 1 FROM bia_go.seller_calendar_blocks b WHERE b.user_id=p.user_id AND b.account_id=$2))`, user, account); readError(w, err) {
+			return
+		}
 		if _, err = tx.Exec(r.Context(), `DELETE FROM bia_go.google_accounts WHERE id=$1 AND user_id=$2`, account, user); readError(w, err) {
 			return
 		}

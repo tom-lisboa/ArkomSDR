@@ -23,6 +23,16 @@ import (
 const CallbackPath = "/v1/management/integrations/google/callback"
 const DefaultRedirectURL = "https://sdk.arkom.ai" + CallbackPath
 const CalendarListScope = "https://www.googleapis.com/auth/calendar.calendarlist.readonly"
+const EventsScope = "https://www.googleapis.com/auth/calendar.events"
+const FreeBusyScope = "https://www.googleapis.com/auth/calendar.events.freebusy"
+
+func CanSchedule(scopes []string) bool {
+	seen := map[string]bool{}
+	for _, scope := range scopes {
+		seen[scope] = true
+	}
+	return seen[EventsScope] && seen[FreeBusyScope]
+}
 
 type Config struct {
 	Enabled                                       bool
@@ -55,7 +65,7 @@ func New(c Config) (*Client, error) {
 	}
 	return &Client{Config: c, OAuth: oauth2.Config{
 		ClientID: c.ClientID, ClientSecret: c.ClientSecret, RedirectURL: c.RedirectURL,
-		Scopes:   []string{CalendarListScope, "openid", "email"},
+		Scopes:   []string{CalendarListScope, EventsScope, FreeBusyScope, "openid", "email"},
 		Endpoint: oauth2.Endpoint{AuthURL: "https://accounts.google.com/o/oauth2/v2/auth", TokenURL: "https://oauth2.googleapis.com/token", AuthStyle: oauth2.AuthStyleInParams},
 	}, HTTP: &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }

@@ -62,7 +62,23 @@ func (s *Server) testContactStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	upcoming := st.Booking != nil && st.Booking.Outcome == "" && st.Booking.Start.After(time.Now())
-	write(w, 200, map[string]any{"booking": st.Booking, "has_future_booking": upcoming, "sms_consent": st.Profile.SMSConsent, "sms_consent_pending": pending, "sms_phone_valid": domain.SMSDestination(st.Profile) != "", "sms_configured": s.SMSEnabled, "audio_ready": s.ReminderAudio.Ready(), "call_configured": s.VoiceEnabled, "contact_blocked": st.Owner != "go" || st.OptedOut || st.Human || st.Paused || !st.Profile.Consent})
+	bookingStatus := "not_booked"
+	if upcoming {
+		bookingStatus = "booked"
+	} else if s.DB.DualCalendar {
+		var latest string
+		err = s.DB.Pool.QueryRow(r.Context(), `SELECT COALESCE((SELECT status FROM bia_go.jobs WHERE lead_id=$1 AND kind='effect' AND payload->>'purpose'='form_booking' ORDER BY seq DESC LIMIT 1),'')`, st.ID).Scan(&latest)
+		if calendarError(w, err) {
+			return
+		}
+		switch latest {
+		case "pending", "running", "uncertain":
+			bookingStatus = "booking_pending"
+		case "dead", "skipped":
+			bookingStatus = "booking_failed"
+		}
+	}
+	write(w, 200, map[string]any{"booking": st.Booking, "booking_status": bookingStatus, "has_future_booking": upcoming, "sms_consent": st.Profile.SMSConsent, "sms_consent_pending": pending, "sms_phone_valid": domain.SMSDestination(st.Profile) != "", "sms_configured": s.SMSEnabled, "audio_ready": s.ReminderAudio.Ready(), "call_configured": s.VoiceEnabled, "contact_blocked": st.Owner != "go" || st.OptedOut || st.Human || st.Paused || !st.Profile.Consent})
 }
 
 func writeActionError(w http.ResponseWriter, status int, code string) {
@@ -93,7 +109,7 @@ func writeActionError(w http.ResponseWriter, status int, code string) {
 	case "lead_already_booked":
 		message = "Este contato já tem uma reunião marcada. Consulte a reserva antes de tentar agendar novamente."
 		next = "show_current_booking"
-	case "slot_no_longer_available":
+	case "slot_no_longer_available", "booking_not_confirmed":
 		message = "Esse horário não está mais disponível. Escolha outra vaga."
 		next = "reload_slots"
 	case "whatsapp_reply_required":

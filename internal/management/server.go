@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"arkom/bia/internal/domain"
+	"arkom/bia/internal/dualcalendar"
 	"arkom/bia/internal/googlecalendar"
 	"arkom/bia/internal/lumi"
 	"arkom/bia/internal/providers"
@@ -22,6 +23,7 @@ import (
 var errInput = errors.New("invalid_input")
 
 type Server struct {
+	Calendar      *dualcalendar.Service
 	Google        *googlecalendar.Client
 	Lumi          *lumi.Client
 	CredentialKey string
@@ -96,6 +98,8 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("GET "+prefix+"/integrations/google/start", s.googleStart)
 	m.HandleFunc("GET "+googlecalendar.CallbackPath, s.googleCallback)
 	m.HandleFunc("GET "+prefix+"/integrations/google/status", s.auth("viewer", s.googleStatus))
+	m.HandleFunc("GET "+prefix+"/integrations/google/scheduling", s.auth("operator", s.googleScheduling))
+	m.HandleFunc("PUT "+prefix+"/integrations/google/scheduling", s.auth("operator", s.googleSchedulingSave))
 	m.HandleFunc("GET "+prefix+"/integrations/google/calendars", s.auth("operator", s.googleCalendars))
 	m.HandleFunc("POST "+prefix+"/integrations/google/disconnect", s.auth("operator", s.googleDisconnect))
 	m.HandleFunc("POST "+prefix+"/auth/login", s.login)

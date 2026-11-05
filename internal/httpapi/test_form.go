@@ -111,6 +111,10 @@ func (s *Server) testForm(w http.ResponseWriter, r *http.Request) {
 		var booking *domain.Booking
 		if input.SlotID != "" {
 			booking, err = s.formBooking(r, id)
+			if s.DB.DualCalendar && err != nil && err.Error() == "booking_pending" {
+				write(w, 202, map[string]any{"status": "booking_pending", "submission_id": id, "event_id": eventID, "duplicate": duplicate, "booking": nil, "requires_whatsapp_action": false, "message": "Solicitação recebida. Estamos confirmando o horário na agenda do vendedor; a Bia avisará quando a reserva estiver concluída."})
+				return
+			}
 			if calendarError(w, err) {
 				return
 			}

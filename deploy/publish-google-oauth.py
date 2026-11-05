@@ -100,6 +100,10 @@ if configure_only:
     updates['BIA_GOOGLE_ENABLED']='true'
 else:
     updates['BIA_GOOGLE_ENABLED']=values.get('BIA_GOOGLE_ENABLED') or 'false'
+if request.get('enable_scheduling'):
+    if updates['BIA_GOOGLE_ENABLED']!='true':
+        raise SystemExit('Google OAuth must be enabled before scheduling.')
+    updates['BIA_GOOGLE_SCHEDULING_ENABLED']='true'
 origins=[o.strip() for o in values.get('BIA_MANAGEMENT_ORIGINS','').split(',') if o.strip()]
 for origin in ['https://sdk.arkom.ai','https://arkom-painelsdr.vercel.app']:
     if origin not in origins:origins.append(origin)
@@ -116,7 +120,7 @@ try:
         subprocess.run(['sh','activate.sh'],cwd=destination,check=True)
     subprocess.run(['curl','--fail','--silent','--show-error','--retry','15','--retry-all-errors','--retry-delay','1','--max-time','5','http://127.0.0.1:8080/readyz'],check=True)
     version=compose(destination,'exec','-T','postgres','psql','-U','bia','-d','bia','-Atc','SELECT max(version) FROM bia_go.schema_versions;',capture_output=True,text=True).stdout.strip()
-    if (not configure_only and version!='21') or (configure_only and int(version)<20):raise SystemExit('Unexpected database schema version after publishing.')
+    if (not configure_only and version!='22') or (configure_only and int(version)<20):raise SystemExit('Unexpected database schema version after publishing.')
 except BaseException:
     shutil.copy2(backup/'runtime.env',runtime)
     if configure_only:
@@ -134,8 +138,11 @@ print(json.dumps({'release':destination.name,'schema':int(version),'google_enabl
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--configure-only", action="store_true")
+    parser.add_argument("--enable-scheduling", action="store_true", help="Enable PostgreSQL and Google scheduling for the internal SDR")
     args = parser.parse_args()
-    payload = {"configure_only": args.configure_only, "release": "", "credentials": {}}
+    if args.configure_only and args.enable_scheduling:
+        parser.error("Scheduling activation requires a full worker release")
+    payload = {"configure_only": args.configure_only, "enable_scheduling": args.enable_scheduling, "release": "", "credentials": {}}
     if args.configure_only:
         payload["credentials"] = credentials()
     else:

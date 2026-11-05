@@ -13,7 +13,7 @@ func TestConfigAndPKCE(t *testing.T) {
 		t.Fatal(err)
 	}
 	u, _ := url.Parse(client.AuthorizationURL("state", "test-verifier"))
-	if q := u.Query(); q.Get("code_challenge_method") != "S256" || q.Get("code_challenge") == "" || q.Get("code_verifier") != "" || q.Get("redirect_uri") != DefaultRedirectURL || q.Get("access_type") != "offline" || q.Get("scope") != CalendarListScope+" openid email" || q.Get("state") != "state" {
+	if q := u.Query(); q.Get("code_challenge_method") != "S256" || q.Get("code_challenge") == "" || q.Get("code_verifier") != "" || q.Get("redirect_uri") != DefaultRedirectURL || q.Get("access_type") != "offline" || q.Get("scope") != CalendarListScope+" "+EventsScope+" "+FreeBusyScope+" openid email" || q.Get("state") != "state" {
 		t.Fatal("invalid authorization URL")
 	}
 	for _, bad := range []string{"http://sdk.arkom.ai" + CallbackPath, "https://24.199.100.186" + CallbackPath, DefaultRedirectURL + "?next=evil", DefaultRedirectURL + "#fragment", DefaultRedirectURL + "/", "https://user@host" + CallbackPath} {

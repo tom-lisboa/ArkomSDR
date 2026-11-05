@@ -208,6 +208,9 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 		s.Stage = "cancelled"
 		s.OfferVersion = ""
 		add("crm", "booking_cancelled", "Cancelamento confirmado pelo provedor.", now, now.Add(24*time.Hour))
+		if s.PreviousBooking.GoogleSynced {
+			add("send", "reply", "Sua reserva foi cancelada. Se quiser retomar, posso ajudar a encontrar outro horário.", now, now.Add(30*time.Minute))
+		}
 	case "attendance.attended", "attendance.no_show":
 		if s.Booking == nil || s.Booking.ID != e.BookingID || e.At.Before(s.Booking.Start) {
 			return finish()
@@ -369,7 +372,7 @@ func Reduce(s State, e Event, d Decision, slots []Slot, p Policy, now time.Time)
 			if e.SelectedSlotID == "" {
 				r.Decision.Evidence = e.Text
 			}
-			if s.Booking != nil && !s.Booking.Group && (s.Booking.CloserID == 0 || chosen.CloserID != s.Booking.CloserID || chosen.Provider != s.Booking.Provider) {
+			if s.Booking != nil && !s.Booking.Group && !canReschedule(*s.Booking, *chosen) {
 				handoff("reschedule_must_keep_provider_and_closer")
 				break
 			}
@@ -440,7 +443,7 @@ func offer(s *State, r *Result, e Event, slots []Slot, p Policy, now time.Time) 
 		if seen[slot.ID] || !slot.Start.After(now.Add(30*time.Minute)) || slot.Group {
 			continue
 		}
-		if s.Booking != nil && (slot.Provider != s.Booking.Provider || slot.CloserID != s.Booking.CloserID || s.Booking.CloserID == 0) {
+		if s.Booking != nil && !canReschedule(*s.Booking, slot) {
 			continue
 		}
 		seen[slot.ID] = true
@@ -484,6 +487,10 @@ func offer(s *State, r *Result, e Event, slots []Slot, p Policy, now time.Time) 
 		due := p.NextContact(now.Add(p.FollowupAfter), *s)
 		r.Effects = append(r.Effects, Effect{ID: e.ID + ":followup", LeadID: s.ID, Kind: "send", Purpose: "followup", Text: "Quer seguir com o diagnóstico? Posso consultar os horários atualizados por aqui.", Due: due, Expires: due.Add(time.Hour), OfferVersion: e.ID})
 	}
+}
+
+func canReschedule(old Booking, slot Slot) bool {
+	return old.Provider == slot.Provider && ((old.CloserID != 0 && old.CloserID == slot.CloserID) || (old.Provider == "local" && !old.GoogleSynced && slot.GoogleCalendar))
 }
 
 func evidence(e Event, d Decision) bool {

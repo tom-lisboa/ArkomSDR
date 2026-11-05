@@ -30,6 +30,7 @@ O fluxo atual é no servidor. Não usa o SDK JavaScript do Google no navegador. 
 ```dotenv
 BIA_MANAGEMENT_ENABLED=true
 BIA_GOOGLE_ENABLED=true
+BIA_GOOGLE_SCHEDULING_ENABLED=true
 BIA_GOOGLE_CLIENT_ID=
 BIA_GOOGLE_CLIENT_SECRET=
 BIA_GOOGLE_REDIRECT_URL=https://sdk.arkom.ai/v1/management/integrations/google/callback
@@ -59,6 +60,8 @@ Veja [Google Agenda no guia de gestão](management-backend.md#google-agenda) e o
 | `GET /integrations/google/callback` | Retorno do Google, protegido por estado, cookie e PKCE |
 | `GET /integrations/google/status` | Bearer; conexão do próprio usuário |
 | `GET /integrations/google/calendars` | Bearer de operator/admin; consulta e renovação de acesso |
+| `GET /integrations/google/scheduling` | Bearer de operator/admin, perfil do próprio vendedor |
+| `PUT /integrations/google/scheduling` | Bearer de operator/admin, agenda de destino e agendas de bloqueio |
 | `POST /integrations/google/disconnect` | Bearer de operator/admin; remoção local |
 
 O frontend deve navegar até a URL retornada por `authorize`, no mesmo navegador que concluirá o consentimento. Isso estabelece o cookie `__Host-bia-google-oauth` no domínio do callback sem exigir cookies de terceiros em uma chamada cross-origin. Não coloque o token de sessão do painel em uma URL. O callback devolve HTML simples para navegação e JSON para os demais clientes.
@@ -74,7 +77,7 @@ O frontend deve navegar até a URL retornada por `authorize`, no mesmo navegador
 - Tentativas substituídas, logout, revogação de sessão e remoção local impedem concluir um retorno pendente. Consultas e operações da mesma conexão são serializadas durante as alterações de credenciais.
 - Refresh token rotacionado é salvo antes da consulta de agendas, inclusive se essa consulta posterior falhar.
 - O endpoint de desconexão remove a concessão do SDR. A revogação no Google é uma ação separada na própria conta.
-- Os escopos atuais são `calendar.calendarlist.readonly`, `openid` e `email`; a identidade é obtida no UserInfo HTTPS do Google e exige e-mail verificado. **Sincronização de reuniões e disponibilidade não está implementada.** Os workers continuam usando a agenda própria no PostgreSQL.
+- A identidade é obtida no UserInfo HTTPS do Google e exige e-mail verificado. `calendar.events.freebusy` autoriza consultar ocupação e `calendar.events` autoriza criar e cancelar eventos.
 
 ## Validação
 
@@ -90,4 +93,14 @@ Nova autorização sem `account_id` adiciona uma identidade; a mesma identidade 
 
 A identidade (subject) não é enviada ao navegador. E-mail e ID da conexão são metadados da conta do próprio vendedor. Cada token novo é associado criptograficamente ao usuário e à conta, impedindo cópia de credenciais entre duas contas do mesmo usuário. Dados de identidade nunca são aceitos como entrada do frontend.
 
-**A conexão de várias contas não torna o SDR integrado à disponibilidade do Google.** O worker continua no calendário PostgreSQL. Não há consulta FreeBusy, calendário de destino escolhido, distribuição por disponibilidade nem criação de eventos Google nesta etapa.
+## Ativar agendamentos do SDR interno
+
+1. Entre com seu usuário individual e conecte as contas Google que quer usar. Se a conta já estava conectada, clique em **Reconectar** para conceder as permissões de agenda.
+2. Em **Reuniões pelo SDR**, clique em **Escolher agendas**. Escolha a agenda que deve receber os eventos e marque as agendas que devem bloquear horários. A agenda de destino sempre bloqueia horários.
+3. Clique em **Ativar agendamento na minha agenda**. Para parar de receber novas reuniões, use **Pausar novos agendamentos**. Reservas já confirmadas continuam registradas.
+
+O worker consulta as agendas marcadas, considera a grade de 45 minutos e escolhe, entre os vendedores livres, o que tem menos reservas futuras no SDR. O lead recebe confirmação depois de a reserva existir no PostgreSQL e na agenda de destino. Remarcações conservam o vendedor quando a reserva já está integrada. O cancelamento só libera a vaga local depois de confirmar a remoção no Google. Os eventos são criados sem convidados e sem link automático de sala.
+
+A migração 22 guarda a configuração e as operações em andamento. Uma resposta perdida do Google é recuperada pelo identificador estável do evento. Enquanto a confirmação estiver pendente, o horário fica retido. Se nenhum vendedor estiver habilitado, a disponibilidade retorna vazia. Reservas antigas permanecem consultáveis. Uma conta com reuniões futuras ou operações pendentes precisa ser mantida conectada para concluir a sincronização.
+
+Consulte [ocupação no Google Agenda](https://developers.google.com/workspace/calendar/api/v3/reference/freebusy/query) e [criação de eventos](https://developers.google.com/workspace/calendar/api/v3/reference/events/insert).

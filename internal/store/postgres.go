@@ -76,10 +76,16 @@ var googleOAuthSchema string
 //go:embed google_accounts.sql
 var googleAccountsSchema string
 
+//go:embed google_scheduling.sql
+var googleSchedulingSchema string
+
 var ErrConflict = errors.New("idempotency key reused with different payload")
 var ErrLease = errors.New("lease lost; stale worker cannot commit")
 
-type DB struct{ Pool *pgxpool.Pool }
+type DB struct {
+	Pool         *pgxpool.Pool
+	DualCalendar bool
+}
 type VoiceInvite struct{ Sender string }
 type Job struct {
 	GuardContext bool                    `json:"-"`
@@ -186,6 +192,9 @@ func (d *DB) Migrate(ctx context.Context) error {
 	if _, e = tx.Exec(ctx, googleAccountsSchema); e != nil {
 		return e
 	}
+	if _, e = tx.Exec(ctx, googleSchedulingSchema); e != nil {
+		return e
+	}
 	return tx.Commit(ctx)
 }
 func (d *DB) Close() { d.Pool.Close() }
@@ -286,6 +295,13 @@ func (d *DB) ClaimQueue(ctx context.Context, queue string) (Job, domain.State, e
 	}
 	// An abandoned external effect is ambiguous. It must be reconciled, never
 	// automatically resent after a process crash or an expired lease.
+	if d.DualCalendar {
+		// Booking mutations have a durable operation and deterministic event ID.
+		// The scheduling worker can recover them without repeating an event.
+		if _, e = tx.Exec(ctx, `UPDATE bia_go.jobs SET status='pending',lease_token=NULL WHERE lead_id=$1 AND kind='effect' AND status='running' AND payload->>'kind' IN ('book','cancel')`, j.LeadID); e != nil {
+			return j, s, e
+		}
+	}
 	ct, e := tx.Exec(ctx, `UPDATE bia_go.jobs SET status='uncertain',error_code='worker_lost_during_effect',completed_at=now()
  WHERE lead_id=$1 AND kind='effect' AND status='running'`, j.LeadID)
 	if e != nil {

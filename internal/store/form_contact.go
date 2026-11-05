@@ -107,7 +107,7 @@ func (d *DB) ActivateTestForm(ctx context.Context, id, mode, sender string) (str
 		if mode != "live" {
 			return "", &FormBookingError{Code: "live_calendar_required"}
 		}
-		if _, _, err = reserveFormSlot(ctx, tx, "form-booking:"+id, leadID, slotID, f, mode); err != nil {
+		if _, _, err = reserveFormSlot(ctx, tx, "form-booking:"+id, leadID, slotID, f, mode, d.DualCalendar); err != nil {
 			return "", err
 		}
 	}

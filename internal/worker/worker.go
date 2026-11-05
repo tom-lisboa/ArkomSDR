@@ -138,7 +138,9 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 		var slots []domain.Slot
 		if e.Kind == "message.received" && !s.OptedOut && !s.Human && !domain.AutomaticReply(e.Text) && (e.Context == nil || !e.Context.MediaFailed) {
 			var calendarErr error
-			slots, calendarErr = w.Calendar.Slots(opCtx, s, now)
+			calendarCtx, cancelCalendar := context.WithTimeout(opCtx, 8*time.Second)
+			slots, calendarErr = w.Calendar.Slots(calendarCtx, s, now)
+			cancelCalendar()
 			e.CalendarUnavailable = calendarErr != nil
 			if !buttonHandled && domain.NeedsPlan(s, e, now) {
 				id := agent.Select(s, e)
@@ -218,6 +220,15 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 			return true, w.DB.DeferJob(ctx, j, now.Add(5*time.Second), "awaiting_form_opening")
 		}
 	}
+	if fx.Purpose == "form_contact" && w.DB.DualCalendar {
+		var bookingPending bool
+		if err := w.DB.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM bia_go.jobs WHERE lead_id=$1 AND kind='effect' AND payload->>'purpose'='form_booking' AND status IN ('pending','running','uncertain'))`, s.ID).Scan(&bookingPending); err != nil {
+			return true, err
+		}
+		if bookingPending {
+			return true, w.DB.DeferJob(ctx, j, now.Add(2*time.Second), "awaiting_google_form_booking")
+		}
+	}
 	if fx.Purpose == "intro_video" {
 		var contextPending bool
 		if err := w.DB.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM bia_go.jobs WHERE lead_id=$1 AND kind='effect' AND status IN ('pending','running') AND payload->>'purpose'='form_context')`, s.ID).Scan(&contextPending); err != nil {
@@ -237,7 +248,7 @@ func (w *Worker) Once(parent context.Context) (bool, error) {
 			return true, e
 		}
 		if pending {
-			if domain.IsMeetingReminder(fx) || fx.Purpose == "intro_video" {
+			if domain.IsMeetingReminder(fx) || fx.Purpose == "intro_video" || fx.Purpose == "form_booking" {
 				return true, w.DB.DeferJob(ctx, j, now.Add(5*time.Second), "new_input_pending")
 			}
 			return true, w.DB.Finish(ctx, j, s, nil, "skipped", map[string]string{"reason": "new_input_superseded_run"})

@@ -56,26 +56,28 @@ type Form struct {
 }
 
 type Booking struct {
-	ID          string     `json:"id"`
-	Provider    string     `json:"provider"`
-	Start       time.Time  `json:"start"`
-	End         time.Time  `json:"end"`
-	MeetingURL  string     `json:"meeting_url"`
-	CloserID    int64      `json:"closer_id"`
-	Group       bool       `json:"group"`
-	SeatID      string     `json:"seat_id,omitempty"`
-	ConfirmedAt *time.Time `json:"confirmed_at,omitempty"`
-	Outcome     string     `json:"outcome,omitempty"`
+	GoogleSynced bool       `json:"google_synced,omitempty"`
+	ID           string     `json:"id"`
+	Provider     string     `json:"provider"`
+	Start        time.Time  `json:"start"`
+	End          time.Time  `json:"end"`
+	MeetingURL   string     `json:"meeting_url"`
+	CloserID     int64      `json:"closer_id"`
+	Group        bool       `json:"group"`
+	SeatID       string     `json:"seat_id,omitempty"`
+	ConfirmedAt  *time.Time `json:"confirmed_at,omitempty"`
+	Outcome      string     `json:"outcome,omitempty"`
 }
 
 type Slot struct {
-	ID          string    `json:"id"`
-	Start       time.Time `json:"start"`
-	End         time.Time `json:"end"`
-	Provider    string    `json:"provider"`
-	CloserID    int64     `json:"closer_id"`
-	EventTypeID int64     `json:"event_type_id"`
-	Group       bool      `json:"group"`
+	GoogleCalendar bool      `json:"google_calendar,omitempty"`
+	ID             string    `json:"id"`
+	Start          time.Time `json:"start"`
+	End            time.Time `json:"end"`
+	Provider       string    `json:"provider"`
+	CloserID       int64     `json:"closer_id"`
+	EventTypeID    int64     `json:"event_type_id"`
+	Group          bool      `json:"group"`
 }
 
 type Turn struct {

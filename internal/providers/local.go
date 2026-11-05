@@ -15,7 +15,10 @@ import (
 
 // LocalCalendar is a Go-owned calendar. Its slots and reservations are isolated
 // from n8n, Cal and ClickMax. No Google invitation is sent by this adapter.
-type LocalCalendar struct{ Pool *pgxpool.Pool }
+type LocalCalendar struct {
+	Pool     *pgxpool.Pool
+	External Calendar
+}
 type LocalSlot struct {
 	domain.Slot
 	MeetingURL string `json:"meeting_url"`
@@ -50,6 +53,9 @@ func (c *LocalCalendar) Add(ctx context.Context, slot LocalSlot) error {
 	return tx.Commit(ctx)
 }
 func (c *LocalCalendar) Slots(ctx context.Context, s domain.State, now time.Time) ([]domain.Slot, error) {
+	if c.External != nil {
+		return c.External.Slots(ctx, s, now)
+	}
 	var closer int64
 	if s.Booking != nil && s.Booking.Outcome == "" {
 		if s.Booking.Provider != "local" || s.Booking.CloserID == 0 {
@@ -73,6 +79,9 @@ func (c *LocalCalendar) Slots(ctx context.Context, s domain.State, now time.Time
 	return out, rows.Err()
 }
 func (c *LocalCalendar) Book(ctx context.Context, key string, s domain.State, slot domain.Slot, old *domain.Booking) (domain.Booking, error) {
+	if c.External != nil {
+		return c.External.Book(ctx, key, s, slot, old)
+	}
 	var b domain.Booking
 	tx, e := c.Pool.Begin(ctx)
 	if e != nil {
@@ -89,6 +98,16 @@ func (c *LocalCalendar) Book(ctx context.Context, key string, s domain.State, sl
 // BookLocalTx lets the form atomically reserve and enqueue the booking event.
 // The caller owns commit/rollback; all calendar locking rules remain shared.
 func BookLocalTx(ctx context.Context, tx pgx.Tx, key string, s domain.State, slot domain.Slot, old *domain.Booking) (domain.Booking, error) {
+	return bookLocalTx(ctx, tx, key, s, slot, old, false)
+}
+
+// BookVerifiedLocalTx commits an already accepted external event after a retry.
+// Its durable intent was validated before Google was mutated; the 30-minute
+// notice cannot invalidate that accepted reservation during reconciliation.
+func BookVerifiedLocalTx(ctx context.Context, tx pgx.Tx, key string, s domain.State, slot domain.Slot, old *domain.Booking) (domain.Booking, error) {
+	return bookLocalTx(ctx, tx, key, s, slot, old, true)
+}
+func bookLocalTx(ctx context.Context, tx pgx.Tx, key string, s domain.State, slot domain.Slot, old *domain.Booking, verified bool) (domain.Booking, error) {
 	var b domain.Booking
 	var e error
 	// Serialize all bookings for this identity, including different slots.
@@ -119,11 +138,11 @@ func BookLocalTx(ctx context.Context, tx pgx.Tx, key string, s domain.State, slo
 	if e != nil {
 		return b, e
 	}
-	if reserved != nil || !start.After(time.Now().Add(30*time.Minute)) || !slot.Start.Equal(start) {
+	if reserved != nil || (!verified && !start.After(time.Now().Add(30*time.Minute))) || !slot.Start.Equal(start) {
 		return b, &Failure{Code: "slot_no_longer_available"}
 	}
 	if old != nil {
-		if old.Provider != "local" || old.CloserID != closer || old.Group {
+		if old.Provider != "local" || old.Group || (old.CloserID != closer && !(verified && !old.GoogleSynced)) {
 			return b, &Failure{Code: "local_reschedule_invariant"}
 		}
 		var previous string
@@ -146,7 +165,7 @@ func BookLocalTx(ctx context.Context, tx pgx.Tx, key string, s domain.State, slo
 	}
 	h := sha256.Sum256([]byte(key))
 	id := "local_" + hex.EncodeToString(h[:16])
-	b = domain.Booking{ID: id, Provider: "local", Start: start, End: end, MeetingURL: meet, CloserID: closer}
+	b = domain.Booking{ID: id, Provider: "local", Start: start, End: end, MeetingURL: meet, CloserID: closer, GoogleSynced: verified}
 	raw, _ = json.Marshal(b)
 	_, e = tx.Exec(ctx, `INSERT INTO bia_go.bookings(id,operation_id,lead_id,slot_id,payload) VALUES($1,$2,$3,$4,$5)`, id, key, s.ID, slot.ID, raw)
 	if e != nil {
@@ -159,6 +178,9 @@ func BookLocalTx(ctx context.Context, tx pgx.Tx, key string, s domain.State, slo
 	return b, nil
 }
 func (c *LocalCalendar) Cancel(ctx context.Context, key string, b domain.Booking) error {
+	if c.External != nil {
+		return c.External.Cancel(ctx, key, b)
+	}
 	if b.Provider != "local" || b.Group {
 		return &Failure{Code: "local_cancel_provider_mismatch"}
 	}

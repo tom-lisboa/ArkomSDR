@@ -99,6 +99,11 @@ func (a DailyAvailability) Slots(now time.Time) ([]LocalSlot, error) {
 }
 
 func (c *LocalCalendar) EnsureAvailability(ctx context.Context, a DailyAvailability, now time.Time) error {
+	if external, ok := c.External.(interface {
+		EnsureAvailability(context.Context, DailyAvailability, time.Time) error
+	}); ok {
+		return external.EnsureAvailability(ctx, a, now)
+	}
 	slots, err := a.Slots(now)
 	if err != nil || len(slots) == 0 {
 		return err

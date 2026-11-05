@@ -35,7 +35,7 @@ A data é apenas exemplo. `timezone` é opcional e usa o fuso configurado se omi
 
 `slots: []` significa ausência de vagas no período consultado. Falha de consulta retorna 503, sem fingir que a agenda está cheia. A lista não bloqueia a vaga; a disponibilidade é verificada novamente na reserva.
 
-A grade atual é gerada diariamente no Postgres: todos os dias, 8h–12h e 14h–20h, reuniões de 45 minutos. Uma reunião inteira precisa caber no intervalo. A lista retornada pelo endpoint é a fonte de verdade; não gere horários no navegador.
+A grade é gerada diariamente no PostgreSQL e filtrada pela ocupação das agendas Google dos vendedores habilitados: todos os dias, 8h–12h e 14h–20h, reuniões de 45 minutos. Uma reunião inteira precisa caber no intervalo. A lista retornada pelo endpoint é a fonte de verdade; não gere horários no navegador.
 
 ## 2. Reservar ao concluir o formulário (preferido)
 
@@ -75,14 +75,14 @@ const response = await fetch(WEBHOOK, {
 });
 const result = await response.json();
 if (!response.ok) throw new Error(result.error || "submission_failed");
-// HTTP 202: contato enfileirado. result.booking já é uma reserva confirmada
-// no banco (não uma simples solicitação). Salve também result.submission_id.
-mostrarConfirmacao(result.booking);
+// Salve result.submission_id para consultar /test-status se necessário.
+if (result.booking) mostrarConfirmacao(result.booking);
+else if (result.status === "booking_pending") mostrarAguardandoConfirmacao();
 ```
 
 A resposta mantém os campos antigos (`submission_id`, `event_id`, `whatsapp_url`, `duplicate`, `status`). Com `slot_id`, inclui `booking` com `id`, `provider`, `start`, `end` e os metadados reais da reserva. Sem `slot_id`, `booking` é `null` e o atendimento continua buscando o agendamento pelo WhatsApp. Omitir `slot_id` não apaga uma reserva que o contato já possua.
 
-A ativação do contato, a reserva e o evento de agenda são confirmados na mesma transação. Se a reserva falhar, não há novo contato enfileirado nem reserva parcial; o registro técnico da submissão fica salvo para idempotência. Quando o usuário escolher OUTRO horário após uma rejeição definitiva, envie o novo corpo com uma NOVA chave. Não mude o corpo de uma requisição cujo resultado ainda é desconhecido.
+O formulário registra a solicitação e o worker confirma nos dois calendários. Se o Google ainda estiver processando, o retorno é HTTP 202 com `status: "booking_pending"` e `booking: null`. Use `POST {WEBHOOK}/test-status` com `submission_id` e `phone` para acompanhar `booking_status`. Mostre a confirmação quando o status for `booked`. Se for `booking_failed`, recarregue os horários e peça uma nova escolha. Preserve a mesma chave para repetir uma tentativa de resultado desconhecido e use uma nova chave ao escolher outro horário.
 
 ## 3. Reservar após um formulário já concluído
 
@@ -100,7 +100,7 @@ Idempotency-Key: UUID_DA_OPERACAO_DE_RESERVA
 }
 ```
 
-HTTP 201 cria a reserva; HTTP 200 com `duplicate: true` confirma uma repetição da mesma operação. Ambos retornam `status: "booked"`, `submission_id` e `booking`.
+HTTP 201 cria a reserva; HTTP 200 com `duplicate: true` confirma uma repetição da mesma operação. Ambos retornam `status: "booked"`, `submission_id` e `booking`. HTTP 202 com `booking_pending` pede acompanhamento em `/test-status`.
 
 A submissão deve ter sido ativada, ter menos de 24 horas e pertencer ao mesmo telefone. As grafias brasileiras com/sem nono dígito reconhecidas pelo WhatsApp mantêm o mesmo contato. Uma reserva existente não é remarcada silenciosamente por esse endpoint. Remarcação/cancelamento continuam pelo atendimento existente.
 

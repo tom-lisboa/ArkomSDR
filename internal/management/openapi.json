@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Arkom SDR Management API",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "description": "Backend da equipe. Isolado do token interno do SDR. Autenticação por sessão Bearer de 12h. Todas as datas em RFC3339; métricas de taxa são frações e denominadores vazios retornam null. Nenhuma interface frontend é fornecida."
   },
   "servers": [
@@ -3702,7 +3702,7 @@
       "get": {
         "summary": "Consultar conexão Google",
         "operationId": "get__integrations_google_status",
-        "description": "Permissão mínima: viewer. Retorna todas as contas do usuário autenticado em accounts, com IDs e e-mails verificados, sem tokens ou subject Google. As propriedades anteriores de conexão única são mantidas quando há uma conta. synchronization_enabled permanece false.",
+        "description": "Permissão mínima: viewer. Retorna todas as contas do usuário autenticado em accounts, com IDs e e-mails verificados, sem tokens ou subject Google. As propriedades anteriores de conexão única são mantidas quando há uma conta. synchronization_enabled indica um perfil habilitado com as permissões necessárias. A disponibilidade é consultada ao oferecer e reservar horários.",
         "responses": {
           "400": {
             "description": "Retorno inválido, expirado, recusado ou já utilizado",
@@ -3989,6 +3989,182 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/GoogleAccountRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/management/integrations/google/scheduling": {
+      "get": {
+        "summary": "Consultar configuração de agendamento",
+        "operationId": "get__integrations_google_scheduling",
+        "description": "Permissão mínima de operador. Retorna a configuração do usuário autenticado.",
+        "responses": {
+          "200": {
+            "description": "Perfil de agendamento do vendedor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleSchedulingProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sessão ausente ou expirada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissão de vendedor necessária",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Agendamento Google indisponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Configurar agendas para receber reuniões",
+        "operationId": "put__integrations_google_scheduling",
+        "description": "Permissão mínima de operador. Valida as agendas da própria conta e escolhe uma agenda de destino com acesso de edição. O destino também é consultado para evitar conflitos. Envie enabled false para pausar novas reservas.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "enabled"
+                ],
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "destination": {
+                    "type": "object",
+                    "required": [
+                      "account_id",
+                      "calendar_id"
+                    ],
+                    "properties": {
+                      "account_id": {
+                        "type": "string"
+                      },
+                      "calendar_id": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "blocking_calendars": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "account_id",
+                        "calendar_id"
+                      ],
+                      "properties": {
+                        "account_id": {
+                          "type": "string"
+                        },
+                        "calendar_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "maxItems": 49
+                  }
+                }
+              },
+              "example": {
+                "enabled": true,
+                "destination": {
+                  "account_id": "gac_exemplo",
+                  "calendar_id": "vendas@example.com"
+                },
+                "blocking_calendars": []
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Perfil de agendamento do vendedor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleSchedulingProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sessão ausente ou expirada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permissão de vendedor necessária",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Agendamento Google indisponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Agenda inválida, permissão insuficiente ou operação pendente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Falha ao validar a agenda no Google",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
               }
             }
           }
@@ -5567,10 +5743,7 @@
             "format": "uri"
           },
           "synchronization_enabled": {
-            "type": "boolean",
-            "enum": [
-              false
-            ]
+            "type": "boolean"
           },
           "connected_at": {
             "type": "string",
@@ -5595,6 +5768,9 @@
             "items": {
               "$ref": "#/components/schemas/GoogleAccount"
             }
+          },
+          "scheduling": {
+            "$ref": "#/components/schemas/GoogleSchedulingProfile"
           }
         }
       },
@@ -5717,6 +5893,67 @@
           "requires_reconnect": {
             "type": "boolean",
             "description": "Concessão anterior que precisa de reconexão para identificar a conta."
+          },
+          "scheduling_permission": {
+            "type": "boolean"
+          }
+        }
+      },
+      "GoogleSchedulingProfile": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "destination": {
+            "type": "object",
+            "required": [
+              "account_id",
+              "calendar_id"
+            ],
+            "properties": {
+              "account_id": {
+                "type": "string"
+              },
+              "calendar_id": {
+                "type": "string"
+              }
+            }
+          },
+          "blocking_calendars": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "account_id",
+                "calendar_id"
+              ],
+              "properties": {
+                "account_id": {
+                  "type": "string"
+                },
+                "calendar_id": {
+                  "type": "string"
+                }
+              }
+            },
+            "maxItems": 49
+          },
+          "calendar_name": {
+            "type": "string"
+          },
+          "closer_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "distribution": {
+            "type": "string",
+            "enum": [
+              "fewest_future_bookings"
+            ]
           }
         }
       }

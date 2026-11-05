@@ -4,6 +4,7 @@ let token = '', userRole = '';
 let generation = 0, refreshing = false;
 let statusRequest = 0;
 let accountSignature = '', pendingSignature = null;
+let connectedAccounts = [], scheduleProfile = null, calendarChoices = [];
 const errors = {
  invalid_credentials: 'Usuário ou senha incorretos. Confira seu acesso e tente novamente.',
  login_rate_limited: 'Houve muitas tentativas de acesso. Aguarde alguns minutos antes de tentar novamente.',
@@ -15,6 +16,12 @@ const errors = {
  google_account_mismatch: 'Foi escolhida outra conta Google. Para reconectar, selecione o mesmo e-mail mostrado no cartão.',
  google_identity_unavailable: 'Não foi possível confirmar a conta Google. Reinicie a autorização e permita identificar seu e-mail.',
  google_refresh_failed: 'O acesso a esta conta precisa ser renovado. Use Reconectar nesta conta.',
+ google_scheduling_permission_required: 'Reconecte esta conta e permita consultar a ocupação e criar reuniões no Google Agenda.',
+ google_account_has_active_bookings: 'Esta conta tem reuniões ou operações em andamento. Cancele ou transfira as reservas antes de desconectar.',
+ google_scheduling_operation_pending: 'Uma reserva está sendo sincronizada. Aguarde a conclusão antes de alterar as agendas.',
+ google_calendar_write_required: 'Escolha uma agenda em que você possa criar eventos.',
+ google_destination_required: 'Escolha a agenda que receberá as reuniões.',
+ google_scheduling_setup_failed: 'Não foi possível validar as agendas. Confira as permissões e tente novamente.',
  google_calendar_unavailable: 'Não foi possível consultar as agendas desta conta. Tente novamente ou reconecte a conta.',
  forbidden: 'Seu acesso ainda não permite conectar agendas. Peça ao administrador um usuário de vendedor.',
  unauthorized: 'Seu acesso expirou. Entre novamente para continuar.',
@@ -44,6 +51,8 @@ function reset() {
  byID('stepLogin').classList.add('active'); byID('stepGoogle').classList.remove('active');
  byID('continueLink').hidden = true; byID('continueLink').removeAttribute('href'); byID('returnHelp').hidden = true;
  byID('accountCards').replaceChildren(); byID('createSeller').hidden = true; byID('createSeller').open = false;
+ byID('schedulingView').hidden = true; byID('schedulingForm').hidden = true;
+ connectedAccounts = []; scheduleProfile = null; calendarChoices = [];
  byID('createSellerForm').reset(); byID('sellerPassword').type = 'password';
  byID('showSellerPassword').textContent = 'Mostrar senha'; byID('sellerMessage').hidden = true;
  message();
@@ -58,7 +67,7 @@ function renderAccounts(accounts) {
   const card = document.createElement('section'); card.className = 'google-account';
   const title = document.createElement('h3'); title.textContent = account.email || 'Conta Google anterior';
   const description = document.createElement('p'); description.className = 'muted small';
-  description.textContent = account.requires_reconnect ? 'Reconecte para confirmar a identidade desta conta.' : 'Conta vinculada ao seu usuário';
+  description.textContent = account.requires_reconnect ? 'Reconecte para confirmar a identidade desta conta.' : account.scheduling_permission ? 'Permissão para consultar ocupação e criar reuniões' : 'Reconecte para permitir consultar ocupação e criar reuniões';
   const actions = document.createElement('div'); actions.className = 'account-actions';
   const feedback = document.createElement('p'); feedback.className = 'help'; feedback.hidden = true;
   const list = document.createElement('ul'); list.hidden = true;
@@ -117,6 +126,12 @@ async function refresh(force = false) {
   const status = await api('/integrations/google/status');
   if (current !== generation || !token || serial !== statusRequest) return;
   const accounts = Array.isArray(status.accounts) ? status.accounts : [];
+  connectedAccounts = accounts; scheduleProfile = status.scheduling || null;
+  byID('schedulingView').hidden = !scheduleProfile;
+  if (scheduleProfile) {
+   byID('schedulingStatus').textContent = scheduleProfile.ready ? `Ativo · Novas reuniões em ${scheduleProfile.calendar_name || 'sua agenda'}` : scheduleProfile.enabled ? 'A configuração precisa de atenção. Confira as contas e as permissões.' : 'Pausado · Sua agenda ainda não recebe novas reservas da Bia.';
+   byID('pauseScheduling').hidden = !scheduleProfile.enabled;
+  }
   const signature = accounts.map(a => a.id + ':' + a.updated_at).join('|');
   byID('connectButton').disabled = !status.configured;
   byID('statusText').textContent = !status.configured ? 'A conexão ainda não foi liberada' : accounts.length ? `${accounts.length} ${accounts.length === 1 ? 'conta Google vinculada' : 'contas Google vinculadas'}` : 'Nenhuma conta Google adicionada';
@@ -130,6 +145,56 @@ async function refresh(force = false) {
  } catch (error) { if (current === generation || error.code === 'unauthorized') message(error.message || 'Não foi possível verificar as conexões.'); }
  finally { if (serial === statusRequest) { refreshing = false; byID('refreshButton').disabled = false; } }
 }
+byID('loadScheduling').addEventListener('click', async () => {
+ const current = generation; byID('loadScheduling').disabled = true; message();
+ try {
+  const choices = [];
+  for (const account of connectedAccounts) {
+   if (account.requires_reconnect || !account.scheduling_permission) continue;
+   let page = '';
+   do {
+    const query = new URLSearchParams({ account_id: account.id }); if (page) query.set('page_token', page);
+    const result = await api('/integrations/google/calendars?' + query);
+    if (current !== generation || !token) return;
+    for (const calendar of result.items || []) choices.push({ account_id: account.id, calendar_id: calendar.id, name: `${calendar.summary || calendar.id} · ${account.email}`, writable: ['owner', 'writer'].includes(calendar.accessRole) });
+    page = result.next_page_token || '';
+    if (choices.length > 500) throw new Error('Muitas agendas nesta conta. Peça ajuda ao administrador para escolher as agendas.');
+   } while (page);
+  }
+  calendarChoices = choices;
+  if (!choices.some(c => c.writable)) throw new Error('Reconecte uma conta com permissão para criar reuniões e escolha uma agenda com acesso de edição.');
+  const select = byID('destination'); select.replaceChildren(new Option('Selecione uma agenda', ''));
+  const field = byID('blockingCalendars'); field.replaceChildren(Object.assign(document.createElement('legend'), { textContent: 'Agendas que bloqueiam horários' }));
+  choices.forEach((choice, index) => {
+   const selected = scheduleProfile?.destination?.account_id === choice.account_id && scheduleProfile.destination.calendar_id === choice.calendar_id;
+   if (choice.writable) select.add(new Option(choice.name, String(index), false, selected));
+   const label = document.createElement('label'), box = document.createElement('input'); box.type = 'checkbox'; box.value = String(index);
+   box.checked = selected || !!scheduleProfile?.blocking_calendars?.some(b => b.account_id === choice.account_id && b.calendar_id === choice.calendar_id);
+   label.append(box, document.createTextNode(choice.name)); field.append(label);
+  });
+  byID('schedulingForm').hidden = false;
+ } catch (error) { if (current === generation) message(error.message); }
+ finally { byID('loadScheduling').disabled = false; }
+});
+byID('schedulingForm').addEventListener('submit', async (event) => {
+ event.preventDefault(); const choice = calendarChoices[Number(byID('destination').value)];
+ if (byID('destination').value === '' || !choice?.writable) { message('Escolha a agenda que receberá as reuniões.'); return; }
+ const selection = c => ({ account_id: c.account_id, calendar_id: c.calendar_id });
+ const blocks = [...byID('blockingCalendars').querySelectorAll('input:checked')].map(box => selection(calendarChoices[Number(box.value)]));
+ const current = generation; byID('saveScheduling').disabled = true; message();
+ try {
+  await api('/integrations/google/scheduling', 'PUT', { enabled: true, destination: selection(choice), blocking_calendars: blocks });
+  if (current !== generation || !token) return;
+  byID('schedulingForm').hidden = true; await refresh(true); message('Agendamento ativado. A Bia já pode reservar no SDR e nesta agenda Google.', true);
+ } catch (error) { if (current === generation) message(error.message); }
+ finally { byID('saveScheduling').disabled = false; }
+});
+byID('pauseScheduling').addEventListener('click', async () => {
+ const current = generation; byID('pauseScheduling').disabled = true;
+ try { await api('/integrations/google/scheduling', 'PUT', { enabled: false }); if (current !== generation || !token) return; await refresh(true); message('Novos agendamentos pausados. As reuniões existentes continuam reservadas.', true); }
+ catch (error) { if (current === generation) message(error.message); }
+ finally { byID('pauseScheduling').disabled = false; }
+});
 async function connectAccount(accountID = '') {
  if (!token) return;
  const tab = window.open('about:blank', '_blank');

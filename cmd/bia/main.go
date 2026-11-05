@@ -2,6 +2,7 @@ package main
 
 import (
 	"arkom/bia/internal/agendaclient"
+	"arkom/bia/internal/dualcalendar"
 	"context"
 	"errors"
 	"flag"
@@ -112,6 +113,16 @@ func run() error {
 		messenger = twilioMessages
 	}
 	calendar := &providers.LocalCalendar{Pool: db.Pool}
+	googleClient, err := googlecalendar.New(c.Google)
+	if err != nil {
+		return err
+	}
+	var dual *dualcalendar.Service
+	if c.GoogleScheduling {
+		dual = &dualcalendar.Service{Pool: db.Pool, Google: googleClient, Availability: c.Availability}
+		calendar.External = dual
+		db.DualCalendar = true
+	}
 	w := &worker.Worker{Buttons: quickreply.Signer{Key: c.Token}, VoiceAutoRequest: c.Voice.AutoRequest, VoiceSender: c.Voice.Sender, Queue: "execution", DB: db, Planner: planner, Messenger: messenger, Calendar: calendar, CRM: providers.LocalCRM{Pool: db.Pool}, Policy: c.Policy, Live: c.Mode == "live", PerLeadDaily: c.PerLeadDaily, GlobalHourly: c.GlobalHourly}
 	if twilioMessages != nil {
 		w.AudioSender = twilioMessages
@@ -177,10 +188,8 @@ func run() error {
 	vs := &voiceworker.Server{Repo: vr, Provider: vp, Account: c.Voice.Account, Sender: c.Voice.Sender, AuthToken: c.Voice.AuthToken, PublicURL: c.Voice.PublicURL, Enabled: c.Voice.Enabled}
 	vs.Messages, vs.Mode, vs.TimeZone, vs.TestPhone = twilioMessages, c.Mode, c.Policy.TimeZone, c.TestPhone
 	panel := &management.Server{DB: db, Mode: c.Mode, Policy: c.Policy, Origins: c.ManagementOrigins, CredentialKey: c.Token, StalledAfter: c.SalesStalledAfter, Download: &providers.Downloader{Account: c.Voice.Account, AuthToken: c.Voice.AuthToken, HTTP: providers.MediaHTTP()}}
-	panel.Google, err = googlecalendar.New(c.Google)
-	if err != nil {
-		return err
-	}
+	panel.Google = googleClient
+	panel.Calendar = dual
 	if c.LumiUserAPIKey != "" {
 		panel.Lumi, err = lumi.New(c.LumiURL, c.LumiUserAPIKey)
 		if err != nil {
@@ -206,6 +215,9 @@ func run() error {
 	}
 	if *role == "all" || *role == "scheduling" {
 		start(func(ctx context.Context) { sw.RunAvailability(ctx, c.Availability) })
+		if dual != nil {
+			start(dual.RunReconciliation)
+		}
 	}
 	for range c.Workers {
 		if *role == "all" || *role == "voice" {

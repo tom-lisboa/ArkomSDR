@@ -164,6 +164,10 @@ func (s *Server) event(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &e) {
 		return
 	}
+	if s.DB.DualCalendar && (e.Kind == "booking.created" || e.Kind == "booking.rescheduled" || e.Kind == "booking.cancelled") {
+		write(w, 422, map[string]string{"error": "booking_event_owned_by_scheduling_worker"})
+		return
+	}
 	if ok, inserted := s.submit(w, r, e); ok {
 		write(w, 202, map[string]any{"event_id": e.ID, "duplicate": !inserted, "mode": s.Mode})
 	}

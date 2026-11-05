@@ -63,7 +63,7 @@ func (d *DB) ReserveTestForm(ctx context.Context, id, submission, phone, slotID,
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return empty, false, err
 	}
-	b, duplicate, err := reserveFormSlot(ctx, tx, key, *lead, slotID, f, mode)
+	b, duplicate, err := reserveFormSlot(ctx, tx, key, *lead, slotID, f, mode, d.DualCalendar)
 	if err != nil {
 		return empty, false, err
 	}
@@ -75,7 +75,7 @@ func (d *DB) ReserveTestForm(ctx context.Context, id, submission, phone, slotID,
 	return b, duplicate, tx.Commit(ctx)
 }
 
-func reserveFormSlot(ctx context.Context, tx pgx.Tx, key, lead, slotID string, profile domain.Form, mode string) (domain.Booking, bool, error) {
+func reserveFormSlot(ctx context.Context, tx pgx.Tx, key, lead, slotID string, profile domain.Form, mode string, dual bool) (domain.Booking, bool, error) {
 	var empty domain.Booking
 	var raw []byte
 	var lease *time.Time
@@ -100,6 +100,19 @@ func reserveFormSlot(ctx context.Context, tx pgx.Tx, key, lead, slotID string, p
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return empty, false, err
+	}
+	if dual {
+		var priorSlot string
+		err = tx.QueryRow(ctx, `SELECT payload->'slot'->>'id' FROM bia_go.jobs WHERE id=$1 AND lead_id=$2`, "booking-event/"+key, lead).Scan(&priorSlot)
+		if err == nil {
+			if priorSlot != slotID {
+				return empty, false, ErrConflict
+			}
+			return empty, true, nil
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return empty, false, err
+		}
 	}
 	if lease != nil && lease.After(time.Now()) {
 		return empty, false, &FormBookingError{"contact_busy"}
@@ -129,6 +142,12 @@ func reserveFormSlot(ctx context.Context, tx pgx.Tx, key, lead, slotID string, p
 	if err = tx.QueryRow(ctx, `SELECT starts_at,ends_at,closer_id FROM bia_go.slots WHERE id=$1`, slotID).Scan(&slot.Start, &slot.End, &slot.CloserID); errors.Is(err, pgx.ErrNoRows) {
 		return empty, false, &FormBookingError{"slot_not_found"}
 	} else if err != nil {
+		return empty, false, err
+	}
+	if dual {
+		fx := domain.Effect{ID: "booking-event/" + key, LeadID: lead, Kind: "book", Purpose: "form_booking", Slot: &slot, Due: time.Now().UTC(), Expires: time.Now().Add(24 * time.Hour)}
+		payload, _ := json.Marshal(fx)
+		_, err = tx.Exec(ctx, `INSERT INTO bia_go.jobs(id,lead_id,kind,mode,payload,fingerprint,due_at) VALUES($1,$2,'effect',$3,$4,$5,now())`, fx.ID, lead, mode, payload, hash(payload))
 		return empty, false, err
 	}
 	b, err := providers.BookLocalTx(ctx, tx, key, state, slot, nil)
