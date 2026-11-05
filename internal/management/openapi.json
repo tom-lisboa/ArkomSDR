@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Arkom SDR Management API",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "description": "Backend da equipe. Isolado do token interno do SDR. Autenticação por sessão Bearer de 12h. Todas as datas em RFC3339; métricas de taxa são frações e denominadores vazios retornam null. Nenhuma interface frontend é fornecida."
   },
   "servers": [
@@ -3343,7 +3343,7 @@
       "post": {
         "summary": "Iniciar conexão Google",
         "operationId": "post__integrations_google_authorize",
-        "description": "Permissão mínima: operator. Cria tentativa única de dez minutos vinculada à sessão. Navegue no mesmo navegador para authorization_url. Não envie Bearer para essa URL nem diretamente ao Google. Não altera reservas.",
+        "description": "Permissão mínima: operator. Sem account_id, adiciona uma conta Google sem substituir as existentes. Com account_id, reconecta exclusivamente aquela conta e rejeita outra identidade. Google solicita escolha de conta, consentimento para calendarList, openid e email. Reautorizar a mesma identidade não cria duplicata. Tentativa expira em dez minutos e é vinculada à sessão; uma tentativa nova invalida a anterior. Navegue para authorization_url no mesmo navegador.",
         "responses": {
           "400": {
             "description": "Retorno inválido, expirado, recusado ou já utilizado",
@@ -3422,6 +3422,16 @@
                 "schema": {
                   "$ref": "#/components/schemas/GoogleAuthorization"
                 }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleAccountRequest"
               }
             }
           }
@@ -3540,7 +3550,7 @@
       "get": {
         "summary": "Receber autorização do Google",
         "operationId": "get__integrations_google_callback",
-        "description": "Callback oficial: https://sdk.arkom.ai/v1/management/integrations/google/callback. Navegação pública protegida por state de uso único, PKCE e cookie do navegador. Vinculada à sessão e papel originais, nunca a um usuário informado na URL. Responde HTML para navegação e JSON nos demais casos. Tokens são cifrados no servidor e não são devolvidos ao frontend. Ainda não sincroniza reservas.",
+        "description": "Callback oficial: https://sdk.arkom.ai/v1/management/integrations/google/callback. Navegação pública protegida por state de uso único, PKCE e cookie do navegador. Vinculada à sessão e papel originais, nunca a um usuário informado na URL. Responde HTML para navegação e JSON nos demais casos. Tokens são cifrados no servidor e não são devolvidos ao frontend. Ainda não sincroniza reservas. A identidade é obtida no endpoint HTTPS UserInfo do Google e precisa ter e-mail verificado. Tokens são cifrados com vínculo ao usuário e ao ID da conta. Reconectar com outro Google subject retorna google_account_mismatch sem alterar a conta anterior.",
         "responses": {
           "400": {
             "description": "Retorno inválido, expirado, recusado ou já utilizado",
@@ -3630,6 +3640,12 @@
                       "enum": [
                         false
                       ]
+                    },
+                    "account_id": {
+                      "type": "string"
+                    },
+                    "account_email": {
+                      "type": "string"
                     }
                   }
                 }
@@ -3686,7 +3702,7 @@
       "get": {
         "summary": "Consultar conexão Google",
         "operationId": "get__integrations_google_status",
-        "description": "Permissão mínima: viewer. Retorna somente a conexão do usuário da sessão e se o servidor está configurado. Não retorna tokens. Sincronização de reservas permanece desativada.",
+        "description": "Permissão mínima: viewer. Retorna todas as contas do usuário autenticado em accounts, com IDs e e-mails verificados, sem tokens ou subject Google. As propriedades anteriores de conexão única são mantidas quando há uma conta. synchronization_enabled permanece false.",
         "responses": {
           "400": {
             "description": "Retorno inválido, expirado, recusado ou já utilizado",
@@ -3775,7 +3791,7 @@
       "get": {
         "summary": "Listar agendas conectadas",
         "operationId": "get__integrations_google_calendars",
-        "description": "Permissão mínima: operator. Consulta read-only de calendarList. Renova o token quando necessário e persiste refresh token rotacionado antes da consulta. Só acessa a própria conexão.",
+        "description": "Permissão mínima: operator. Liste as agendas de uma conta do próprio vendedor usando account_id. Sem o parâmetro, só funciona quando existe uma única conta; com várias, responde 422 google_account_id_required. Paginação e renovação de token são isoladas por conta. Não consulta conflitos ou eventos e não agenda reuniões.",
         "responses": {
           "400": {
             "description": "Retorno inválido, expirado, recusado ou já utilizado",
@@ -3861,6 +3877,15 @@
         "parameters": [
           {
             "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 80
+            }
+          },
+          {
+            "in": "query",
             "name": "page_token",
             "required": false,
             "schema": {
@@ -3875,7 +3900,7 @@
       "post": {
         "summary": "Desconectar Google no SDR",
         "operationId": "post__integrations_google_disconnect",
-        "description": "Permissão mínima: operator. Remove tokens locais e tentativas pendentes do próprio usuário. Não revoga no Google a concessão inteira do aplicativo e não apaga eventos ou reservas.",
+        "description": "Permissão mínima: operator. Remove somente account_id do próprio usuário. Sem account_id, funciona apenas quando há zero ou uma conta; com várias retorna 422 e não remove nada. As demais contas são preservadas. Tentativas OAuth pendentes do usuário são invalidadas para impedir restauração por callback antigo. A revogação no Google é separada.",
         "responses": {
           "400": {
             "description": "Retorno inválido, expirado, recusado ou já utilizado",
@@ -3954,6 +3979,16 @@
                 "schema": {
                   "$ref": "#/components/schemas/GoogleDisconnected"
                 }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleAccountRequest"
               }
             }
           }
@@ -5515,7 +5550,9 @@
           "configured",
           "connected",
           "redirect_uri",
-          "synchronization_enabled"
+          "synchronization_enabled",
+          "account_count",
+          "accounts"
         ],
         "properties": {
           "configured": {
@@ -5523,7 +5560,7 @@
           },
           "connected": {
             "type": "boolean",
-            "description": "Concessão armazenada localmente; não comprova validade atual no Google."
+            "description": "Existe pelo menos uma concessão armazenada para o usuário. A validade no Google é verificada ao consultar agendas."
           },
           "redirect_uri": {
             "type": "string",
@@ -5547,6 +5584,16 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "account_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoogleAccount"
             }
           }
         }
@@ -5582,7 +5629,8 @@
         "type": "object",
         "required": [
           "items",
-          "next_page_token"
+          "next_page_token",
+          "account_id"
         ],
         "properties": {
           "items": {
@@ -5592,6 +5640,9 @@
             }
           },
           "next_page_token": {
+            "type": "string"
+          },
+          "account_id": {
             "type": "string"
           }
         }
@@ -5604,9 +5655,68 @@
         "properties": {
           "connected": {
             "type": "boolean",
-            "enum": [
-              false
-            ]
+            "description": "Ainda resta alguma conta conectada após a remoção desta conta."
+          },
+          "account_id": {
+            "type": "string"
+          },
+          "account_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "GoogleAccountRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "maxLength": 80,
+            "description": "ID de uma conta retornada por status; nunca um ID de outro vendedor."
+          }
+        }
+      },
+      "GoogleAccount": {
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "connected_at",
+          "updated_at",
+          "token_expires_at",
+          "scopes",
+          "requires_reconnect"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "description": "E-mail verificado pelo Google. Vazio apenas em concessões migradas sem identidade."
+          },
+          "connected_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "token_expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "requires_reconnect": {
+            "type": "boolean",
+            "description": "Concessão anterior que precisa de reconexão para identificar a conta."
           }
         }
       }

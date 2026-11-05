@@ -27,8 +27,16 @@ type googleFlow struct {
 }
 
 func beginGoogle(t *testing.T, f panelFixture) googleFlow {
+	return beginGoogleAccount(t, f, "")
+}
+
+func beginGoogleAccount(t *testing.T, f panelFixture, account string) googleFlow {
 	t.Helper()
-	out := panelCall(t, f, "POST", "/integrations/google/authorize", nil, "")
+	var body any
+	if account != "" {
+		body = map[string]any{"account_id": account}
+	}
+	out := panelCall(t, f, "POST", "/integrations/google/authorize", body, "")
 	v := decodeMap(t, out)
 	u, err := url.Parse(v["authorization_url"].(string))
 	if err != nil || u.Host != "sdk.arkom.ai" {
@@ -89,7 +97,7 @@ func TestGoogleOAuthCallbackRefreshIsolationAndDisconnect(t *testing.T) {
 				if r.Form.Get("code") != "test-code" || r.Form.Get("redirect_uri") != googlecalendar.DefaultRedirectURL || oauth2.S256ChallengeFromVerifier(r.Form.Get("code_verifier")) != challenge {
 					t.Fatal("invalid code exchange or PKCE")
 				}
-				body = `{"access_token":"access-secret","refresh_token":"refresh-secret","token_type":"Bearer","expires_in":3600,"scope":"` + googlecalendar.CalendarListScope + `"}`
+				body = `{"access_token":"access-secret","refresh_token":"refresh-secret","token_type":"Bearer","expires_in":3600,"scope":"` + googlecalendar.CalendarListScope + ` openid email"}`
 			} else {
 				refreshes.Add(1)
 				if r.Form.Get("refresh_token") != "refresh-secret" {
@@ -97,6 +105,8 @@ func TestGoogleOAuthCallbackRefreshIsolationAndDisconnect(t *testing.T) {
 				}
 				body = `{"access_token":"rotated-access","refresh_token":"rotated-refresh","token_type":"Bearer","expires_in":3600}`
 			}
+		case "openidconnect.googleapis.com":
+			body = `{"sub":"google-account-one","email":"agenda@example.com","email_verified":true}`
 		case "www.googleapis.com":
 			lists.Add(1)
 			if r.URL.Path != "/calendar/v3/users/me/calendarList" || r.URL.Query().Get("pageToken") != "page-two" || r.Header.Get("Authorization") != "Bearer rotated-access" {
@@ -126,11 +136,12 @@ func TestGoogleOAuthCallbackRefreshIsolationAndDisconnect(t *testing.T) {
 		t.Fatal(status)
 	}
 	var credential []byte
-	if err = db.Pool.QueryRow(context.Background(), `SELECT credential FROM bia_go.google_connections WHERE user_id=$1`, f.user.ID).Scan(&credential); err != nil || bytes.Contains(credential, []byte("secret")) {
+	var accountID string
+	if err = db.Pool.QueryRow(context.Background(), `SELECT id,credential FROM bia_go.google_accounts WHERE user_id=$1`, f.user.ID).Scan(&accountID, &credential); err != nil || bytes.Contains(credential, []byte("secret")) {
 		t.Fatal("plaintext token in database", err)
 	}
 	// Expire the encrypted access token to exercise the actual refresh path.
-	raw, err := client.Open("token:"+f.user.ID, credential)
+	raw, err := client.Open("account:"+f.user.ID+":"+accountID, credential)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,18 +151,18 @@ func TestGoogleOAuthCallbackRefreshIsolationAndDisconnect(t *testing.T) {
 	}
 	token.Expiry = time.Now().Add(-time.Hour)
 	raw, _ = json.Marshal(token)
-	credential, _ = client.Seal("token:"+f.user.ID, raw)
-	if _, err = db.Pool.Exec(context.Background(), `UPDATE bia_go.google_connections SET credential=$2 WHERE user_id=$1`, f.user.ID, credential); err != nil {
+	credential, _ = client.Seal("account:"+f.user.ID+":"+accountID, raw)
+	if _, err = db.Pool.Exec(context.Background(), `UPDATE bia_go.google_accounts SET credential=$2 WHERE user_id=$1`, f.user.ID, credential); err != nil {
 		t.Fatal(err)
 	}
 	out := panelCall(t, f, "GET", "/integrations/google/calendars?page_token=page-two", nil, "")
 	if out.Code != 200 || refreshes.Load() != 1 || lists.Load() != 1 || strings.Contains(out.Body.String(), "secret") || !strings.Contains(out.Body.String(), "page-three") {
 		t.Fatal(out.Code, out.Body.String())
 	}
-	if err = db.Pool.QueryRow(context.Background(), `SELECT credential FROM bia_go.google_connections WHERE user_id=$1`, f.user.ID).Scan(&credential); err != nil {
+	if err = db.Pool.QueryRow(context.Background(), `SELECT credential FROM bia_go.google_accounts WHERE user_id=$1`, f.user.ID).Scan(&credential); err != nil {
 		t.Fatal(err)
 	}
-	raw, _ = client.Open("token:"+f.user.ID, credential)
+	raw, _ = client.Open("account:"+f.user.ID+":"+accountID, credential)
 	if !bytes.Contains(raw, []byte("rotated-refresh")) {
 		t.Fatal("rotated refresh token was lost")
 	}
@@ -288,7 +299,7 @@ func TestGoogleRejectsIncompleteGrantsAndConsumesFailedExchanges(t *testing.T) {
 				t.Fatal("failed exchange replayed")
 			}
 			var grants int
-			if err := db.Pool.QueryRow(context.Background(), `SELECT count(*) FROM bia_go.google_connections`).Scan(&grants); err != nil || grants != 0 {
+			if err := db.Pool.QueryRow(context.Background(), `SELECT count(*) FROM bia_go.google_accounts`).Scan(&grants); err != nil || grants != 0 {
 				t.Fatal("incomplete grant saved", err)
 			}
 		})
@@ -306,6 +317,9 @@ func TestGoogleConcurrentCallbackOnlyExchangesOnce(t *testing.T) {
 	entered, release := make(chan struct{}), make(chan struct{})
 	var calls atomic.Int32
 	client.HTTP.Transport = googleTransport(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Host == "openidconnect.googleapis.com" {
+			return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"sub":"google-account-one","email":"agenda@example.com","email_verified":true}`)), Request: r}, nil
+		}
 		if calls.Add(1) == 1 {
 			close(entered)
 		}
@@ -314,7 +328,7 @@ func TestGoogleConcurrentCallbackOnlyExchangesOnce(t *testing.T) {
 		case <-r.Context().Done():
 			return nil, r.Context().Err()
 		}
-		body := `{"access_token":"a","refresh_token":"r","token_type":"Bearer","expires_in":3600,"scope":"` + googlecalendar.CalendarListScope + `"}`
+		body := `{"access_token":"a","refresh_token":"r","token_type":"Bearer","expires_in":3600,"scope":"` + googlecalendar.CalendarListScope + ` openid email"}`
 		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(body)), Request: r}, nil
 	})
 	flow := beginGoogle(t, f)

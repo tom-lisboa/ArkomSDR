@@ -55,7 +55,7 @@ func New(c Config) (*Client, error) {
 	}
 	return &Client{Config: c, OAuth: oauth2.Config{
 		ClientID: c.ClientID, ClientSecret: c.ClientSecret, RedirectURL: c.RedirectURL,
-		Scopes:   []string{CalendarListScope},
+		Scopes:   []string{CalendarListScope, "openid", "email"},
 		Endpoint: oauth2.Endpoint{AuthURL: "https://accounts.google.com/o/oauth2/v2/auth", TokenURL: "https://oauth2.googleapis.com/token", AuthStyle: oauth2.AuthStyleInParams},
 	}, HTTP: &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
@@ -65,7 +65,32 @@ func (c *Client) Context(ctx context.Context) context.Context {
 }
 
 func (c *Client) AuthorizationURL(state, verifier string) string {
-	return c.OAuth.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce, oauth2.S256ChallengeOption(verifier))
+	return c.OAuth.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.SetAuthURLParam("prompt", "consent select_account"), oauth2.S256ChallengeOption(verifier))
+}
+
+type Identity struct {
+	Subject       string `json:"sub"`
+	Email         string `json:"email"`
+	EmailVerified bool   `json:"email_verified"`
+}
+
+// Identity comes from Google's fixed HTTPS authority, never from browser data.
+func (c *Client) Identity(ctx context.Context, token *oauth2.Token) (Identity, error) {
+	var identity Identity
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://openidconnect.googleapis.com/v1/userinfo", nil)
+	if err != nil {
+		return identity, err
+	}
+	token.SetAuthHeader(req)
+	r, err := c.HTTP.Do(req)
+	if err != nil {
+		return identity, errors.New("google_identity_unavailable")
+	}
+	defer r.Body.Close()
+	if r.StatusCode != 200 || json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&identity) != nil || identity.Subject == "" || len(identity.Subject) > 255 || identity.Email == "" || len(identity.Email) > 320 || !identity.EmailVerified {
+		return Identity{}, errors.New("google_identity_unavailable")
+	}
+	return identity, nil
 }
 
 func (c *Client) Seal(subject string, value []byte) ([]byte, error) {

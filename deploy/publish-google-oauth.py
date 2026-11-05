@@ -52,7 +52,7 @@ if not str(previous).startswith('/opt/arkom-bia/releases/r-'):
     raise SystemExit('Unexpected active release path.')
 def compose(directory, *args, **kwargs):
     return subprocess.run(['docker','compose',*args],cwd=directory,check=True,**kwargs)
-sql = "SELECT (SELECT count(*) FROM bia_go.voice_requests WHERE state IN ('requesting','dialing','queued','initiated','ringing','in-progress'))+(SELECT count(*) FROM bia_go.jobs j JOIN bia_go.leads l ON l.id=j.lead_id WHERE j.status='running' AND l.lease_until>now())+(SELECT count(*) FROM bia_go.worker_tasks WHERE status='running' AND lease_until>now());"
+sql = "SELECT (SELECT count(*) FROM bia_go.voice_requests WHERE state IN ('requesting','dialing','queued','initiated','ringing','in-progress'))+(SELECT count(*) FROM bia_go.jobs j JOIN bia_go.leads l ON l.id=j.lead_id WHERE j.status='running' AND l.lease_until>now())+(SELECT count(*) FROM bia_go.worker_tasks WHERE status='running' AND lease_until>now())+(SELECT count(*) FROM bia_go.google_oauth_states WHERE started_at IS NOT NULL AND expires_at>now() AND (consumed_at IS NULL OR consumed_at>now()-interval '30 seconds'));"
 active = compose(previous,'exec','-T','postgres','psql','-U','bia','-d','bia','-Atc',sql,capture_output=True,text=True).stdout.strip()
 if active != '0':
     raise SystemExit('Active SDR work; retry after that operation finishes.')
@@ -116,7 +116,7 @@ try:
         subprocess.run(['sh','activate.sh'],cwd=destination,check=True)
     subprocess.run(['curl','--fail','--silent','--show-error','--retry','15','--retry-all-errors','--retry-delay','1','--max-time','5','http://127.0.0.1:8080/readyz'],check=True)
     version=compose(destination,'exec','-T','postgres','psql','-U','bia','-d','bia','-Atc','SELECT max(version) FROM bia_go.schema_versions;',capture_output=True,text=True).stdout.strip()
-    if version!='20':raise SystemExit('Unexpected database schema version after publishing.')
+    if (not configure_only and version!='21') or (configure_only and int(version)<20):raise SystemExit('Unexpected database schema version after publishing.')
 except BaseException:
     shutil.copy2(backup/'runtime.env',runtime)
     if configure_only:

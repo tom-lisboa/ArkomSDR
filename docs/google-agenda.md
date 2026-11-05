@@ -10,7 +10,7 @@ https://sdk.arkom.ai/v1/management/integrations/google/callback
 
 O endereço fixo para compartilhar com a equipe é **https://sdk.arkom.ai/conectar-agenda/**. A página é servida pelo backend Go e pode ser usada sem aguardar um botão no painel externo.
 
-Cada vendedor entra com seu próprio usuário do SDR (`operator` ou `admin`) e clica em **Conectar Google Agenda**. A autorização abre em outra aba. Depois de permitir o acesso no Google, ele volta à página para conferir a conexão e as agendas disponíveis. A página também permite renovar a autorização e desconectar a própria conta, com confirmação.
+Cada vendedor entra com seu próprio usuário do SDR (`operator` ou `admin`) e clica em **Adicionar conta Google**. A autorização abre em outra aba. Depois de permitir o acesso no Google, ele volta à página para conferir a conexão e as agendas disponíveis. Cada vendedor pode adicionar várias contas; cada conta pode conter várias agendas. A página identifica cada conta por e-mail e permite listar suas agendas, renovar sua autorização e desconectar somente aquela conta, com confirmação.
 
 O endereço é comum à equipe; a autorização gerada é individual e vinculada à sessão de quem entrou. A sessão do SDR permanece apenas na memória da página, sem armazenamento em `localStorage` ou `sessionStorage`. Recarregar a página exige entrar novamente. Nenhuma conta é conectada ou criada automaticamente.
 
@@ -74,10 +74,20 @@ O frontend deve navegar até a URL retornada por `authorize`, no mesmo navegador
 - Tentativas substituídas, logout, revogação de sessão e remoção local impedem concluir um retorno pendente. Consultas e operações da mesma conexão são serializadas durante as alterações de credenciais.
 - Refresh token rotacionado é salvo antes da consulta de agendas, inclusive se essa consulta posterior falhar.
 - O endpoint de desconexão remove a concessão do SDR. A revogação no Google é uma ação separada na própria conta.
-- O escopo atual é apenas `calendar.calendarlist.readonly`. **Sincronização de reuniões e disponibilidade não está implementada.** Os workers continuam usando a agenda própria no PostgreSQL.
+- Os escopos atuais são `calendar.calendarlist.readonly`, `openid` e `email`; a identidade é obtida no UserInfo HTTPS do Google e exige e-mail verificado. **Sincronização de reuniões e disponibilidade não está implementada.** Os workers continuam usando a agenda própria no PostgreSQL.
 
 ## Validação
 
 Os testes usam PostgreSQL isolado e um transporte Google simulado, sem autorização real ou chamadas à conta de um usuário. Cobrem PKCE, vínculo de navegador, replay e concorrência, recusa, expiração, sessão revogada, alteração de papel, concessões incompletas, isolamento, criptografia, renovação e remoção local. A publicação verifica que a rota existe e que os endpoints protegidos exigem sessão. O teste real de consentimento depende das credenciais e da autorização de uma conta Google.
 
 Referências: [OAuth web do Google](https://developers.google.com/identity/protocols/oauth2/web-server), [biblioteca OAuth2 para Go](https://pkg.go.dev/golang.org/x/oauth2) e [CalendarList](https://developers.google.com/workspace/calendar/api/v3/reference/calendarList/list).
+
+## Várias contas e compatibilidade
+
+A migração 21 guarda contas em `google_accounts`, com ID próprio e unicidade por vendedor, cliente OAuth e subject Google. Conexões antigas são copiadas uma vez com a cifra anterior e podem continuar listando calendários. Ao abrir o token, a cifra é atualizada para o contexto da conta. As credenciais antigas associadas à conexão migrada também são removidas quando ela é desconectada. O registro de migração impede que ela seja recriada em uma execução posterior.
+
+Nova autorização sem `account_id` adiciona uma identidade; a mesma identidade é atualizada sem duplicação. Para reconexão, forneça o ID alvo; outra identidade Google é rejeitada. `status` lista todas as contas e `account_count`. Para calendários e desconexão, use `account_id`; chamadas antigas sem ID só escolhem automaticamente quando há uma única conta. Com mais de uma, retornam `google_account_id_required`.
+
+A identidade (subject) não é enviada ao navegador. E-mail e ID da conexão são metadados da conta do próprio vendedor. Cada token novo é associado criptograficamente ao usuário e à conta, impedindo cópia de credenciais entre duas contas do mesmo usuário. Dados de identidade nunca são aceitos como entrada do frontend.
+
+**A conexão de várias contas não torna o SDR integrado à disponibilidade do Google.** O worker continua no calendário PostgreSQL. Não há consulta FreeBusy, calendário de destino escolhido, distribuição por disponibilidade nem criação de eventos Google nesta etapa.
